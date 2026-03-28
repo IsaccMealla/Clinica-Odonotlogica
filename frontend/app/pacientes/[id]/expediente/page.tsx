@@ -11,6 +11,8 @@ import { useRouter } from "next/navigation"
 import { TabEvaluacionGeneral } from "@/components/tabs-expediente/tab-evaluacion-general"
 import { TabOdontopediatria } from "@/components/tabs-expediente/tab-odontopediatria"
 import { TabPeriodoncia } from "@/components/tabs-expediente/tab-periodoncia"
+// NUEVO IMPORT: La pestaña gráfica del periodontograma
+import { TabPeriodontogramaGrafico } from "@/components/tabs-expediente/tab-periodontograma-grafico"
 
 export default function ExpedientePacientePage({ params }: { params: Promise<{ id: string }> }) {
     const router = useRouter();
@@ -172,7 +174,7 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
                                     <TabOdontopediatria formData={formData} onChange={handleInputChange} />
                                 </TabsContent>
 
-                                {/* 3. SUB-PESTAÑA: PERIODONCIA (Ya conectada) */}
+                                {/* 3. SUB-PESTAÑA: PERIODONCIA (Textos) */}
                                 <TabsContent value="periodoncia">
                                     <TabPeriodoncia formData={formData} onChange={handleInputChange} />
                                 </TabsContent>
@@ -181,16 +183,23 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
                     </Card>
                 </TabsContent>
 
-                {/* --- CONTENIDO: MODELOS 3D --- */}
+                {/* --- CONTENIDO: ODONTOGRAMA 3D --- */}
                 <TabsContent value="odontograma" className="mt-6">
                     <Card className="h-[600px] flex items-center justify-center bg-slate-900">
                         <p className="text-slate-400">Espacio reservado para Canvas de Three.js (Odontograma)</p>
                     </Card>
                 </TabsContent>
 
-                <TabsContent value="periodontograma" className="mt-6">
-                    <Card className="h-[600px] flex items-center justify-center bg-slate-900">
-                        <p className="text-slate-400">Espacio reservado para Canvas de Three.js (Periodontograma)</p>
+                {/* --- CONTENIDO: PERIODONTOGRAMA GRÁFICO (El nuevo) --- */}
+                <TabsContent value="periodontograma" className="mt-6 flex-1">
+                    <Card className="min-h-full border-rose-100 shadow-sm">
+                        <CardHeader className="bg-rose-50/50 border-b">
+                            <CardTitle className="text-rose-800">Periodontograma Gráfico</CardTitle>
+                            <CardDescription>Registro de márgenes, sondaje, placa y sangrado por pieza dental.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="p-6">
+                            <TabPeriodontogramaGrafico />
+                        </CardContent>
                     </Card>
                 </TabsContent>
 
