@@ -29,13 +29,13 @@ export default function LoginPage() {
 
     try {
       // Conexión real con tu backend en Django
-      const res = await fetch("http://localhost:8000/api/login/", {
+      const res = await fetch("/api/auth/login/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          username: formData.username,
+          email: formData.username,
           password: formData.password,
         }),
       })

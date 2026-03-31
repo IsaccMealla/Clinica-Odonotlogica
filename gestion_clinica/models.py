@@ -1,6 +1,62 @@
 import uuid
 from django.db import models
 from datetime import date
+from django.conf import settings
+from django.utils import timezone
+
+
+class RolePermission(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    role = models.CharField(max_length=20, choices=User.ROLE_CHOICES)
+    module = models.CharField(max_length=100)
+    can_view = models.BooleanField(default=False)
+    can_create = models.BooleanField(default=False)
+    can_edit = models.BooleanField(default=False)
+    can_delete = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ('role', 'module')
+        db_table = 'role_permissions'
+
+    def __str__(self):
+        return f"{self.role} - {self.module}"
+
+
+class AuditLog(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='audit_logs')
+    action = models.CharField(max_length=150)
+    module = models.CharField(max_length=100)
+    record_id = models.CharField(max_length=100, blank=True, null=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    ip_address = models.GenericIPAddressField(blank=True, null=True)
+
+    class Meta:
+        db_table = 'audit_logs'
+        ordering = ['-timestamp']
+
+    def __str__(self):
+        return f"{self.timestamp} - {self.user} - {self.action}"
+
+
+class UserSession(models.Model):
+    STATUS_CHOICES = [
+        ('active', 'Active'),
+        ('terminated', 'Terminated'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='sessions')
+    login_time = models.DateTimeField(auto_now_add=True)
+    ip_address = models.GenericIPAddressField(blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
+
+    class Meta:
+        db_table = 'user_sessions'
+
+    def __str__(self):
+        return f"{self.user.email} - {self.status} - {self.login_time}" 
+
 
 # 1. PACIENTE
 class Paciente(models.Model):
@@ -18,6 +74,7 @@ class Paciente(models.Model):
     ocupacion = models.CharField(max_length=150, blank=True, null=True)
     
     direccion = models.TextField(blank=True, null=True)
+    email = models.EmailField(blank=True, null=True)
     celular = models.CharField(max_length=20, blank=True, null=True)
     telefono = models.CharField(max_length=20, blank=True, null=True)
     
@@ -552,6 +609,51 @@ class ExamenClinicoFisico(models.Model):
     cuello = models.CharField(max_length=255, blank=True, null=True)
     ganglios_linfaticos = models.CharField(max_length=255, blank=True, null=True)
 
+    def __str__(self):
+        return f"Examen Clínico de {self.paciente}"
+
+    class Meta:
+        verbose_name = "Examen Clínico y Físico"
+        verbose_name_plural = "Exámenes Clínicos y Físicos"
+
+
+class MedicalImage(models.Model):
+    IMAGE_TYPES = [
+        ('dicom', 'DICOM'),
+        ('xray', 'X-ray'),
+        ('intraoral_photo', 'Intraoral photo'),
+        ('extraoral_photo', 'Extraoral photo'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    patient = models.ForeignKey(Paciente, on_delete=models.CASCADE, related_name='medical_images')
+    file = models.FileField(upload_to='medical_images/%Y/%m/%d/')
+    image_type = models.CharField(max_length=30, choices=IMAGE_TYPES, default='xray')
+    description = models.TextField(blank=True, null=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.patient} - {self.image_type} ({self.uploaded_at.date()})"
+
+
+class ClinicalAnimation(models.Model):
+    CATEGORIES = [
+        ('implant', 'Implant'),
+        ('orthodontics', 'Orthodontics'),
+        ('cleaning', 'Cleaning'),
+        ('extraction', 'Extraction'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True, null=True)
+    video_file = models.FileField(upload_to='clinical_animations/%Y/%m/%d/')
+    category = models.CharField(max_length=30, choices=CATEGORIES)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.title
+
     # --- EXAMEN DE LA ATM (Articulación Temporomandibular) ---
     lateralidad = models.BooleanField(default=False)
     lateralidad_obs = models.CharField(max_length=255, blank=True, null=True)
@@ -586,3 +688,250 @@ class ExamenClinicoFisico(models.Model):
     class Meta:
         verbose_name = "Examen Clínico y Físico"
         verbose_name_plural = "Exámenes Clínicos y Físicos"
+
+
+class DentalChair(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100, unique=True)
+    code = models.CharField(max_length=30, blank=True, null=True, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
+
+class Dentist(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    first_name = models.CharField(max_length=100)
+    last_name = models.CharField(max_length=100)
+    specialty = models.CharField(max_length=100, blank=True, null=True)
+    email = models.EmailField(blank=True, null=True)
+    cellphone = models.CharField(max_length=20, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.first_name} {self.last_name}"
+
+
+class Student(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    first_name = models.CharField(max_length=100)
+    last_name = models.CharField(max_length=100)
+    email = models.EmailField(blank=True, null=True)
+    cellphone = models.CharField(max_length=20, blank=True, null=True)
+    tutor = models.CharField(max_length=150, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.first_name} {self.last_name}"
+
+
+class Appointment(models.Model):
+    STATUS_SCHEDULED = 'scheduled'
+    STATUS_CONFIRMED = 'confirmed'
+    STATUS_COMPLETED = 'completed'
+    STATUS_CANCELLED = 'cancelled'
+    STATUS_NO_SHOW = 'no_show'
+
+    STATUS_CHOICES = [
+        (STATUS_SCHEDULED, 'Scheduled'),
+        (STATUS_CONFIRMED, 'Confirmed'),
+        (STATUS_COMPLETED, 'Completed'),
+        (STATUS_CANCELLED, 'Cancelled'),
+        (STATUS_NO_SHOW, 'No show'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    patient = models.ForeignKey(Paciente, on_delete=models.CASCADE, related_name='appointments')
+    dentist = models.ForeignKey(Dentist, on_delete=models.CASCADE, related_name='appointments')
+    student = models.ForeignKey(Student, on_delete=models.SET_NULL, null=True, blank=True, related_name='appointments')
+    chair = models.ForeignKey(DentalChair, on_delete=models.CASCADE, related_name='appointments')
+
+    appointment_date = models.DateField()
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    reason = models.TextField(blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_SCHEDULED)
+    check_in_time = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.patient} - {self.appointment_date} {self.start_time.strftime('%H:%M')}"
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.end_time <= self.start_time:
+            raise ValidationError({'end_time': 'El fin de cita debe ser posterior al inicio'})
+
+        overlap_filter = (
+            models.Q(appointment_date=self.appointment_date)
+            & models.Q(start_time__lt=self.end_time)
+            & models.Q(end_time__gt=self.start_time)
+            & models.Q(status__in=[self.STATUS_SCHEDULED, self.STATUS_CONFIRMED])
+            & (models.Q(chair=self.chair) | models.Q(dentist=self.dentist))
+        )
+
+        conflicts = Appointment.objects.filter(overlap_filter).exclude(pk=self.pk)
+        if conflicts.exists():
+            raise ValidationError('La cita se superpone con otra para el mismo sillón o dentista')
+
+    def save(self, *args, **kwargs):
+        from django.core.exceptions import ValidationError
+        # Verificar superposición antes de guardar
+        self.clean()
+
+        previous_status = None
+        if self.pk:
+            try:
+                previous_status = Appointment.objects.get(pk=self.pk).status
+            except Appointment.DoesNotExist:
+                previous_status = None
+
+        super().save(*args, **kwargs)
+
+        if previous_status != self.STATUS_NO_SHOW and self.status == self.STATUS_NO_SHOW:
+            p = self.patient
+            p.no_show_count = (p.no_show_count or 0) + 1
+            if p.no_show_count >= 3:
+                p.no_show_status = 'flagged'
+            elif p.no_show_count >= 2:
+                p.no_show_status = 'warning'
+            else:
+                p.no_show_status = 'none'
+            p.save()
+
+        if self.status in [self.STATUS_COMPLETED, self.STATUS_CANCELLED, self.STATUS_CONFIRMED, self.STATUS_SCHEDULED]:
+            # actualizar estado del paciente si fue corregido manualmente
+            p = self.patient
+            if p.no_show_count >= 3:
+                p.no_show_status = 'flagged'
+                p.save()
+            elif p.no_show_count >= 2:
+                p.no_show_status = 'warning'
+                p.save()
+
+    @property
+    def minutes_waiting(self):
+        if not self.check_in_time:
+            return 0
+        from django.utils import timezone
+        delta = timezone.now() - self.check_in_time
+        return int(delta.total_seconds() // 60)
+
+
+class Subject(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=150, unique=True)
+    description = models.TextField(blank=True, null=True)
+    semester = models.CharField(max_length=50)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.semester})"
+
+
+class AcademicGroup(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='groups')
+    group_name = models.CharField(max_length=100)
+    teacher = models.ForeignKey(Dentist, on_delete=models.SET_NULL, null=True, blank=True, related_name='academic_groups')
+    semester = models.CharField(max_length=50)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('subject', 'group_name', 'semester')
+
+    def __str__(self):
+        return f"{self.group_name} - {self.subject.name} ({self.semester})"
+
+
+class StudentGroup(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='student_groups')
+    group = models.ForeignKey(AcademicGroup, on_delete=models.CASCADE, related_name='student_groups')
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('student', 'group')
+
+    def __str__(self):
+        return f"{self.student} in {self.group}"
+
+
+class PatientAssignment(models.Model):
+    STATUS_ACTIVE = 'active'
+    STATUS_COMPLETED = 'completed'
+    STATUS_CANCELLED = 'cancelled'
+
+    STATUS_CHOICES = [
+        (STATUS_ACTIVE, 'Active'),
+        (STATUS_COMPLETED, 'Completed'),
+        (STATUS_CANCELLED, 'Cancelled'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    patient = models.ForeignKey(Paciente, on_delete=models.CASCADE, related_name='assignments')
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='assignments')
+    supervising_teacher = models.ForeignKey(Dentist, on_delete=models.SET_NULL, null=True, blank=True, related_name='supervised_assignments')
+    treatment_area = models.CharField(max_length=150)
+    assigned_date = models.DateField(auto_now_add=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_ACTIVE)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-assigned_date']
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+
+        if self.status == self.STATUS_ACTIVE:
+            conflict = PatientAssignment.objects.filter(
+                patient=self.patient,
+                treatment_area__iexact=self.treatment_area,
+                status=self.STATUS_ACTIVE,
+            ).exclude(pk=self.pk).exists()
+            if conflict:
+                raise ValidationError('El paciente ya tiene una asignación activa para esta área de tratamiento.')
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.patient} -> {self.student} ({self.treatment_area}) [{self.status}]"
+
+
+class TeacherApproval(models.Model):
+    STATUS_APPROVED = 'approved'
+    STATUS_REJECTED = 'rejected'
+    STATUS_PENDING = 'pending'
+
+    STATUS_CHOICES = [
+        (STATUS_APPROVED, 'Approved'),
+        (STATUS_REJECTED, 'Rejected'),
+        (STATUS_PENDING, 'Pending'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    assignment = models.ForeignKey(PatientAssignment, on_delete=models.CASCADE, related_name='approvals')
+    teacher = models.ForeignKey(Dentist, on_delete=models.SET_NULL, null=True, blank=True, related_name='approvals')
+    approval_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    approval_date = models.DateTimeField(blank=True, null=True)
+    digital_signature = models.TextField(blank=True, null=True)
+    comments = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        from django.utils import timezone
+
+        if self.approval_status in [self.STATUS_APPROVED, self.STATUS_REJECTED] and not self.approval_date:
+            self.approval_date = timezone.now()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Approval {self.assignment} by {self.teacher} -> {self.approval_status}"
+
+
+# Agregar campos de no-show al paciente (conservamos histórico)
+Paciente.add_to_class('no_show_count', models.PositiveSmallIntegerField(default=0))
+Paciente.add_to_class('no_show_status', models.CharField(max_length=20, default='none', choices=[('none', 'None'), ('warning', 'Warning'), ('flagged', 'Flagged')]))

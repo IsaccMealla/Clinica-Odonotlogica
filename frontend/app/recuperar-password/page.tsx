@@ -22,7 +22,7 @@ export default function RecuperarPasswordPage() {
 
     try {
       // Petición REAL a tu backend de Django
-      const res = await fetch("http://localhost:8000/api/recuperar-password/", {
+      const res = await fetch("/api/auth/reset-password/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

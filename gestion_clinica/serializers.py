@@ -12,8 +12,21 @@ from .models import (
     ProstodonciaRemovible,
     ProstodonciaFija,
     ProtocoloQuirurgico,
-    ExamenClinicoFisico
-)
+    ExamenClinicoFisico,
+    DentalChair,
+    Dentist,
+    Student,
+    Appointment,
+    MedicalImage,
+    ClinicalAnimation,    Subject,
+    AcademicGroup,
+    StudentGroup,
+    PatientAssignment,
+    TeacherApproval,
+    User,
+    RolePermission,
+    AuditLog,
+    UserSession,)
 
 # 1. Serializers Individuales (Hijos)
 # -------------------------------------------------------------------------
@@ -81,6 +94,139 @@ class ExamenClinicoFisicoSerializer(serializers.ModelSerializer):
         exclude = ('paciente',)
 
 
+class DentalChairSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DentalChair
+        fields = '__all__'
+
+
+class DentistSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Dentist
+        fields = '__all__'
+
+
+class StudentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Student
+        fields = '__all__'
+
+
+class AppointmentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Appointment
+        fields = '__all__'
+
+
+class MedicalImageSerializer(serializers.ModelSerializer):
+    file_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MedicalImage
+        fields = ['id', 'patient', 'file', 'file_url', 'image_type', 'description', 'uploaded_at']
+        read_only_fields = ['uploaded_at']
+
+    def get_file_url(self, obj):
+        request = self.context.get('request')
+        if request is None:
+            return obj.file.url
+        return request.build_absolute_uri(obj.file.url)
+
+
+class ClinicalAnimationSerializer(serializers.ModelSerializer):
+    video_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ClinicalAnimation
+        fields = ['id', 'title', 'description', 'video_file', 'video_url', 'category', 'created_at']
+        read_only_fields = ['created_at']
+
+    def get_video_url(self, obj):
+        request = self.context.get('request')
+        if request is None:
+            return obj.video_file.url
+        return request.build_absolute_uri(obj.video_file.url)
+
+
+class SubjectSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Subject
+        fields = '__all__'
+
+
+class AcademicGroupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AcademicGroup
+        fields = '__all__'
+
+
+class StudentGroupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StudentGroup
+        fields = '__all__'
+
+
+class PatientAssignmentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PatientAssignment
+        fields = '__all__'
+
+    def validate(self, attrs):
+        patient = attrs.get('patient')
+        treatment_area = attrs.get('treatment_area')
+        status = attrs.get('status', PatientAssignment.STATUS_ACTIVE)
+        assignment_id = self.instance.id if self.instance else None
+
+        if status == PatientAssignment.STATUS_ACTIVE and patient and treatment_area:
+            conflict = PatientAssignment.objects.filter(
+                patient=patient,
+                treatment_area__iexact=treatment_area,
+                status=PatientAssignment.STATUS_ACTIVE,
+            )
+            if assignment_id:
+                conflict = conflict.exclude(pk=assignment_id)
+            if conflict.exists():
+                raise serializers.ValidationError('El paciente ya tiene una asignación activa para esta área de tratamiento.')
+
+        return attrs
+
+
+class TeacherApprovalSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TeacherApproval
+        fields = '__all__'
+
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'name', 'email', 'role', 'is_active', 'is_staff', 'created_at', 'last_login']
+        read_only_fields = ['id', 'created_at', 'last_login']
+
+
+class RolePermissionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RolePermission
+        fields = ['id', 'role', 'module', 'can_view', 'can_create', 'can_edit', 'can_delete']
+        read_only_fields = ['id']
+
+
+class AuditLogSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+
+    class Meta:
+        model = AuditLog
+        fields = ['id', 'user', 'action', 'module', 'record_id', 'timestamp', 'ip_address']
+
+
+class UserSessionSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+
+    class Meta:
+        model = UserSession
+        fields = ['id', 'user', 'login_time', 'ip_address', 'status']
+
+
 # 2. Serializer Principal (Maestro)
 # -------------------------------------------------------------------------
 
@@ -110,7 +256,7 @@ class PacienteSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'ci', 'nombres', 'apellido_paterno', 'apellido_materno', 
             'sexo', 'fecha_nacimiento', 'lugar_nacimiento', 'estado_civil', 
-            'ocupacion', 'direccion', 'celular', 'telefono', 
+            'ocupacion', 'direccion', 'email', 'celular', 'telefono', 
             'contacto_emergencia', 'telefono_emergencia', 
             'fecha_ultima_consulta', 'motivo_ultima_consulta', 
             'activo', 'edad',

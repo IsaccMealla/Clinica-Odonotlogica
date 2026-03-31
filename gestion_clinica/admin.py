@@ -12,7 +12,11 @@ from .models import (
     ProstodonciaRemovible,
     ProstodonciaFija,
     ProtocoloQuirurgico,
-    ExamenClinicoFisico
+    ExamenClinicoFisico,
+    User,
+    RolePermission,
+    AuditLog,
+    UserSession,
 )
 
 # Registramos el modelo principal
@@ -31,3 +35,9 @@ admin.site.register(ProstodonciaRemovible)
 admin.site.register(ProstodonciaFija)
 admin.site.register(ProtocoloQuirurgico)
 admin.site.register(ExamenClinicoFisico)
+
+# Modelos de seguridad y accesos
+admin.site.register(User)
+admin.site.register(RolePermission)
+admin.site.register(AuditLog)
+admin.site.register(UserSession)
