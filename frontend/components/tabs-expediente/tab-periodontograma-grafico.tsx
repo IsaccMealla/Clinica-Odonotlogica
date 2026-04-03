@@ -5,7 +5,6 @@ import { SuperiorPalatino } from "./periodontograma/SuperiorPalatino";
 import { SuperiorVestibular } from "./periodontograma/SuperiorVestibular";
 import { InferiorVestibular } from "./periodontograma/InferiorVestibular";
 import { InferiorPalatino } from "./periodontograma/InferiorPalatino";
-//import { InferiorLingual } from "./periodontograma/InferiorLingual";
 
 export function TabPeriodontogramaGrafico() {
   return (

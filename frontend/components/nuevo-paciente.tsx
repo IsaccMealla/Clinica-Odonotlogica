@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -22,8 +21,12 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 
-export function NuevoPaciente() {
-  const router = useRouter()
+// 👇 Interfaz
+interface NuevoPacienteProps {
+  onPacienteCreado?: () => void;
+}
+
+export function NuevoPaciente({ onPacienteCreado }: NuevoPacienteProps) {
   const [abierto, setAbierto] = useState(false)
   const [cargando, setCargando] = useState(false)
 
@@ -40,21 +43,18 @@ export function NuevoPaciente() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let { name, value } = e.target;
 
-    // Validación: Solo letras para nombres, apellidos y textos
     if (['nombres', 'apellido_paterno', 'apellido_materno', 'lugar_nacimiento', 'ocupacion', 'contacto_emergencia'].includes(name)) {
       const soloLetras = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]*$/;
       if (!soloLetras.test(value)) return;
       value = value.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
     }
 
-    // Validación: CI (Alfanumérico sin símbolos)
     if (name === "ci") {
       const ciRegex = /^[a-zA-Z0-9]*$/;
       if (!ciRegex.test(value)) return;
       value = value.toUpperCase();
     }
 
-    // Validación: Teléfonos (Solo números y signos básicos)
     if (['celular', 'telefono', 'telefono_emergencia'].includes(name)) {
       const soloTel = /^[0-9\+\-\s]*$/;
       if (!soloTel.test(value)) return;
@@ -71,21 +71,29 @@ export function NuevoPaciente() {
     e.preventDefault()
     setCargando(true)
 
-    // Limpieza de datos antes de enviar
     const dataToSend = { ...formData };
     if (!dataToSend.fecha_ultima_consulta) delete dataToSend.fecha_ultima_consulta;
 
     try {
+      // 👇 Obtenemos el token
+      const token = localStorage.getItem("access_token") || "";
+
       const res = await fetch("http://localhost:8000/api/pacientes/", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}` // Lo enviamos
+        },
         body: JSON.stringify(dataToSend),
       })
 
       if (res.ok) {
         setAbierto(false)
-        router.refresh()
-        // Reset del formulario
+        // 👇 Llamamos a la recarga de tabla en vez de router.refresh()
+        if (onPacienteCreado) {
+          onPacienteCreado();
+        }
+        
         setFormData({
           ci: "", nombres: "", apellido_paterno: "", apellido_materno: "", sexo: "", fecha_nacimiento: "",
           lugar_nacimiento: "", estado_civil: "", ocupacion: "", direccion: "", celular: "", telefono: "",

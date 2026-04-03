@@ -1,4 +1,6 @@
 from rest_framework import serializers
+from django.contrib.auth import get_user_model
+from django.contrib.auth.hashers import make_password
 from .models import (
     Paciente, 
     AntecedentePatologicoFamiliar, 
@@ -15,8 +17,40 @@ from .models import (
     ExamenClinicoFisico
 )
 
+User = get_user_model()
+
+# =========================================================================
+# 0. Serializer de Usuarios (Personal de la Clínica)
+# =========================================================================
+
+class UsuarioSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        # 👇 ¡AQUÍ ESTÁ LA CLAVE! Agregamos 'rol' a los fields 👇
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'rol', 'password']
+        extra_kwargs = {
+            'password': {'write_only': True},
+            'username': {'required': False} # Le decimos a Django que no obligue al frontend a enviarlo
+        }
+
+    def create(self, validated_data):
+        # Si el frontend no envía 'username', copiamos el 'email' en ese campo
+        if 'username' not in validated_data:
+            validated_data['username'] = validated_data.get('email')
+
+        # Encriptamos la contraseña
+        if 'password' in validated_data:
+             validated_data['password'] = make_password(validated_data.get('password'))
+        return super().create(validated_data)
+        
+    def update(self, instance, validated_data):
+        # Manejamos la actualización, asegurando que si envían password, se encripte
+        if 'password' in validated_data:
+            validated_data['password'] = make_password(validated_data.pop('password'))
+        return super().update(instance, validated_data)
+# =========================================================================
 # 1. Serializers Individuales (Hijos)
-# -------------------------------------------------------------------------
+# =========================================================================
 
 class AntecedenteFamiliarSerializer(serializers.ModelSerializer):
     class Meta:
@@ -37,8 +71,6 @@ class AntecedenteGinecologicoSerializer(serializers.ModelSerializer):
     class Meta:
         model = AntecedenteGinecologico
         exclude = ('paciente', 'creado_en', 'actualizado_en')
-
-# --- NUEVOS SERIALIZADORES ---
 
 class HabitosSerializer(serializers.ModelSerializer):
     class Meta:
@@ -81,18 +113,16 @@ class ExamenClinicoFisicoSerializer(serializers.ModelSerializer):
         exclude = ('paciente',)
 
 
+# =========================================================================
 # 2. Serializer Principal (Maestro)
-# -------------------------------------------------------------------------
+# =========================================================================
 
 class PacienteSerializer(serializers.ModelSerializer):
-    # Usamos los related_name definidos en tus modelos
-    # read_only=True porque los antecedentes suelen tener su propio flujo de guardado post-registro
     antecedentes_familiares = AntecedenteFamiliarSerializer(read_only=True)
     antecedentes_personales = AntecedentePersonalSerializer(read_only=True)
     antecedentes_no_patologicos = AntecedenteNoPatologicoSerializer(read_only=True)
     antecedentes_ginecologicos = AntecedenteGinecologicoSerializer(read_only=True)
     
-    # --- NUEVAS RELACIONES ---
     habitos = HabitosSerializer(read_only=True)
     antecedentes_periodontales = AntecedentesPeriodontalesSerializer(read_only=True)
     examen_periodontal = ExamenPeriodontalSerializer(read_only=True)
@@ -102,7 +132,6 @@ class PacienteSerializer(serializers.ModelSerializer):
     protocolo_quirurgico = ProtocoloQuirurgicoSerializer(read_only=True)
     examen_clinico_fisico = ExamenClinicoFisicoSerializer(read_only=True)
     
-    # Campo calculado en el modelo (recuerda tener el método @property edad en tu modelo)
     edad = serializers.ReadOnlyField()
 
     class Meta:
@@ -114,6 +143,7 @@ class PacienteSerializer(serializers.ModelSerializer):
             'contacto_emergencia', 'telefono_emergencia', 
             'fecha_ultima_consulta', 'motivo_ultima_consulta', 
             'activo', 'edad',
+            'estudiante_asignado',
             
             # Relaciones anidadas
             'antecedentes_familiares', 
@@ -131,10 +161,5 @@ class PacienteSerializer(serializers.ModelSerializer):
         ]
 
     def to_representation(self, instance):
-        """
-        Este método ayuda a que si un antecedente no existe (es None), 
-        el frontend reciba un objeto vacío o null de forma limpia.
-        """
         ret = super().to_representation(instance)
-        # Opcional: Podrías forzar valores por defecto aquí si fuera necesario
         return ret

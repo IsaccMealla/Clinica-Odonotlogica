@@ -1,26 +1,38 @@
 "use client"
-import { Trash2, RotateCcw } from "lucide-react"
+import { Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
-import { useRouter } from "next/navigation"
 
-export function EliminarPaciente({ id, nombre, esLogico = true }: { id: string, nombre: string, esLogico?: boolean }) {
-  const router = useRouter()
+// 👇 Interfaz
+interface EliminarPacienteProps {
+  id: string;
+  nombre: string;
+  esLogico?: boolean;
+  onRefresh?: () => void;
+}
+
+export function EliminarPaciente({ id, nombre, esLogico = true, onRefresh }: EliminarPacienteProps) {
 
   const handleEliminar = async () => {
     const url = esLogico 
-      ? `http://localhost:8000/api/pacientes/${id}/` // PATCH activo=false
-      : `http://localhost:8000/api/pacientes/${id}/`; // DELETE físico
+      ? `http://localhost:8000/api/pacientes/${id}/` 
+      : `http://localhost:8000/api/pacientes/${id}/`;
     
     const method = esLogico ? "PATCH" : "DELETE";
     const body = esLogico ? JSON.stringify({ activo: false }) : null;
 
+    const token = localStorage.getItem("access_token") || "";
+
     await fetch(url, {
       method,
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}` 
+      },
       body
     });
-    router.refresh();
+    
+    if (onRefresh) onRefresh();
   }
 
   return (

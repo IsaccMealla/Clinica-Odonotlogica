@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -23,12 +22,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 
-export function EditarPaciente({ paciente }: { paciente: any }) {
-  const router = useRouter()
+// 👇 Interfaz
+interface EditarPacienteProps {
+  paciente: any;
+  onRefresh?: () => void;
+}
+
+export function EditarPaciente({ paciente, onRefresh }: EditarPacienteProps) {
   const [abierto, setAbierto] = useState(false)
   const [cargando, setCargando] = useState(false)
 
-  // Inicializamos el estado con los datos actuales del paciente
   const [formData, setFormData] = useState({ ...paciente })
 
   const hoy = new Date().toISOString().split("T")[0];
@@ -36,21 +39,18 @@ export function EditarPaciente({ paciente }: { paciente: any }) {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let { name, value } = e.target;
 
-    // Validación: Solo letras
     if (['nombres', 'apellido_paterno', 'apellido_materno', 'lugar_nacimiento', 'ocupacion', 'contacto_emergencia'].includes(name)) {
       const soloLetras = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]*$/;
       if (!soloLetras.test(value)) return;
       value = value.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
     }
 
-    // Validación: CI
     if (name === "ci") {
       const ciRegex = /^[a-zA-Z0-9]*$/;
       if (!ciRegex.test(value)) return;
       value = value.toUpperCase();
     }
 
-    // Validación: Teléfonos
     if (['celular', 'telefono', 'telefono_emergencia'].includes(name)) {
       const soloTel = /^[0-9\+\-\s]*$/;
       if (!soloTel.test(value)) return;
@@ -68,15 +68,20 @@ export function EditarPaciente({ paciente }: { paciente: any }) {
     setCargando(true)
 
     try {
+      const token = localStorage.getItem("access_token") || "";
+
       const res = await fetch(`http://localhost:8000/api/pacientes/${paciente.id}/`, {
-        method: "PUT", // Usamos PUT para actualización completa
-        headers: { "Content-Type": "application/json" },
+        method: "PUT",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}` 
+        },
         body: JSON.stringify(formData),
       })
 
       if (res.ok) {
         setAbierto(false)
-        router.refresh()
+        if (onRefresh) onRefresh();
       } else {
         alert("Error al actualizar los datos.")
       }

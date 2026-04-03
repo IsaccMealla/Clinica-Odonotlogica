@@ -63,7 +63,7 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'clinica_dental',       
+        'NAME': 'gestion_clinica',       
         'USER': 'postgres',              
         'PASSWORD': 'admin',       
         'HOST': '127.0.0.1',             
@@ -107,7 +107,7 @@ REST_FRAMEWORK = {
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60), 
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),    
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),    
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': False, # Apagado temporalmente para no pedirte nuevas migraciones
     'AUTH_HEADER_TYPES': ('Bearer',),
@@ -122,3 +122,7 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'isacc.mealla.psn@gmail.com'  
 EMAIL_HOST_PASSWORD = 'kmmp rcny urga htqa'
+# ==========================================
+# MODELO DE USUARIO PERSONALIZADO
+# ==========================================
+AUTH_USER_MODEL = 'gestion_clinica.CustomUser'

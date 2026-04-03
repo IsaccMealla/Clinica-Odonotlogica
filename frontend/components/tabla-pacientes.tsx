@@ -20,10 +20,16 @@ import { VerPaciente } from "./ver-paciente"
 import { EditarPaciente } from "./editar-paciente"
 import { EliminarPaciente } from "./eliminar-paciente"
 
-export function TablaPacientes({ pacientesIniciales }: { pacientesIniciales: any[] }) {
+// Interfaz para las props
+interface TablaPacientesProps {
+  pacientesIniciales: any[];
+  onRefresh?: () => void;
+}
+
+export function TablaPacientes({ pacientesIniciales, onRefresh }: TablaPacientesProps) {
   const [busqueda, setBusqueda] = useState("")
 
-  // Lógica de filtrado: Busca coincidencias en CI, Nombre o Apellidos
+  // Lógica de filtrado por CI o Nombre
   const pacientesFiltrados = pacientesIniciales.filter((p) => {
     const termino = busqueda.toLowerCase()
     return (
@@ -47,7 +53,7 @@ export function TablaPacientes({ pacientesIniciales }: { pacientesIniciales: any
         />
       </div>
 
-      {/* TABLA */}
+      {/* TABLA DE PACIENTES */}
       <div className="rounded-xl border bg-white dark:bg-zinc-950 shadow-sm overflow-hidden">
         <Table>
           <TableHeader className="bg-slate-50 dark:bg-zinc-900/50">
@@ -82,16 +88,18 @@ export function TablaPacientes({ pacientesIniciales }: { pacientesIniciales: any
                   </TableCell>
                   <TableCell className="text-sm">
                     {paciente.celular || paciente.telefono || (
-                        <span className="text-xs text-muted-foreground italic">Sin registro</span>
+                      <span className="text-xs text-muted-foreground italic">Sin registro</span>
                     )}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
-                      {/* BOTÓN 1: ANTECEDENTES (CARPETA MÉDICA) */}
+                      
+                      {/* ACCIÓN 1: CARPETA MÉDICA (Antecedentes Rápidos) */}
                       <CarpetaMedica paciente={paciente} />
                       
-                      {/* --- NUEVO BOTÓN: EXPEDIENTE CLÍNICO GIGANTE --- */}
-                      <Link href={`/pacientes/${paciente.id}/expediente`}>
+                      {/* ACCIÓN 2: EXPEDIENTE COMPLETO (CORREGIDO) */}
+                      {/* Eliminamos /expediente para que coincida con app/pacientes/[id]/page.tsx */}
+                      <Link href={`/pacientes/${paciente.id}`}>
                         <Button 
                           variant="ghost" 
                           size="icon" 
@@ -102,17 +110,18 @@ export function TablaPacientes({ pacientesIniciales }: { pacientesIniciales: any
                         </Button>
                       </Link>
                       
-                      {/* BOTÓN 2: VER PERFIL */}
+                      {/* ACCIÓN 3: VER PERFIL DETALLADO */}
                       <VerPaciente paciente={paciente} />
                       
-                      {/* BOTÓN 3: EDITAR DATOS */}
-                      <EditarPaciente paciente={paciente} />
+                      {/* ACCIÓN 4: EDITAR DATOS */}
+                      <EditarPaciente paciente={paciente} onRefresh={onRefresh} />
                       
-                      {/* BOTÓN 4: ELIMINAR (LÓGICO) */}
+                      {/* ACCIÓN 5: ELIMINAR (BORRADO LÓGICO) */}
                       <EliminarPaciente 
                         id={paciente.id} 
                         nombre={`${paciente.nombres} ${paciente.apellido_paterno}`} 
                         esLogico={true} 
+                        onRefresh={onRefresh}
                       />
                     </div>
                   </TableCell>
@@ -123,16 +132,16 @@ export function TablaPacientes({ pacientesIniciales }: { pacientesIniciales: any
         </Table>
       </div>
       
-      {/* Contador de resultados */}
+      {/* FOOTER DE LA TABLA */}
       <div className="flex items-center justify-between px-2">
         <div className="text-xs text-muted-foreground">
-            Mostrando {pacientesFiltrados.length} de {pacientesIniciales.length} pacientes registrados.
+          Mostrando {pacientesFiltrados.length} de {pacientesIniciales.length} pacientes registrados.
         </div>
         <div className="flex gap-2">
-            <div className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                <span className="text-[10px] text-muted-foreground">Activos</span>
-            </div>
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+            <span className="text-[10px] text-muted-foreground">Activos</span>
+          </div>
         </div>
       </div>
     </div>

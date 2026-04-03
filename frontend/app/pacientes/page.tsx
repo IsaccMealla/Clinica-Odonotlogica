@@ -1,21 +1,51 @@
+"use client"
+
+import { useState, useEffect } from "react"
 import { NuevoPaciente } from "@/components/nuevo-paciente"
 import { PapeleraPacientes } from "@/components/papelera-pacientes"
-import { TablaPacientes } from "@/components/tabla-pacientes" // Importamos el nuevo componente
+import { TablaPacientes } from "@/components/tabla-pacientes"
 
-async function getPacientes() {
-  try {
-    // Django ahora filtra activos por defecto gracias al get_queryset
-    const res = await fetch("http://localhost:8000/api/pacientes/", { cache: 'no-store' });
-    if (!res.ok) return [];
-    return res.json();
-  } catch (error) {
-    console.error("Error conectando con Django:", error);
-    return [];
+export default function PacientesPage() {
+  const [pacientes, setPacientes] = useState([])
+  const [cargando, setCargando] = useState(true)
+
+  // Creamos la función para buscar pacientes con el token
+  const fetchPacientes = async () => {
+    try {
+      setCargando(true)
+      
+      // Obtenemos la llave de seguridad
+      const token = localStorage.getItem("access_token") || ""
+
+      const res = await fetch("http://localhost:8000/api/pacientes/", {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` // Le mostramos la credencial a Django
+        }
+      })
+      
+      if (res.ok) {
+        const data = await res.json()
+        
+        // 👇 AQUÍ ESTÁ LA MAGIA 👇
+        // Extraemos 'results' si existe (por la paginación de Django), 
+        // caso contrario usamos 'data' directo.
+        setPacientes(data.results || data) 
+        
+      } else {
+        console.error("Error de autorización o servidor. Status:", res.status)
+      }
+    } catch (error) {
+      console.error("Error conectando con Django:", error)
+    } finally {
+      setCargando(false)
+    }
   }
-}
 
-export default async function PacientesPage() {
-  const pacientes = await getPacientes();
+  // Ejecutamos la búsqueda al cargar la página
+  useEffect(() => {
+    fetchPacientes()
+  }, [])
 
   return (
     <div className="space-y-6">
@@ -32,15 +62,22 @@ export default async function PacientesPage() {
           {/* Módulo de papelera */}
           <PapeleraPacientes />
           {/* Botón de creación */}
-          <NuevoPaciente />
+          <NuevoPaciente onPacienteCreado={fetchPacientes} />
         </div>
       </div>
 
-      {/* TABLA CON BUSCADOR INTEGRADO 
-          Le pasamos los datos del servidor al componente de cliente
-      */}
-      <TablaPacientes pacientesIniciales={pacientes} />
+      {/* CONTENIDO PRINCIPAL: Loading o la Tabla */}
+      {cargando ? (
+        <div className="flex justify-center items-center py-20">
+          <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-600"></div>
+        </div>
+      ) : (
+        <TablaPacientes 
+          pacientesIniciales={pacientes} 
+          onRefresh={fetchPacientes} 
+        />
+      )}
       
     </div>
-  );
+  )
 }
