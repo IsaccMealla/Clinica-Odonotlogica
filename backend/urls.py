@@ -10,6 +10,7 @@ from rest_framework_simplejwt.views import (
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('gestion_clinica.urls')), # Aquí viven tus rutas de pacientes
+    path('api/ninja/', include('gestion_clinica.ninja_urls')),
     
     # --- NUEVAS RUTAS PARA EL LOGIN (Generación de Tokens) ---
     path('api/login/', TokenObtainPairView.as_view(), name='login'), # Usaremos esta para iniciar sesión

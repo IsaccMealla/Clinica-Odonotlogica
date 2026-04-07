@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { toast } from "sonner"
 
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000/api"
+
 type Appointment = {
   id: string
   appointment_date: string
@@ -29,7 +31,7 @@ export function AppointmentTable() {
 
   const fetchAppointments = async () => {
     try {
-      const res = await fetch("http://localhost:8000/api/appointments/?cache=no-store")
+      const res = await fetch(`${API_BASE}/appointments/?cache=no-store`)
       if (!res.ok) throw new Error("Error al cargar citas")
       const data = await res.json()
       setAppointments(data)
@@ -54,7 +56,7 @@ export function AppointmentTable() {
 
   const onCheckIn = async (id: string) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/appointments/${id}/checkin/`, { method: 'POST' })
+      const res = await fetch(`${API_BASE}/appointments/${id}/checkin/`, { method: 'POST' })
       if (!res.ok) throw new Error('Checkin failed')
       const data = await res.json()
       toast.success('Paciente marcado como llegado')
@@ -74,7 +76,7 @@ export function AppointmentTable() {
   const onDelete = async (id: string) => {
     if (!confirm('Eliminar esta cita?')) return
     try {
-      const res = await fetch(`http://localhost:8000/api/appointments/${id}/`, { method: 'DELETE' })
+      const res = await fetch(`${API_BASE}/appointments/${id}/`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Eliminar error')
       toast.success('Cita eliminada')
       fetchAppointments()

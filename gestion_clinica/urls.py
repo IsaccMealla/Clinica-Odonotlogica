@@ -25,6 +25,8 @@ from .views import (
     register,
     logout,
     reset_password,
+    ResourceViewSet,
+    disponibilidad,
 )
 
 # Creamos el router automático
@@ -49,6 +51,7 @@ router.register(r'examen-clinico', ExamenClinicoFisicoViewSet)
 router.register(r'chairs', views.DentalChairViewSet)
 router.register(r'dentists', views.DentistViewSet)
 router.register(r'students', views.StudentViewSet)
+router.register(r'resources', views.ResourceViewSet)
 router.register(r'appointments', views.AppointmentViewSet)
 router.register(r'images', views.MedicalImageViewSet)
 router.register(r'clinical-animations', views.ClinicalAnimationViewSet)
@@ -84,6 +87,7 @@ urlpatterns = [
     path('auth/login/', views.CustomTokenObtainPairView.as_view(), name='auth_login'),
     path('auth/logout/', views.logout, name='auth_logout'),
     path('auth/reset-password/', views.reset_password, name='auth_reset_password'),
+    path('disponibilidad/', views.disponibilidad, name='disponibilidad'),
 
     # Ruta personalizada para recuperación de contraseña (legacy)
     path('recuperar-password/', views.enviar_correo_recuperacion, name='recuperar_password'),

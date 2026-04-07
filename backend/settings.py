@@ -2,6 +2,7 @@
 Django settings for backend project.
 """
 
+import os
 from pathlib import Path
 from datetime import timedelta # <-- Movido arriba (Buenas prácticas de Python)
 
@@ -24,10 +25,15 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.postgres',
     'rest_framework',         # Para crear la API
     'corsheaders',            # Para que React pueda conectarse
     'gestion_clinica',        # Tu app de la clínica
+    
 ]
+
+# Custom user model
+AUTH_USER_MODEL = 'gestion_clinica.User'
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware', # <--- AQUÍ ESTÁ, LISTO PARA FUNCIONAR
@@ -41,6 +47,7 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'backend.urls'
+ASGI_APPLICATION = 'backend.asgi.application'
 
 TEMPLATES = [
     {
@@ -62,8 +69,12 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # Database
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.environ.get('POSTGRES_DB', 'clinica_db'),
+        'USER': os.environ.get('POSTGRES_USER', 'postgres'),
+        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
+        'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
+        'PORT': os.environ.get('POSTGRES_PORT', '5432'),
     }
 }
 
@@ -111,6 +122,24 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
+CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', CELERY_BROKER_URL)
+CELERY_BEAT_SCHEDULE = {
+    'send-waiting-alerts-every-5-minutes': {
+        'task': 'gestion_clinica.tasks.send_waiting_alerts',
+        'schedule': 300.0,
+    },
+}
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            'hosts': [os.environ.get('REDIS_URL', 'redis://localhost:6379/1')],
+        },
+    },
+}
+
 # Seguridad HTTPS y cookies seguras
 SECURE_SSL_REDIRECT = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
@@ -128,3 +157,5 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'isacc.mealla.psn@gmail.com'  
 EMAIL_HOST_PASSWORD = 'kmmp rcny urga htqa'
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

@@ -8,7 +8,7 @@ import * as cornerstoneWADOImageLoader from "cornerstone-wado-image-loader"
 
 cornerstoneWADOImageLoader.external.cornerstone = cornerstone
 cornerstoneWADOImageLoader.configure({
-  beforeSend: function (xhr) {
+  beforeSend: function (xhr: any) {
     // Puede agregar auth headers si usa JWT
   },
 })

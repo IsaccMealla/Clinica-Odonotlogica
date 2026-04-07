@@ -1,3 +1,4 @@
+from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from .models import (
     Paciente, 
@@ -13,20 +14,25 @@ from .models import (
     ProstodonciaFija,
     ProtocoloQuirurgico,
     ExamenClinicoFisico,
+    Gabinete,
     DentalChair,
     Dentist,
     Student,
+    Resource,
     Appointment,
     MedicalImage,
-    ClinicalAnimation,    Subject,
+    ClinicalAnimation,
+    Subject,
     AcademicGroup,
     StudentGroup,
     PatientAssignment,
     TeacherApproval,
-    User,
     RolePermission,
     AuditLog,
-    UserSession,)
+    UserSession,
+)
+
+User = get_user_model()
 
 # 1. Serializers Individuales (Hijos)
 # -------------------------------------------------------------------------
@@ -94,9 +100,21 @@ class ExamenClinicoFisicoSerializer(serializers.ModelSerializer):
         exclude = ('paciente',)
 
 
+class PatientSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Paciente
+        fields = ['id', 'ci', 'nombres', 'apellido_paterno', 'apellido_materno', 'email', 'celular']
+
+
 class DentalChairSerializer(serializers.ModelSerializer):
     class Meta:
         model = DentalChair
+        fields = '__all__'
+
+
+class GabineteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Gabinete
         fields = '__all__'
 
 
@@ -112,10 +130,66 @@ class StudentSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class ResourceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Resource
+        fields = '__all__'
+
+
 class AppointmentSerializer(serializers.ModelSerializer):
+    patient = PatientSerializer(read_only=True)
+    dentist = DentistSerializer(read_only=True)
+    student = StudentSerializer(read_only=True)
+    chair = DentalChairSerializer(read_only=True)
+
+    patient_id = serializers.PrimaryKeyRelatedField(queryset=Paciente.objects.all(), source='patient', write_only=True)
+    dentist_id = serializers.PrimaryKeyRelatedField(queryset=Dentist.objects.all(), source='dentist', write_only=True)
+    student_id = serializers.PrimaryKeyRelatedField(queryset=Student.objects.all(), source='student', allow_null=True, required=False, write_only=True)
+    chair_id = serializers.PrimaryKeyRelatedField(queryset=DentalChair.objects.all(), source='chair', write_only=True)
+    gabinete_id = serializers.PrimaryKeyRelatedField(queryset=Gabinete.objects.all(), source='gabinete', allow_null=True, required=False, write_only=True)
+
+    start_datetime = serializers.DateTimeField(required=False, write_only=True)
+    end_datetime = serializers.DateTimeField(required=False, write_only=True)
+
     class Meta:
         model = Appointment
         fields = '__all__'
+
+    def validate(self, attrs):
+        start_dt = attrs.pop('start_datetime', None)
+        end_dt = attrs.pop('end_datetime', None)
+
+        if start_dt and end_dt:
+            attrs['appointment_date'] = start_dt.date()
+            attrs['start_time'] = start_dt.time()
+            attrs['end_time'] = end_dt.time()
+
+        if 'appointment_date' in attrs and 'start_time' in attrs and 'end_time' in attrs:
+            appointment_date = attrs['appointment_date']
+            start_time = attrs['start_time']
+            end_time = attrs['end_time']
+            if end_time <= start_time:
+                raise serializers.ValidationError({'end_time': 'El fin de cita debe ser posterior al inicio'})
+
+        return super().validate(attrs)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Estos campos solo existen si se enviaron al crear, no en la instancia guardada
+        if hasattr(instance, 'start_datetime'):
+            data['start_datetime'] = instance.start_datetime.isoformat()
+        if hasattr(instance, 'end_datetime'):
+            data['end_datetime'] = instance.end_datetime.isoformat()
+        # Construir resource_ids a partir de los campos reales
+        resource_ids = []
+        if instance.chair_id:
+            resource_ids.append(str(instance.chair_id))
+        if instance.dentist_id:
+            resource_ids.append(str(instance.dentist_id))
+        if instance.student_id:
+            resource_ids.append(str(instance.student_id))
+        data['resource_ids'] = resource_ids
+        return data
 
 
 class MedicalImageSerializer(serializers.ModelSerializer):

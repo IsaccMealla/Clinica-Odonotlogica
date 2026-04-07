@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.contrib.auth import get_user_model
 from .models import (
     Paciente,
     AntecedentePatologicoFamiliar,
@@ -13,11 +14,12 @@ from .models import (
     ProstodonciaFija,
     ProtocoloQuirurgico,
     ExamenClinicoFisico,
-    User,
     RolePermission,
     AuditLog,
     UserSession,
 )
+
+User = get_user_model()
 
 # Registramos el modelo principal
 admin.site.register(Paciente)
@@ -37,7 +39,7 @@ admin.site.register(ProtocoloQuirurgico)
 admin.site.register(ExamenClinicoFisico)
 
 # Modelos de seguridad y accesos
-admin.site.register(User)
+
 admin.site.register(RolePermission)
 admin.site.register(AuditLog)
 admin.site.register(UserSession)

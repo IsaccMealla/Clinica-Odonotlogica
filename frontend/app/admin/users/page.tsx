@@ -18,7 +18,12 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = useState(false)
 
   const fetchUsers = async () => {
-    const res = await fetch("/api/users/")
+    const token = localStorage.getItem("access_token")
+    const res = await fetch("/api/users/", {
+      headers: {
+        "Authorization": `Bearer ${token}`,
+      },
+    })
     if (res.ok) {
       const data = await res.json()
       setUsers(data)
@@ -31,10 +36,14 @@ export default function AdminUsersPage() {
 
   const createUser = async (payload: { name: string; email: string; password: string; role: string }) => {
     setLoading(true)
+    const token = localStorage.getItem("access_token")
     try {
       const res = await fetch("/api/users/", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
         body: JSON.stringify(payload),
       })
       if (res.ok) {
@@ -53,8 +62,14 @@ export default function AdminUsersPage() {
   }
 
   const deactivateUser = async (id: string) => {
+    const token = localStorage.getItem("access_token")
     try {
-      await fetch(`/api/users/${id}/`, { method: "DELETE" })
+      await fetch(`/api/users/${id}/`, {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+        },
+      })
       toast.success("Usuario desactivado")
       fetchUsers()
     } catch (err) {

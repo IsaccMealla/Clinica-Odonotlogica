@@ -2,6 +2,8 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated, BasePermission
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 
 
 class RoleBasedPermission(BasePermission):
@@ -37,6 +39,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.db.models import Count, Q
 from django.utils.timezone import now
 from django.http import HttpResponse
+from datetime import datetime, date, time, timedelta
+from zoneinfo import ZoneInfo
 
 import io
 from reportlab.pdfgen import canvas
@@ -218,6 +222,129 @@ class StudentViewSet(viewsets.ModelViewSet):
     serializer_class = StudentSerializer
 
 
+def notify_student_patient_arrived(appointment: Appointment):
+    try:
+        from asgiref.sync import async_to_sync
+        from channels.layers import get_channel_layer
+
+        channel_layer = get_channel_layer()
+        if not channel_layer or not appointment.student_id:
+            return
+
+        async_to_sync(channel_layer.group_send)(
+            f'student_{appointment.student_id}',
+            {
+                'type': 'patient.arrived',
+                'appointment_id': str(appointment.id),
+                'patient': str(appointment.patient),
+                'chair': str(appointment.chair),
+                'start_datetime': appointment.start_datetime.isoformat() if appointment.start_datetime else None,
+            }
+        )
+    except ImportError:
+        pass
+
+
+class ResourceViewSet(viewsets.ModelViewSet):
+    queryset = Resource.objects.order_by('resource_type', 'name')
+    serializer_class = ResourceSerializer
+
+
+def _lookup_resource(resource_id):
+    resource = Resource.objects.filter(id=resource_id, active=True).first()
+    if resource:
+        if resource.resource_type == Resource.RESOURCE_CHAIR:
+            return {'chair': resource.chair}
+        if resource.resource_type == Resource.RESOURCE_DOCTOR:
+            return {'dentist': resource.dentist}
+        if resource.resource_type == Resource.RESOURCE_STUDENT:
+            return {'student': resource.student}
+    chair = DentalChair.objects.filter(id=resource_id).first()
+    if chair:
+        return {'chair': chair}
+    dentist = Dentist.objects.filter(id=resource_id).first()
+    if dentist:
+        return {'dentist': dentist}
+    student = Student.objects.filter(id=resource_id).first()
+    if student:
+        return {'student': student}
+    return None
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def disponibilidad(request):
+    resource_id = request.query_params.get('recurso')
+    fecha = request.query_params.get('fecha')
+
+    if not resource_id or not fecha:
+        return Response({'error': 'recurso and fecha are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        requested_date = date.fromisoformat(fecha)
+    except ValueError:
+        return Response({'error': 'fecha must be YYYY-MM-DD'}, status=status.HTTP_400_BAD_REQUEST)
+
+    lookup = _lookup_resource(resource_id)
+    if not lookup:
+        return Response({'error': 'Resource not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    local_zone = ZoneInfo(settings.TIME_ZONE)
+    day_start_local = datetime.combine(requested_date, time(hour=8, minute=0), tzinfo=local_zone)
+    day_end_local = datetime.combine(requested_date, time(hour=18, minute=0), tzinfo=local_zone)
+    day_start_utc = day_start_local.astimezone(timezone.utc)
+    day_end_utc = day_end_local.astimezone(timezone.utc)
+
+    status_filter = [
+        Appointment.STATUS_SCHEDULED,
+        Appointment.STATUS_WAITING,
+        Appointment.STATUS_IN_PROGRESS,
+        Appointment.STATUS_CONFIRMED,
+    ]
+
+    if settings.DATABASES['default']['ENGINE'] == 'django.db.backends.postgresql':
+        appointment_filter = Q(status__in=status_filter) & Q(time_range__overlap=(day_start_utc, day_end_utc))
+    else:
+        appointment_filter = (
+            Q(appointment_date=requested_date)
+            & Q(start_time__lt=day_end_local.time())
+            & Q(end_time__gt=day_start_local.time())
+            & Q(status__in=status_filter)
+        )
+
+    appointments = Appointment.objects.filter(appointment_filter)
+    if lookup.get('chair'):
+        appointments = appointments.filter(chair=lookup['chair'])
+    if lookup.get('dentist'):
+        appointments = appointments.filter(dentist=lookup['dentist'])
+    if lookup.get('student'):
+        appointments = appointments.filter(student=lookup['student'])
+
+    busy_ranges = []
+    for appointment in appointments:
+        start = appointment.start_datetime or timezone.make_aware(datetime.combine(appointment.appointment_date, appointment.start_time), local_zone).astimezone(timezone.utc)
+        end = appointment.end_datetime or timezone.make_aware(datetime.combine(appointment.appointment_date, appointment.end_time), local_zone).astimezone(timezone.utc)
+        busy_ranges.append((start, end))
+
+    slots = []
+    slot_start = day_start_utc
+    while slot_start < day_end_utc:
+        slot_end = slot_start + timedelta(minutes=30)
+        overlap = any(not (slot_end <= busy_start or slot_start >= busy_end) for busy_start, busy_end in busy_ranges)
+        if not overlap:
+            slots.append({
+                'start': slot_start.isoformat(),
+                'end': slot_end.isoformat(),
+            })
+        slot_start = slot_end
+
+    return Response({
+        'resource_id': resource_id,
+        'fecha': fecha,
+        'slots': slots,
+    })
+
+
 class AppointmentViewSet(viewsets.ModelViewSet):
     queryset = Appointment.objects.order_by('-appointment_date', '-start_time')
     serializer_class = AppointmentSerializer
@@ -239,13 +366,61 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(appointment_date=date)
         return queryset
 
+    def perform_create(self, serializer):
+        """Crear cita y enviar notificación WebSocket"""
+        appointment = serializer.save()
+        self._notify_new_appointment(appointment)
+
+    def _notify_new_appointment(self, appointment):
+        """Enviar notificación a través de Channels (opcional, no rompe si falla)"""
+        try:
+            channel_layer = get_channel_layer()
+            if channel_layer is None:
+                return
+            
+            patient_name = f"{appointment.patient.nombres} {appointment.patient.apellido_paterno}"
+            message = f"Nueva cita para {appointment.appointment_date} a las {appointment.start_time.strftime('%H:%M')}"
+            
+            async_to_sync(channel_layer.group_send)(
+                'appointments_updates',
+                {
+                    'type': 'new_appointment',
+                    'appointment_id': str(appointment.id),
+                    'patient_name': patient_name,
+                    'message': message,
+                }
+            )
+        except Exception as e:
+            # No romper la aplicación si las notificaciones fallan
+            print(f"[WARNING] WebSocket notification failed (non-critical): {e}")
+
     @action(detail=True, methods=['post'])
     def checkin(self, request, pk=None):
         appointment = self.get_object()
         from django.utils import timezone
         appointment.check_in_time = timezone.now()
-        appointment.status = Appointment.STATUS_CONFIRMED
+        appointment.status = Appointment.STATUS_WAITING
         appointment.save()
+
+        notify_student_patient_arrived(appointment)
+        
+        # Enviar notificación WebSocket (opcional, no rompe si falla)
+        try:
+            channel_layer = get_channel_layer()
+            if channel_layer:
+                patient_name = f"{appointment.patient.nombres} {appointment.patient.apellido_paterno}"
+                async_to_sync(channel_layer.group_send)(
+                    'appointments_updates',
+                    {
+                        'type': 'patient_arrived',
+                        'appointment_id': str(appointment.id),
+                        'patient_name': patient_name,
+                        'message': f"{patient_name} ha llegado a la cita",
+                        'patient_arrived_at': appointment.check_in_time.isoformat(),
+                    }
+                )
+        except Exception as e:
+            print(f"[WARNING] Check-in notification failed (non-critical): {e}")
 
         wait_min = appointment.minutes_waiting
         alert = None
@@ -437,7 +612,7 @@ def reset_password(request):
 
 
 class UserViewSet(viewsets.ModelViewSet):
-    queryset = User.objects.order_by('-created_at')
+    queryset = User.objects.order_by('-date_joined')
     serializer_class = UserSerializer
     permission_classes = [IsAdminUser]
 
@@ -703,3 +878,126 @@ def enviar_correo_recuperacion(request):
     )
     
     return Response({'mensaje': 'Correo de recuperación enviado con éxito.'})
+
+
+# --- NO-SHOW STATISTICS AND ANALYTICS ---
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def no_show_statistics_by_day(request):
+    """
+    Get no-show statistics grouped by day of the week.
+    Returns data suitable for Recharts visualization.
+    
+    Example: GET /api/no-show-statistics-by-day/
+    Response: {
+        "day_statistics": [
+            {"day": "Monday", "no_shows": 5, "day_number": 2},
+            {"day": "Tuesday", "no_shows": 3, "day_number": 3},
+            ...
+        ]
+    }
+    """
+    from gestion_clinica.tasks import get_no_show_statistics
+    
+    try:
+        stats = get_no_show_statistics()
+        return Response({
+            'day_statistics': stats,
+            'total_no_shows': sum(item['no_shows'] for item in stats)
+        })
+    except Exception as e:
+        return Response(
+            {'error': f'Error retrieving no-show statistics: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def no_show_statistics_by_patient(request):
+    """
+    Get patients with the most no-shows.
+    Useful for identifying patterns of missed appointments.
+    
+    Example: GET /api/no-show-statistics-by-patient/
+    Response: {
+        "patient_statistics": [
+            {
+                "patient_id": "123",
+                "patient_name": "John Doe",
+                "total_no_shows": 3
+            },
+            ...
+        ]
+    }
+    """
+    from gestion_clinica.tasks import get_no_shows_by_patient
+    
+    try:
+        stats = get_no_shows_by_patient()
+        return Response({
+            'patient_statistics': stats,
+            'total_patients_with_no_shows': len(stats)
+        })
+    except Exception as e:
+        return Response(
+            {'error': f'Error retrieving patient no-show statistics: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def no_show_weekly_summary(request):
+    """
+    Get weekly no-show summary.
+    Returns aggregated no-show count for the current week.
+    
+    Example: GET /api/no-show-weekly-summary/
+    Response: {
+        "week_start": "2024-04-01T00:00:00Z",
+        "week_end": "2024-04-08T00:00:00Z",
+        "total_no_shows": 12
+    }
+    """
+    from gestion_clinica.tasks import get_weekly_no_show_summary
+    
+    try:
+        summary = get_weekly_no_show_summary()
+        return Response(summary)
+    except Exception as e:
+        return Response(
+            {'error': f'Error retrieving weekly summary: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAdminUser])
+def trigger_no_show_check(request):
+    """
+    Manually trigger the no-show check task.
+    This will mark all overdue scheduled appointments as no-shows.
+    
+    Example: POST /api/trigger-no-show-check/
+    Response: {
+        "status": "success",
+        "no_shows_marked": 5,
+        "timestamp": "2024-04-07T10:30:00Z"
+    }
+    """
+    from gestion_clinica.tasks import check_appointment_no_shows
+    
+    try:
+        result = check_appointment_no_shows.delay()  # Execute as background task if using Celery
+        return Response({
+            'status': 'submitted',
+            'task_id': result.id if hasattr(result, 'id') else None,
+            'message': 'No-show check task has been triggered'
+        })
+    except Exception as e:
+        return Response(
+            {'error': f'Error triggering no-show check: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

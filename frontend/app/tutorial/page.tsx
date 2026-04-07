@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import Joyride, { Step } from "react-joyride"
+import { Joyride, Step } from "react-joyride"
 
 export default function TutorialPage() {
   const [run, setRun] = useState(true)
@@ -68,13 +68,11 @@ export default function TutorialPage() {
         run={run}
         stepIndex={stepIndex}
         continuous
-        showProgress
-        showSkipButton
         styles={{
           options: {
             zIndex: 10000,
           },
-        }}
+        } as any}
         callback={(data) => {
           if (["finished", "skipped"].includes(data.status)) setRun(false)
           if (typeof data.index === "number") setStepIndex(data.index)

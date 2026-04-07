@@ -1,13 +1,48 @@
 import uuid
-from django.db import models
-from datetime import date
+from datetime import date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
+
 from django.conf import settings
+from django.contrib.auth.models import AbstractUser
+from django.contrib.postgres.constraints import ExclusionConstraint
+from django.contrib.postgres.fields import DateTimeRangeField
+from django.db import models
+from django.db.models import Q
 from django.utils import timezone
+
+TimeRangeField = DateTimeRangeField if settings.DATABASES['default']['ENGINE'] == 'django.db.backends.postgresql' else models.JSONField
+
+ROLE_CHOICES = [
+    ('admin', 'Administrador'),
+    ('dentist', 'Odontólogo'),
+    ('student', 'Estudiante'),
+    ('receptionist', 'Recepción'),
+    ('assistant', 'Auxiliar'),
+]
+
+
+class User(AbstractUser):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=150)
+    email = models.EmailField(unique=True)
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='student')
+    is_active = models.BooleanField(default=True)
+    is_staff = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['name']
+
+    class Meta:
+        db_table = 'users'
+
+    def __str__(self):
+        return self.name
 
 
 class RolePermission(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    role = models.CharField(max_length=20, choices=User.ROLE_CHOICES)
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
     module = models.CharField(max_length=100)
     can_view = models.BooleanField(default=False)
     can_create = models.BooleanField(default=False)
@@ -690,10 +725,45 @@ class ClinicalAnimation(models.Model):
         verbose_name_plural = "Exámenes Clínicos y Físicos"
 
 
+class Gabinete(models.Model):
+    ESTADO_CHOICES = [
+        ('disponible', 'Disponible'),
+        ('mantenimiento', 'En Mantenimiento'),
+        ('ocupado', 'Ocupado'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    nombre = models.CharField(max_length=100, unique=True)
+    descripcion = models.TextField(blank=True, null=True)
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='disponible')
+    capacidad = models.PositiveIntegerField(default=1, help_text="Número máximo de citas simultáneas")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.nombre
+
+    def esta_disponible_en_fecha(self, fecha_hora):
+        """Verifica si el gabinete está disponible en una fecha y hora específica"""
+        if self.estado != 'disponible':
+            return False
+
+        # Contar citas activas en ese horario
+        citas_en_horario = Appointment.objects.filter(
+            gabinete=self,
+            appointment_date=fecha_hora.date(),
+            start_time__lte=fecha_hora.time(),
+            end_time__gt=fecha_hora.time(),
+            status__in=['scheduled', 'confirmed']
+        ).count()
+
+        return citas_en_horario < self.capacidad
+
+
 class DentalChair(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100, unique=True)
     code = models.CharField(max_length=30, blank=True, null=True, unique=True)
+    gabinete = models.ForeignKey(Gabinete, on_delete=models.CASCADE, related_name='chairs', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -726,8 +796,52 @@ class Student(models.Model):
         return f"{self.first_name} {self.last_name}"
 
 
+class Resource(models.Model):
+    RESOURCE_CHAIR = 'chair'
+    RESOURCE_DOCTOR = 'doctor'
+    RESOURCE_STUDENT = 'student'
+
+    RESOURCE_TYPES = [
+        (RESOURCE_CHAIR, 'Gabinete'),
+        (RESOURCE_DOCTOR, 'Doctor'),
+        (RESOURCE_STUDENT, 'Student'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=150)
+    resource_type = models.CharField(max_length=20, choices=RESOURCE_TYPES)
+    chair = models.ForeignKey('DentalChair', on_delete=models.CASCADE, null=True, blank=True, related_name='resources')
+    dentist = models.ForeignKey('Dentist', on_delete=models.CASCADE, null=True, blank=True, related_name='resources')
+    student = models.ForeignKey('Student', on_delete=models.CASCADE, null=True, blank=True, related_name='resources')
+    active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'resources'
+        ordering = ['resource_type', 'name']
+
+    def __str__(self):
+        return f"{self.name} ({self.get_resource_type_display()})"
+
+
+class Patient(Paciente):
+    class Meta:
+        proxy = True
+        verbose_name = 'Patient'
+        verbose_name_plural = 'Patients'
+
+
+class Doctor(Dentist):
+    class Meta:
+        proxy = True
+        verbose_name = 'Doctor'
+        verbose_name_plural = 'Doctors'
+
+
 class Appointment(models.Model):
     STATUS_SCHEDULED = 'scheduled'
+    STATUS_WAITING = 'waiting'
+    STATUS_IN_PROGRESS = 'in_progress'
     STATUS_CONFIRMED = 'confirmed'
     STATUS_COMPLETED = 'completed'
     STATUS_CANCELLED = 'cancelled'
@@ -735,6 +849,8 @@ class Appointment(models.Model):
 
     STATUS_CHOICES = [
         (STATUS_SCHEDULED, 'Scheduled'),
+        (STATUS_WAITING, 'Waiting'),
+        (STATUS_IN_PROGRESS, 'In progress'),
         (STATUS_CONFIRMED, 'Confirmed'),
         (STATUS_COMPLETED, 'Completed'),
         (STATUS_CANCELLED, 'Cancelled'),
@@ -746,38 +862,76 @@ class Appointment(models.Model):
     dentist = models.ForeignKey(Dentist, on_delete=models.CASCADE, related_name='appointments')
     student = models.ForeignKey(Student, on_delete=models.SET_NULL, null=True, blank=True, related_name='appointments')
     chair = models.ForeignKey(DentalChair, on_delete=models.CASCADE, related_name='appointments')
+    gabinete = models.ForeignKey(Gabinete, on_delete=models.CASCADE, related_name='appointments', null=True, blank=True)
 
     appointment_date = models.DateField()
     start_time = models.TimeField()
     end_time = models.TimeField()
+    procedure = models.CharField(max_length=250, blank=True, null=True)
     reason = models.TextField(blank=True, null=True)
+    time_range = TimeRangeField(blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_SCHEDULED)
     check_in_time = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        # constraints will be added later if needed
+        pass
+
     def __str__(self):
         return f"{self.patient} - {self.appointment_date} {self.start_time.strftime('%H:%M')}"
+
+    def _build_time_range(self):
+        local_zone = ZoneInfo(settings.TIME_ZONE)
+        start_dt = datetime.combine(self.appointment_date, self.start_time)
+        end_dt = datetime.combine(self.appointment_date, self.end_time)
+
+        aware_start = timezone.make_aware(start_dt, local_zone)
+        aware_end = timezone.make_aware(end_dt, local_zone)
+        if aware_start.tzinfo != timezone.utc:
+            aware_start = aware_start.astimezone(timezone.utc)
+        if aware_end.tzinfo != timezone.utc:
+            aware_end = aware_end.astimezone(timezone.utc)
+
+        if settings.DATABASES['default']['ENGINE'] == 'django.db.backends.postgresql':
+            return (aware_start, aware_end)
+        return {'start': aware_start, 'end': aware_end}
 
     def clean(self):
         from django.core.exceptions import ValidationError
         if self.end_time <= self.start_time:
             raise ValidationError({'end_time': 'El fin de cita debe ser posterior al inicio'})
 
-        overlap_filter = (
-            models.Q(appointment_date=self.appointment_date)
-            & models.Q(start_time__lt=self.end_time)
-            & models.Q(end_time__gt=self.start_time)
-            & models.Q(status__in=[self.STATUS_SCHEDULED, self.STATUS_CONFIRMED])
-            & (models.Q(chair=self.chair) | models.Q(dentist=self.dentist))
-        )
+        self.time_range = self._build_time_range()
+        overlap_statuses = [self.STATUS_SCHEDULED, self.STATUS_WAITING, self.STATUS_IN_PROGRESS, self.STATUS_CONFIRMED]
+
+        if settings.DATABASES['default']['ENGINE'] == 'django.db.backends.postgresql':
+            resource_filter = Q(chair=self.chair) | Q(dentist=self.dentist)
+            if self.student:
+                resource_filter |= Q(student=self.student)
+            overlap_filter = (
+                Q(time_range__overlap=self.time_range)
+                & Q(status__in=overlap_statuses)
+                & resource_filter
+            )
+        else:
+            resource_filter = Q(chair=self.chair) | Q(dentist=self.dentist)
+            if self.student:
+                resource_filter |= Q(student=self.student)
+            overlap_filter = (
+                Q(appointment_date=self.appointment_date)
+                & Q(start_time__lt=self.end_time)
+                & Q(end_time__gt=self.start_time)
+                & Q(status__in=overlap_statuses)
+                & resource_filter
+            )
 
         conflicts = Appointment.objects.filter(overlap_filter).exclude(pk=self.pk)
         if conflicts.exists():
-            raise ValidationError('La cita se superpone con otra para el mismo sillón o dentista')
+            raise ValidationError('La cita se superpone con otra para el mismo recurso')
 
     def save(self, *args, **kwargs):
-        from django.core.exceptions import ValidationError
-        # Verificar superposición antes de guardar
+        self.time_range = self._build_time_range()
         self.clean()
 
         previous_status = None
@@ -800,8 +954,7 @@ class Appointment(models.Model):
                 p.no_show_status = 'none'
             p.save()
 
-        if self.status in [self.STATUS_COMPLETED, self.STATUS_CANCELLED, self.STATUS_CONFIRMED, self.STATUS_SCHEDULED]:
-            # actualizar estado del paciente si fue corregido manualmente
+        if self.status in [self.STATUS_COMPLETED, self.STATUS_CANCELLED, self.STATUS_CONFIRMED, self.STATUS_SCHEDULED, self.STATUS_WAITING, self.STATUS_IN_PROGRESS]:
             p = self.patient
             if p.no_show_count >= 3:
                 p.no_show_status = 'flagged'
@@ -811,10 +964,32 @@ class Appointment(models.Model):
                 p.save()
 
     @property
+    def start_datetime(self):
+        if self.time_range:
+            if isinstance(self.time_range, dict):
+                return self.time_range.get('start')
+            return self.time_range.lower
+        return timezone.make_aware(datetime.combine(self.appointment_date, self.start_time), ZoneInfo(settings.TIME_ZONE)).astimezone(timezone.utc)
+
+    @property
+    def end_datetime(self):
+        if self.time_range:
+            if isinstance(self.time_range, dict):
+                return self.time_range.get('end')
+            return self.time_range.upper
+        return timezone.make_aware(datetime.combine(self.appointment_date, self.end_time), ZoneInfo(settings.TIME_ZONE)).astimezone(timezone.utc)
+
+    @property
+    def resource_ids(self):
+        ids = [str(self.chair_id), str(self.dentist_id)]
+        if self.student_id:
+            ids.append(str(self.student_id))
+        return ids
+
+    @property
     def minutes_waiting(self):
         if not self.check_in_time:
             return 0
-        from django.utils import timezone
         delta = timezone.now() - self.check_in_time
         return int(delta.total_seconds() // 60)
 
