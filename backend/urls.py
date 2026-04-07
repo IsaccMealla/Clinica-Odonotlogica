@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.urls import path, include
-
+from django.conf.urls.static import static # NUEVO
+from django.conf import settings # NUEVO
 # Importamos las vistas de SimpleJWT para el Login
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
@@ -15,3 +16,7 @@ urlpatterns = [
     path('api/login/', TokenObtainPairView.as_view(), name='login'), # Usaremos esta para iniciar sesión
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'), # Para mantener la sesión activa
 ]
+
+# NUEVO: Esto permite que Django muestre las imágenes en desarrollo
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

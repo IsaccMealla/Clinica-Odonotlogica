@@ -6,7 +6,8 @@ import {
   AlertTriangle, HeartPulse, Droplets, Edit3, Trash2, X 
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+// 👇 Importamos DialogDescription
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -52,18 +53,30 @@ export function CarpetaMedica({ paciente }: { paciente: any }) {
   const guardarAntecedentes = async () => {
     setLoading(true)
     try {
+      // Usando la llave correcta encontrada en tu login
+      const token = localStorage.getItem("access_token") 
+
       const res = await fetch(`http://localhost:8000/api/pacientes/${paciente.id}/antecedentes/`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify(data),
       })
+      
       if (res.ok) {
         toast.success("Expediente actualizado")
         setIsEditing(false)
         setOpen(false)
         router.refresh()
+      } else {
+        console.error("Fallo al guardar, status:", res.status)
+        toast.error("Hubo un error al guardar los datos. Revisa si tu sesión sigue activa.")
       }
-    } catch (e) { toast.error("Error de servidor") }
+    } catch (e) { 
+      toast.error("Error de servidor") 
+    }
     finally { setLoading(false) }
   }
 
@@ -85,6 +98,12 @@ export function CarpetaMedica({ paciente }: { paciente: any }) {
                 <ClipboardList className="text-blue-600 h-6 w-6" />
                 Expediente: {paciente.nombres} {paciente.apellido_paterno}
               </DialogTitle>
+              
+              {/* 👇 Agregado para cumplir accesibilidad y quitar el Warning de la consola */}
+              <DialogDescription className="sr-only">
+                Detalles y antecedentes médicos del paciente.
+              </DialogDescription>
+
               <p className="text-xs font-bold text-slate-500 mt-1 uppercase">
                 CI: {paciente.ci} | {paciente.edad} años | {paciente.sexo}
               </p>
@@ -117,7 +136,7 @@ export function CarpetaMedica({ paciente }: { paciente: any }) {
             <ScrollArea className="h-full w-full bg-slate-50/30">
               <div className="p-8 pb-20">
                 
-                {/* --- SECCIÓN PERSONALES (LA LARGA) --- */}
+                {/* --- SECCIÓN PERSONALES --- */}
                 <TabsContent value="personales" className="m-0 space-y-8">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2"><Label>Estado Salud</Label><Input disabled={!isEditing} value={data.personales.estado_salud || ""} onChange={(e) => handleInputChange("personales", "estado_salud", e.target.value)} className="bg-white" /></div>

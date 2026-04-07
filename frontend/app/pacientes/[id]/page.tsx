@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, use } from "react"
-import { ArrowLeft, User, Stethoscope, Activity, FileText, Save } from "lucide-react"
+import { useState, use, useEffect } from "react"
+import { ArrowLeft, User, Stethoscope, Activity, FileText, Save, ClipboardList } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,8 +11,8 @@ import { useRouter } from "next/navigation"
 import { TabEvaluacionGeneral } from "@/components/tabs-expediente/tab-evaluacion-general"
 import { TabOdontopediatria } from "@/components/tabs-expediente/tab-odontopediatria"
 import { TabPeriodoncia } from "@/components/tabs-expediente/tab-periodoncia"
-// NUEVO IMPORT: La pestaña gráfica del periodontograma
 import { TabPeriodontogramaGrafico } from "@/components/tabs-expediente/tab-periodontograma-grafico"
+import { TabHistorialTratamientos } from "@/components/tabs-expediente/tab-historial-tratamientos"
 
 export default function ExpedientePacientePage({ params }: { params: Promise<{ id: string }> }) {
     const router = useRouter();
@@ -49,6 +49,42 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
         sexo: "Masculino"
     }
 
+    // --- NUEVO: FUNCIÓN PARA CARGAR DATOS AL INICIAR ---
+    useEffect(() => {
+        const cargarExpediente = async () => {
+            try {
+                const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+                
+                // Hacemos un GET a la misma ruta para traer lo que ya está guardado
+                const response = await fetch(`http://localhost:8000/api/pacientes/${pacienteId}/antecedentes/`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': token ? `Bearer ${token}` : '',
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const datosGuardados = await response.json();
+                    
+                    // Actualizamos el estado combinando la estructura base con los datos de Django
+                    setFormData(prev => ({
+                        ...prev,
+                        ...datosGuardados
+                    }));
+                } else if (response.status !== 404) {
+                    console.error("Error al cargar los datos:", await response.text());
+                }
+            } catch (error) {
+                console.error("Error de red al intentar cargar el expediente:", error);
+            }
+        };
+
+        if (pacienteId) {
+            cargarExpediente();
+        }
+    }, [pacienteId]);
+
     // --- 2. FUNCIÓN MAESTRA PARA ACTUALIZAR CAMPOS ---
     const handleInputChange = (seccion: string, campo: string, valor: any) => {
         setFormData((prev) => ({
@@ -60,17 +96,33 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
         }));
     };
 
-    // --- 3. FUNCIÓN PARA ENVIAR A DJANGO ---
+// --- 3. FUNCIÓN PARA ENVIAR A DJANGO ---
     const guardarExpediente = async () => {
         setGuardando(true);
         try {
+            const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+
+            // 🌟 LA MAGIA DE LA LIMPIEZA:
+            // Hacemos una copia de los datos para no modificar el estado original
+            const dataParaEnviar = JSON.parse(JSON.stringify(formData));
+            
+            // Recorremos todas las secciones y eliminamos el 'id' y 'paciente' 
+            // para que Django no colapse al hacer el update_or_create
+            Object.keys(dataParaEnviar).forEach(seccion => {
+                if (dataParaEnviar[seccion]) {
+                    delete dataParaEnviar[seccion].id;
+                    delete dataParaEnviar[seccion].paciente;
+                }
+            });
+
             const response = await fetch(`http://localhost:8000/api/pacientes/${pacienteId}/antecedentes/`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    // 'Authorization': `Bearer ${tu_token_jwt}` // <-- Cuando haya login
+                    'Authorization': token ? `Bearer ${token}` : '' 
                 },
-                body: JSON.stringify(formData)
+                // 🌟 ENVIAMOS LA DATA LIMPIA, SIN IDs
+                body: JSON.stringify(dataParaEnviar)
             });
 
             if (response.ok) {
@@ -132,20 +184,11 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
                     <TabsTrigger value="periodontograma" className="text-md data-[state=active]:bg-rose-50 data-[state=active]:text-rose-700">
                         <Activity className="h-4 w-4 mr-2" /> Periodontograma
                     </TabsTrigger>
-                </TabsList>
+                    <TabsTrigger value="tratamientos" className="text-md data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700">
+                        <ClipboardList className="h-4 w-4 mr-2" /> Tratamientos
+                    </TabsTrigger>
 
-                {/* --- CONTENIDO: ANTECEDENTES (Carpeta Médica General) --- */}
-                <TabsContent value="antecedentes" className="mt-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Antecedentes Médicos</CardTitle>
-                            <CardDescription>Resumen de antecedentes patológicos y familiares.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-slate-500">Aquí incrustaremos tu diseño de carpeta-medica.tsx pero sin el modal.</p>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
+                </TabsList>
 
                 {/* --- CONTENIDO: HISTORIA CLÍNICA --- */}
                 <TabsContent value="historia" className="mt-6 flex-1">
@@ -190,7 +233,7 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
                     </Card>
                 </TabsContent>
 
-                {/* --- CONTENIDO: PERIODONTOGRAMA GRÁFICO (El nuevo) --- */}
+                {/* --- CONTENIDO: PERIODONTOGRAMA GRÁFICO --- */}
                 <TabsContent value="periodontograma" className="mt-6 flex-1">
                     <Card className="min-h-full border-rose-100 shadow-sm">
                         <CardHeader className="bg-rose-50/50 border-b">
@@ -199,6 +242,19 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
                         </CardHeader>
                         <CardContent className="p-6">
                             <TabPeriodontogramaGrafico />
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* --- CONTENIDO: HISTORIAL DE TRATAMIENTOS --- */}
+                <TabsContent value="tratamientos" className="mt-6 flex-1">
+                    <Card className="min-h-full border-indigo-100 shadow-sm">
+                        <CardHeader className="bg-indigo-50/50 border-b">
+                            <CardTitle className="text-indigo-800">Historial de Tratamientos</CardTitle>
+                            <CardDescription>Registro cronológico de visitas, procedimientos y evidencias del paciente.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="p-6 bg-slate-50">
+                            <TabHistorialTratamientos pacienteId={pacienteId} />
                         </CardContent>
                     </Card>
                 </TabsContent>

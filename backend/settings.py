@@ -3,8 +3,8 @@ Django settings for backend project.
 """
 
 from pathlib import Path
-from datetime import timedelta # <-- Movido arriba (Buenas prácticas de Python)
-
+from datetime import timedelta 
+import os
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -26,11 +26,11 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',         # Para crear la API
     'corsheaders',            # Para que React pueda conectarse
-    'gestion_clinica',        # Tu app de la clínica
+    'gestion_clinica',        
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware', # <--- AQUÍ ESTÁ, LISTO PARA FUNCIONAR
+    'corsheaders.middleware.CorsMiddleware', 
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -126,3 +126,6 @@ EMAIL_HOST_PASSWORD = 'kmmp rcny urga htqa'
 # MODELO DE USUARIO PERSONALIZADO
 # ==========================================
 AUTH_USER_MODEL = 'gestion_clinica.CustomUser'
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')

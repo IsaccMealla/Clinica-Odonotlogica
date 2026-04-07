@@ -2,7 +2,11 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
-
+# --- NUEVA IMPORTACIÓN PARA RECIBIR ARCHIVOS/FOTOS ---
+from rest_framework.parsers import MultiPartParser, FormParser 
+# Asegúrate de importar el modelo y el serializador en la parte superior:
+from .models import Sillon 
+from .serializers import SillonSerializer
 # --- IMPORTACIONES DE TIEMPO PARA FILTROS ---
 from django.utils import timezone
 from datetime import timedelta
@@ -57,7 +61,6 @@ class PacienteViewSet(viewsets.ModelViewSet):
             return Paciente.objects.none()
 
         # 2. Filtrar por papelera o activos
-        # CORRECCIÓN: 'restaurar' también necesita buscar entre los inactivos
         if self.action in ['papelera', 'restaurar']: 
             qs = Paciente.objects.filter(activo=False)
         else:
@@ -81,11 +84,8 @@ class PacienteViewSet(viewsets.ModelViewSet):
         Retorna solo los pacientes que el estudiante tiene asignados.
         URL: /api/pacientes/mis_asignaciones/
         """
-        # Aprovechamos la lógica de filtrado que ya escribiste en get_queryset
         pacientes = self.get_queryset()
         
-        # Opcional: Si quieres estar 100% seguro de que solo devuelva los del estudiante
-        # incluso si un admin llama a esta ruta:
         if getattr(request.user, 'rol', None) == 'ESTUDIANTE':
             pacientes = pacientes.filter(estudiante_asignado=request.user)
             
@@ -103,14 +103,11 @@ class PacienteViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def restaurar(self, request, pk=None):
         try:
-            # CORRECCIÓN: get_object() usa las reglas de get_queryset. 
-            # ¡Ahora es 100% seguro y respeta los roles!
             paciente = self.get_object() 
             paciente.activo = True
             paciente.save()
             return Response({'message': 'Paciente restaurado con éxito'}, status=status.HTTP_200_OK)
         except Exception:
-            # Capturamos cualquier error (ej. 404 si el paciente no existe o es de otro estudiante)
             return Response({'error': 'Paciente no encontrado o no tienes permisos'}, status=status.HTTP_404_NOT_FOUND)
 
     def destroy(self, request, *args, **kwargs):
@@ -128,56 +125,166 @@ class PacienteViewSet(viewsets.ModelViewSet):
         paciente = self.get_object()
 
         if request.method == 'GET':
-            # El Serializer de Paciente ya trae todo anidado
             serializer = self.get_serializer(paciente)
+            data = serializer.data
+            
+            # Función auxiliar para sacar el primer elemento si es una lista (por los ForeignKey)
+            def get_first(item):
+                return item[0] if item and isinstance(item, list) else item
+
             return Response({
-                'familiares': serializer.data.get('antecedentes_familiares'),
-                'personales': serializer.data.get('antecedentes_personales'),
-                'no_patologicos': serializer.data.get('antecedentes_no_patologicos'),
-                'ginecologicos': serializer.data.get('antecedentes_ginecologicos'),
-                'habitos': serializer.data.get('habitos'),
-                'antecedentes_periodontales': serializer.data.get('antecedentes_periodontales'),
-                'examen_periodontal': serializer.data.get('examen_periodontal'),
-                'historia_odontopediatrica': serializer.data.get('historia_odontopediatrica'),
-                'prostodoncia_removible': serializer.data.get('prostodoncia_removible'),
-                'prostodoncia_fija': serializer.data.get('prostodoncia_fija'),
-                'protocolo_quirurgico': serializer.data.get('protocolo_quirurgico'),
-                'examen_clinico_fisico': serializer.data.get('examen_clinico_fisico'),
+                'familiares': data.get('antecedentes_familiares'),
+                'personales': data.get('antecedentes_personales'),
+                'no_patologicos': data.get('antecedentes_no_patologicos'),
+                'ginecologicos': data.get('antecedentes_ginecologicos'),
+                'habitos': data.get('habitos'),
+                'antecedentes_periodontales': data.get('antecedentes_periodontales'),
+                'historia_odontopediatrica': data.get('historia_odontopediatrica'),
+                # 👇 Usamos la función para los que son ForeignKey y vienen en lista 👇
+                'examen_periodontal': get_first(data.get('examen_periodontal')),
+                'prostodoncia_removible': get_first(data.get('prostodoncia_removible')),
+                'prostodoncia_fija': get_first(data.get('prostodoncia_fija')),
+                'protocolo_quirurgico': get_first(data.get('protocolo_quirurgico')),
+                'examen_clinico_fisico': get_first(data.get('examen_clinico_fisico')),
             })
 
         if request.method == 'POST':
             data = request.data
             
+            # Función auxiliar para inyectar el ID en cada sección antes de guardar
+            def limpiar_datos(seccion_data):
+                if isinstance(seccion_data, dict):
+                    # Creamos una copia para evitar el error de "QueryDict is immutable"
+                    data_copia = dict(seccion_data)
+                    data_copia.pop('id', None)
+                    data_copia.pop('paciente', None)
+                    
+                    # 🌟 SOLUCIÓN AQUÍ: Obtenemos el usuario directamente adentro de la función
+                    estudiante_final = paciente.estudiante_asignado if paciente.estudiante_asignado else request.user
+                    data_copia['estudiante'] = estudiante_final
+                    
+                    return data_copia
+                return seccion_data
+                
             # 1. Formularios Base
             if 'familiares' in data:
-                AntecedentePatologicoFamiliar.objects.update_or_create(paciente=paciente, defaults=data['familiares'])
+                AntecedentePatologicoFamiliar.objects.update_or_create(
+                    paciente=paciente, defaults=limpiar_datos(data['familiares'])
+                )
             if 'personales' in data:
-                AntecedentePatologicoPersonal.objects.update_or_create(paciente=paciente, defaults=data['personales'])
+                AntecedentePatologicoPersonal.objects.update_or_create(
+                    paciente=paciente, defaults=limpiar_datos(data['personales'])
+                )
             if 'no_patologicos' in data:
-                AntecedenteNoPatologicoPersonal.objects.update_or_create(paciente=paciente, defaults=data['no_patologicos'])
+                AntecedenteNoPatologicoPersonal.objects.update_or_create(
+                    paciente=paciente, defaults=limpiar_datos(data['no_patologicos'])
+                )
             if 'ginecologicos' in data:
-                AntecedenteGinecologico.objects.update_or_create(paciente=paciente, defaults=data['ginecologicos'])
+                AntecedenteGinecologico.objects.update_or_create(
+                    paciente=paciente, defaults=limpiar_datos(data['ginecologicos'])
+                )
             
             # 2. Nuevos Formularios
             if 'habitos' in data:
-                Habitos.objects.update_or_create(paciente=paciente, defaults=data['habitos'])
+                Habitos.objects.update_or_create(
+                    paciente=paciente, defaults=limpiar_datos(data['habitos'])
+                )
             if 'antecedentes_periodontales' in data:
-                AntecedentesPeriodontales.objects.update_or_create(paciente=paciente, defaults=data['antecedentes_periodontales'])
+                AntecedentesPeriodontales.objects.update_or_create(
+                    paciente=paciente, defaults=limpiar_datos(data['antecedentes_periodontales'])
+                )
             if 'examen_periodontal' in data:
-                ExamenPeriodontal.objects.update_or_create(paciente=paciente, defaults=data['examen_periodontal'])
+                ExamenPeriodontal.objects.update_or_create(
+                    paciente=paciente, defaults=limpiar_datos(data['examen_periodontal'])
+                )
             if 'historia_odontopediatrica' in data:
-                HistoriaOdontopediatrica.objects.update_or_create(paciente=paciente, defaults=data['historia_odontopediatrica'])
+                HistoriaOdontopediatrica.objects.update_or_create(
+                    paciente=paciente, defaults=limpiar_datos(data['historia_odontopediatrica'])
+                )
             if 'prostodoncia_removible' in data:
-                ProstodonciaRemovible.objects.update_or_create(paciente=paciente, defaults=data['prostodoncia_removible'])
+                ProstodonciaRemovible.objects.update_or_create(
+                    paciente=paciente, defaults=limpiar_datos(data['prostodoncia_removible'])
+                )
             if 'prostodoncia_fija' in data:
-                ProstodonciaFija.objects.update_or_create(paciente=paciente, defaults=data['prostodoncia_fija'])
+                ProstodonciaFija.objects.update_or_create(
+                    paciente=paciente, defaults=limpiar_datos(data['prostodoncia_fija'])
+                )
             if 'protocolo_quirurgico' in data:
-                ProtocoloQuirurgico.objects.update_or_create(paciente=paciente, defaults=data['protocolo_quirurgico'])
+                ProtocoloQuirurgico.objects.update_or_create(
+                    paciente=paciente, defaults=limpiar_datos(data['protocolo_quirurgico'])
+                )
             if 'examen_clinico_fisico' in data:
-                ExamenClinicoFisico.objects.update_or_create(paciente=paciente, defaults=data['examen_clinico_fisico'])
+                ExamenClinicoFisico.objects.update_or_create(
+                    paciente=paciente, defaults=limpiar_datos(data['examen_clinico_fisico'])
+                )
 
             return Response({'message': 'Historial clínico actualizado correctamente'}, status=status.HTTP_200_OK)
+# Función auxiliar para inyectar el ID en cada sección antes de guardar
+            def limpiar_datos(seccion_data):
+                if isinstance(seccion_data, dict):
+                    # Creamos una copia para evitar el error de "QueryDict is immutable"
+                    data_copia = dict(seccion_data)
+                    data_copia.pop('id', None)
+                    data_copia.pop('paciente', None)
+                    
+                    # 👇 AQUÍ ESTÁ LA MAGIA: Inyectamos el usuario automáticamente 👇
+                    estudiante_final = paciente.estudiante_asignado if paciente.estudiante_asignado else request.user
+                    data_copia['estudiante'] = estudiante_final
+                    return data_copia
+                return seccion_data
+                # 1. Formularios Base
+            if 'familiares' in data:
+                AntecedentePatologicoFamiliar.objects.update_or_create(
+                    paciente=paciente, defaults=limpiar_datos(data['familiares'])
+                )
+            if 'personales' in data:
+                AntecedentePatologicoPersonal.objects.update_or_create(
+                    paciente=paciente, defaults=limpiar_datos(data['personales'])
+                )
+            if 'no_patologicos' in data:
+                AntecedenteNoPatologicoPersonal.objects.update_or_create(
+                    paciente=paciente, defaults=limpiar_datos(data['no_patologicos'])
+                )
+            if 'ginecologicos' in data:
+                AntecedenteGinecologico.objects.update_or_create(
+                    paciente=paciente, defaults=limpiar_datos(data['ginecologicos'])
+                )
+            
+            # 2. Nuevos Formularios
+            if 'habitos' in data:
+                Habitos.objects.update_or_create(
+                    paciente=paciente, defaults=limpiar_datos(data['habitos'])
+                )
+            if 'antecedentes_periodontales' in data:
+                AntecedentesPeriodontales.objects.update_or_create(
+                    paciente=paciente, defaults=limpiar_datos(data['antecedentes_periodontales'])
+                )
+            if 'examen_periodontal' in data:
+                ExamenPeriodontal.objects.update_or_create(
+                    paciente=paciente, defaults=limpiar_datos(data['examen_periodontal'])
+                )
+            if 'historia_odontopediatrica' in data:
+                HistoriaOdontopediatrica.objects.update_or_create(
+                    paciente=paciente, defaults=limpiar_datos(data['historia_odontopediatrica'])
+                )
+            if 'prostodoncia_removible' in data:
+                ProstodonciaRemovible.objects.update_or_create(
+                    paciente=paciente, defaults=limpiar_datos(data['prostodoncia_removible'])
+                )
+            if 'prostodoncia_fija' in data:
+                ProstodonciaFija.objects.update_or_create(
+                    paciente=paciente, defaults=limpiar_datos(data['prostodoncia_fija'])
+                )
+            if 'protocolo_quirurgico' in data:
+                ProtocoloQuirurgico.objects.update_or_create(
+                    paciente=paciente, defaults=limpiar_datos(data['protocolo_quirurgico'])
+                )
+            if 'examen_clinico_fisico' in data:
+                ExamenClinicoFisico.objects.update_or_create(
+                    paciente=paciente, defaults=limpiar_datos(data['examen_clinico_fisico'])
+                )
 
+            return Response({'message': 'Historial clínico actualizado correctamente'}, status=status.HTTP_200_OK)
 # --- VIEWSETS INDIVIDUALES ---
 class AntecedenteFamiliarViewSet(viewsets.ModelViewSet):
     queryset = AntecedentePatologicoFamiliar.objects.all()
@@ -226,6 +333,52 @@ class ProtocoloQuirurgicoViewSet(viewsets.ModelViewSet):
 class ExamenClinicoFisicoViewSet(viewsets.ModelViewSet):
     queryset = ExamenClinicoFisico.objects.all()
     serializer_class = ExamenClinicoFisicoSerializer
+
+
+# =========================================================================
+# NUEVOS VIEWSETS: TRATAMIENTOS, AVANCES Y TRANSFERENCIAS
+# =========================================================================
+
+class TratamientoViewSet(viewsets.ModelViewSet):
+    serializer_class = TratamientoSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        user = self.request.user
+        
+        # 1. Seguridad básica
+        if not user.is_authenticated:
+            return Tratamiento.objects.none()
+            
+        # 2. Superusuario o Docente/Admin ven todos los tratamientos
+        if user.is_superuser or getattr(user, 'rol', '') in ['DOCENTE', 'ADMIN', 'ADMINISTRADOR']:
+            return Tratamiento.objects.all().order_by('-creado_en')
+            
+        # 3. Estudiantes solo ven los tratamientos asignados a ellos
+        if getattr(user, 'rol', '') == 'ESTUDIANTE':
+            return Tratamiento.objects.filter(estudiante=user).order_by('-creado_en')
+            
+        # 4. Fallback de seguridad
+        return Tratamiento.objects.none()
+
+class AvanceClinicoViewSet(viewsets.ModelViewSet):
+    queryset = AvanceClinico.objects.all()
+    serializer_class = AvanceClinicoSerializer
+    permission_classes = [IsAuthenticated]
+    # filterset_fields = ['tratamiento', 'estudiante', 'estado_academico'] # Descomenta si usas django-filter
+
+class EvidenciaViewSet(viewsets.ModelViewSet):
+    queryset = Evidencia.objects.all()
+    serializer_class = EvidenciaSerializer
+    permission_classes = [IsAuthenticated]
+    # Súper importante: parser_classes permite recibir multipart/form-data (archivos)
+    parser_classes = (MultiPartParser, FormParser)
+
+class TransferenciaViewSet(viewsets.ModelViewSet):
+    queryset = Transferencia.objects.all()
+    serializer_class = TransferenciaSerializer
+    permission_classes = [IsAuthenticated]
+    # filterset_fields = ['paciente', 'estudiante_origen', 'estudiante_destino', 'estado'] # Descomenta si usas django-filter
 
 
 # =========================================================================
@@ -315,9 +468,6 @@ def estadisticas_3d_view(request):
         if start_date:
             pacientes = pacientes.filter(creado_en__gte=start_date)
             carpetas = carpetas.filter(creado_en__gte=start_date)
-            # Como SeguimientoAcademico tiene fecha_aprobacion y puede ser null si está en borrador,
-            # filtramos aquellos que tengan una fecha de aprobación mayor o igual a start_date.
-            # Alternativamente, si quieres basarte en cuándo se aprobó:
             periodontogramas = periodontogramas.filter(fecha_aprobacion__gte=start_date)
 
         data = [
@@ -327,3 +477,13 @@ def estadisticas_3d_view(request):
         ]
 
     return Response(data)
+
+# gestion_clinica/views.py
+
+
+# ... aquí están tus otras vistas (UsuarioViewSet, PacienteViewSet, etc) ...
+
+# Agrega esto al final de tu archivo views.py
+class SillonViewSet(viewsets.ModelViewSet):
+    queryset = Sillon.objects.all()
+    serializer_class = SillonSerializer

@@ -2,7 +2,7 @@ import uuid
 from django.db import models
 from datetime import date
 from django.conf import settings # Importante para relacionar con CustomUser
-
+from django.utils import timezone
 
 from django.contrib.auth.models import AbstractUser
 
@@ -580,3 +580,182 @@ class ProtocoloQuirurgico(SeguimientoAcademico):
     class Meta:
         verbose_name = "Protocolo Quirúrgico"
         verbose_name_plural = "Protocolos Quirúrgicos"
+
+        # ==========================================
+# 4. TRATAMIENTOS, AVANCES (SESIONES) Y TRANSFERENCIAS
+# ==========================================
+
+class Tratamiento(models.Model):
+    ESTADOS_TRATAMIENTO = [
+        ('EN_PROGRESO', 'En Progreso'),
+        ('FINALIZADO', 'Finalizado con Éxito'),
+        ('DERIVADO', 'Derivado a otro estudiante'),
+        ('ABANDONADO', 'Abandonado por el paciente'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    paciente = models.ForeignKey('Paciente', on_delete=models.CASCADE, related_name='tratamientos')
+    estudiante = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.RESTRICT, related_name='tratamientos_realizados')
+    
+    nombre_tratamiento = models.CharField(max_length=200, help_text="Ej: Profilaxis, Exodoncia de 3er Molar")
+    diente_pieza = models.CharField(max_length=50, blank=True, null=True, help_text="Ej: 14, 46, Toda la boca")
+    estado = models.CharField(max_length=20, choices=ESTADOS_TRATAMIENTO, default='EN_PROGRESO')
+    
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.nombre_tratamiento} - {self.paciente}"
+
+    class Meta:
+        verbose_name = "Tratamiento"
+        verbose_name_plural = "Tratamientos"
+
+class AvanceClinico(SeguimientoAcademico):
+    """
+    Cada sesión que el estudiante atiende al paciente.
+    Hereda de SeguimientoAcademico (Requiere firma del docente).
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tratamiento = models.ForeignKey(Tratamiento, on_delete=models.CASCADE, related_name='avances')
+    
+    fecha_sesion = models.DateField(default=date.today)
+    descripcion_procedimiento = models.TextField(help_text="¿Qué se le hizo al paciente hoy?")
+    proxima_cita = models.DateField(blank=True, null=True, help_text="Fecha de la siguiente sesión si es necesaria")
+
+    def __str__(self):
+        return f"Avance {self.fecha_sesion} - {self.tratamiento}"
+
+    class Meta:
+        verbose_name = "Avance de Sesión"
+        verbose_name_plural = "Avances de Sesiones"
+        ordering = ['-fecha_sesion']
+
+class Evidencia(models.Model):
+    """Fotos o documentos del avance para que el docente evalúe"""
+    TIPOS_EVIDENCIA = [
+        ('RADIOGRAFIA', 'Radiografía'),
+        ('FOTO_INICIAL', 'Fotografía Clínica Inicial'),
+        ('FOTO_PROCESO', 'Fotografía Clínica en Proceso'),
+        ('FOTO_FINAL', 'Fotografía Clínica Final'),
+        ('DOCUMENTO', 'Documento / Consentimiento'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    avance = models.ForeignKey(AvanceClinico, on_delete=models.CASCADE, related_name='evidencias')
+    
+    tipo_evidencia = models.CharField(max_length=20, choices=TIPOS_EVIDENCIA)
+    archivo = models.FileField(upload_to='evidencias_clinicas/%Y/%m/')
+    descripcion = models.CharField(max_length=255, blank=True, null=True)
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Evidencia: {self.get_tipo_evidencia_display()} - Avance {self.avance.fecha_sesion}"
+
+class Transferencia(models.Model):
+    """Registro histórico de derivación de pacientes entre estudiantes"""
+    ESTADOS_TRANSFERENCIA = [
+        ('PENDIENTE', 'Pendiente de Aprobación Docente'),
+        ('APROBADA', 'Transferencia Aprobada'),
+        ('RECHAZADA', 'Transferencia Rechazada'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    paciente = models.ForeignKey('Paciente', on_delete=models.CASCADE, related_name='historial_transferencias')
+    
+    estudiante_origen = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.RESTRICT, related_name='transferencias_emitidas')
+    estudiante_destino = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.RESTRICT, related_name='transferencias_recibidas')
+    
+    docente_aprobador = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.SET_NULL, 
+        null=True, blank=True, 
+        related_name='transferencias_evaluadas',
+        limit_choices_to={'rol': 'DOCENTE'}
+    )
+    
+    motivo_transferencia = models.TextField(help_text="¿Por qué se deriva al paciente?")
+    estado = models.CharField(max_length=20, choices=ESTADOS_TRANSFERENCIA, default='PENDIENTE')
+    
+    fecha_solicitud = models.DateTimeField(auto_now_add=True)
+    fecha_resolucion = models.DateTimeField(blank=True, null=True, help_text="Cuando el docente aprobó/rechazó")
+
+    def __str__(self):
+        return f"Transferencia de {self.paciente}"
+    
+
+# Asegúrate de tener uuid importado (ya lo tienes)
+# Importar JSONField (en Django 3.1+ viene incluido en models)
+
+# ==========================================
+# 5. PERIODONTOGRAMA
+# ==========================================
+class Periodontograma(SeguimientoAcademico):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    
+    # Usamos ForeignKey y NO OneToOneField, porque un paciente necesitará 
+    # múltiples periodontogramas a lo largo del tiempo (Inicial, Reevaluación, Mantenimiento)
+    paciente = models.ForeignKey(
+        'Paciente', 
+        on_delete=models.CASCADE, 
+        related_name='periodontogramas'
+    )
+    
+    # Aquí guardaremos el estado de React tal cual (dictionaries anidados)
+    # Ejemplo: { "48": { "movilidad": "", "implante": false, "sangrado": [...], ... } }
+    datos_vestibular_superior = models.JSONField(default=dict, blank=True, help_text="Datos de la arcada superior vestibular")
+    datos_palatino_superior = models.JSONField(default=dict, blank=True, help_text="Datos de la arcada superior palatino")
+    datos_vestibular_inferior = models.JSONField(default=dict, blank=True, help_text="Datos de la arcada inferior vestibular")
+    datos_lingual_inferior = models.JSONField(default=dict, blank=True, help_text="Datos de la arcada inferior lingual")
+    
+    # Campos adicionales útiles para el diagnóstico periodontal
+    placa_bacteriana_porcentaje = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, verbose_name="% de Placa (O'Leary)")
+    sangrado_porcentaje = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, verbose_name="% de Sangrado")
+    diagnostico = models.TextField(blank=True, null=True, verbose_name="Diagnóstico Periodontal")
+    pronostico = models.TextField(blank=True, null=True, verbose_name="Pronóstico General y por piezas")
+    
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        # Como heredas de SeguimientoAcademico, asumimos que tienes acceso al estudiante
+        return f"Periodontograma de {self.paciente} - {self.creado_en.strftime('%d/%m/%Y')}"
+
+    class Meta:
+        verbose_name = "Periodontograma"
+        verbose_name_plural = "Periodontogramas"
+        ordering = ['-creado_en'] # Ordenar del más reciente al más antiguo
+
+
+#==========================================
+# 6. SILLONES Y EQUIPOS (Para tu mapa en React)
+#+==========================================
+class Sillon(models.Model): 
+    ESTADOS = [
+        ('operativo', 'Operativo'),
+        ('revision', 'En Revisión'),
+        ('falla', 'Con Falla'),
+    ]
+
+    # Datos básicos
+    nombre = models.CharField(max_length=50, help_text="Ej: Sillón 01")
+    estado = models.CharField(max_length=20, choices=ESTADOS, default='operativo')
+    
+    # Detalles del equipo
+    marca = models.CharField(max_length=100, blank=True, null=True)
+    modelo = models.CharField(max_length=100, blank=True, null=True)
+    numero_serie = models.CharField(max_length=100, blank=True, null=True, unique=True)
+    descripcion = models.TextField(blank=True, null=True, help_text="Características especiales del equipo")
+
+    # Cotas y Mantenimiento
+    ultima_revision = models.DateTimeField(default=timezone.now)
+    dias_frecuencia_mantenimiento = models.IntegerField(default=180, help_text="Cada cuántos días necesita revisión")
+    notas_tecnicas = models.TextField(blank=True, null=True, help_text="Registro de fallas comunes o piezas cambiadas")
+
+    # Coordenadas 3D (Para tu mapa en React)
+    posicion_x = models.FloatField(default=0.0)
+    posicion_y = models.FloatField(default=0.0)
+    posicion_z = models.FloatField(default=0.0)
+
+    def __str__(self):
+        return f"{self.nombre} - {self.estado.upper()}"

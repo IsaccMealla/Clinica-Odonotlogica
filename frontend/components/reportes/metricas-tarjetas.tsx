@@ -1,7 +1,8 @@
 "use client"
 
 import { Card, CardContent } from "@/components/ui/card"
-import { Users, FileText, Activity, Stethoscope, Palette } from "lucide-react"
+// Agregamos más íconos visuales de Lucide
+import { Users, FileText, Activity, Stethoscope, Palette, Clock, CheckCircle, AlertTriangle, XCircle, ShieldAlert } from "lucide-react"
 
 interface MetricasProps {
   datos: any[];
@@ -13,11 +14,18 @@ interface MetricasProps {
 
 export function MetricasTarjetas({ datos, activas, onToggle, colores, onColorChange }: MetricasProps) {
   
+  // Función mejorada para detectar automáticamente el mejor ícono
   const getIcon = (nombre: string) => {
     const n = nombre.toLowerCase();
+    
     if (n.includes("estudiant") || n.includes("docent") || n.includes("pacient") || n.includes("usuario")) return Users;
-    if (n.includes("periodoncia") || n.includes("ortodoncia") || n.includes("riesgo")) return Activity;
+    if (n.includes("progreso") || n.includes("pendiente")) return Clock;
+    if (n.includes("finalizado") || n.includes("completado")) return CheckCircle;
+    if (n.includes("abandonado") || n.includes("cancelado")) return XCircle;
+    if (n.includes("riesgo") || n.includes("alerta")) return AlertTriangle;
+    if (n.includes("periodoncia") || n.includes("ortodoncia")) return Activity;
     if (n.includes("general") || n.includes("tratamiento") || n.includes("clinico")) return Stethoscope;
+    
     return FileText;
   }
 
@@ -59,7 +67,6 @@ export function MetricasTarjetas({ datos, activas, onToggle, colores, onColorCha
                 </div>
               </div>
 
-              {/* CONTROLES DE COLOR ARREGLADOS */}
               {estaActiva && (
                 <div 
                   className="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 p-1.5 rounded-lg transition-colors z-10"
