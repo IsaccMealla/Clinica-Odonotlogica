@@ -6,6 +6,7 @@ import { OrbitControls, Text, Float, Environment, ContactShadows, Grid, Sparkles
 import toast, { Toaster } from "react-hot-toast"
 import { AlertTriangle, CheckCircle2, Wrench, Activity, ShieldAlert, Power, Loader2, Plus, X, Save, MousePointerClick, Trash2 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import PantallaCarga3D from "@/components/PantallaCarga3D" // Ajusta la ruta a tu estructura real
 
 // --- TIPOS DE DATOS ---
 type EstadoSillon = 'operativo' | 'revision' | 'falla';
@@ -113,7 +114,9 @@ export default function MantenimientoClinica() {
         if (token) headers["Authorization"] = `Bearer ${token}`;
 
         const res = await fetch("http://localhost:8000/api/sillones/", { headers });
-        
+                // Efecto visual de carga para la presentación
+        await new Promise(r => setTimeout(r, 5000)); 
+
         if (res.ok) {
           const data = await res.json();
           
@@ -296,12 +299,12 @@ export default function MantenimientoClinica() {
   const enRevision = sillones.filter(s => s.estado === 'revision').length;
   const enFalla = sillones.filter(s => s.estado === 'falla').length;
 
-  if (cargandoInicial) {
+if (cargandoInicial) {
     return (
-      <div className="flex flex-col items-center justify-center h-[60vh] text-slate-500">
-        <Loader2 className="h-12 w-12 animate-spin text-blue-500 mb-4" />
-        <h2 className="text-xl font-bold text-slate-700 animate-pulse">Sincronizando Gemelo Digital...</h2>
-      </div>
+      <PantallaCarga3D 
+        texto="Cargando Mantenimiento 3D" 
+        subtexto="Sincronizando estado de los sillones..." 
+      />
     );
   }
 

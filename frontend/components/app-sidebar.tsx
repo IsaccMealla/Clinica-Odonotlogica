@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/sidebar"
 
 const items = [
-  { title: "Inicio", url: "/", icon: Home, roles: ["ADMIN", "DOCENTE", "ESTUDIANTE", "RECEPCIONISTA"] },
+  { title: "Inicio", url: "/dashboard", icon: Home, roles: ["ADMIN", "DOCENTE", "ESTUDIANTE", "RECEPCIONISTA"] },
   { title: "Pacientes", url: "/pacientes", icon: Users, roles: ["ADMIN", "DOCENTE", "RECEPCIONISTA"] },
   { title: "Mis Pacientes", url: "/mis-pacientes", icon: UserCheck, roles: ["ESTUDIANTE"] },
   { title: "Asignaciones", url: "/asignacion", icon: ClipboardList, roles: ["ADMIN", "DOCENTE"] },

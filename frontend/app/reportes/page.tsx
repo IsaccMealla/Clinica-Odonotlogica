@@ -9,6 +9,8 @@ import { MetricasTarjetas } from "@/components/reportes/metricas-tarjetas"
 import { GraficoFinanciero } from "@/components/reportes/grafico-financiero"
 import { Grafico3DEspecialidades } from "@/components/reportes/grafico-3d-especialidades"
 
+import PantallaCarga3D from "@/components/PantallaCarga3D"
+
 export default function DashboardReportesPage() {
   // Estados para la carga y gráficos estáticos (financiero)
   const [cargando, setCargando] = useState(true);
@@ -32,7 +34,7 @@ export default function DashboardReportesPage() {
       setCargando(true);
       try {
         // Efecto visual de carga para la presentación
-        await new Promise(r => setTimeout(r, 1200)); 
+        await new Promise(r => setTimeout(r, 5000)); 
 
         const token = localStorage.getItem("access_token");
         const headers: HeadersInit = {
@@ -124,14 +126,17 @@ export default function DashboardReportesPage() {
     }));
 
   // --- PANTALLA DE CARGA ---
+// --- PANTALLA DE CARGA ---
   if (cargando && datos3D.length === 0) {
     return (
-      <div className="h-[80vh] flex flex-col items-center justify-center bg-transparent text-slate-500">
-        <Loader2 className="h-12 w-12 animate-spin text-blue-600 mb-4" />
-        <h2 className="text-xl font-bold text-slate-700 animate-pulse">Generando Analíticas...</h2>
-        <p className="text-sm">Cruzando datos de historias clínicas y rendimiento académico</p>
+      <div className="p-6 h-screen flex items-center justify-center">
+        <PantallaCarga3D 
+          texto="Generando Analíticas..." 
+          subtexto="Cruzando datos de historias clínicas y rendimiento académico"
+          alturaClase="h-[80vh]" // Le damos la altura que ya tenías pensada
+        />
       </div>
-    )
+    );
   }
 
   return (
