@@ -7,6 +7,8 @@ from rest_framework.parsers import MultiPartParser, FormParser
 # Asegúrate de importar el modelo y el serializador en la parte superior:
 from .models import Sillon 
 from .serializers import SillonSerializer
+from .models import ImagenClinica
+from .serializers import ImagenClinicaSerializer
 # --- IMPORTACIONES DE TIEMPO PARA FILTROS ---
 from django.utils import timezone
 from datetime import timedelta
@@ -487,3 +489,244 @@ def estadisticas_3d_view(request):
 class SillonViewSet(viewsets.ModelViewSet):
     queryset = Sillon.objects.all()
     serializer_class = SillonSerializer
+
+
+# =========================================================================
+# VIEWSET DE CITAS (MEJORADO CON VALIDACIÓN Y AUDITORÍA)
+# =========================================================================
+class CitaViewSet(viewsets.ModelViewSet):
+    queryset = Cita.objects.all().order_by('fecha_hora')
+    serializer_class = CitaSerializer
+    permission_classes = [IsAuthenticated]
+    filterset_fields = ['estado', 'paciente', 'estudiante', 'docente', 'gabinete']
+
+    def validate_conflict(self, paciente, estudiante, docente, gabinete, fecha_hora, duracion, exclude_id=None):
+        """Valida conflictos de doble reserva"""
+        from datetime import timedelta as td
+        
+        fecha_fin = fecha_hora + td(minutes=duracion)
+        
+        conflicts = Cita.objects.filter(
+            estado__in=['RESERVADA', 'CONFIRMADA', 'EN_ESPERA', 'ATENDIENDO']
+        )
+        
+        if exclude_id:
+            conflicts = conflicts.exclude(id=exclude_id)
+        
+        # Verificar gabinete
+        gabinete_conflict = conflicts.filter(
+            gabinete=gabinete,
+            fecha_hora__lt=fecha_fin,
+            fecha_hora__gte=fecha_hora - td(minutes=30)
+        )
+        
+        if gabinete_conflict.exists():
+            return False, "El gabinete está ocupado en ese horario"
+        
+        # Verificar estudiante
+        estudiante_conflict = conflicts.filter(
+            estudiante=estudiante,
+            fecha_hora__lt=fecha_fin,
+            fecha_hora__gte=fecha_hora - td(minutes=duracion)
+        )
+        
+        if estudiante_conflict.exists():
+            return False, "El estudiante tiene otra cita en ese horario"
+        
+        # Verificar docente
+        docente_conflict = conflicts.filter(
+            docente=docente,
+            fecha_hora__lt=fecha_fin,
+            fecha_hora__gte=fecha_hora - td(minutes=duracion)
+        )
+        
+        if docente_conflict.exists():
+            return False, "El docente tiene otra cita en ese horario"
+        
+        return True, "OK"
+
+    def perform_create(self, serializer):
+        data = serializer.validated_data
+        is_valid, message = self.validate_conflict(
+            data['paciente'],
+            data['estudiante'],
+            data['docente'],
+            data['gabinete'],
+            data['fecha_hora'],
+            data['duracion_estimada']
+        )
+        
+        if not is_valid:
+            raise serializers.ValidationError(message)
+        
+        cita = serializer.save()
+        
+        # Registrar en auditoría
+        AuditoriaCita.objects.create(
+            cita=cita,
+            tipo_cambio='CREACION',
+            usuario=self.request.user,
+            descripcion='Cita creada por ' + self.request.user.get_full_name()
+        )
+
+    @action(detail=True, methods=['post'])
+    def check_in(self, request, pk=None):
+        """Marca el check-in del paciente"""
+        cita = self.get_object()
+        
+        if cita.estado not in ['CONFIRMADA', 'RESERVADA']:
+            return Response(
+                {'error': 'La cita no puede marcar check-in en estado ' + cita.estado},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        cita.estado = 'EN_ESPERA'
+        cita.check_in_time = timezone.now()
+        cita.save()
+        
+        # Registrar en auditoría
+        AuditoriaCita.objects.create(
+            cita=cita,
+            tipo_cambio='CHECK_IN',
+            usuario=request.user,
+            descripcion='Paciente marcado en sala de espera'
+        )
+        
+        serializer = self.get_serializer(cita)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def cancelar(self, request, pk=None):
+        """Cancela una cita"""
+        cita = self.get_object()
+        
+        if cita.estado == 'CANCELADA':
+            return Response(
+                {'error': 'La cita ya está cancelada'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        data = request.data
+        cita.estado = 'CANCELADA'
+        cita.cancelada_en = timezone.now()
+        cita.razon_cancelacion = data.get('razon', 'OTRA')
+        cita.motivo_cancelacion = data.get('motivo', '')
+        cita.cancelada_por = request.user
+        cita.save()
+        
+        # Registrar en auditoría
+        AuditoriaCita.objects.create(
+            cita=cita,
+            tipo_cambio='CANCELACION',
+            usuario=request.user,
+            descripcion=f'Cita cancelada: {cita.motivo_cancelacion}',
+            valores_nuevos={'razon': cita.razon_cancelacion}
+        )
+        
+        serializer = self.get_serializer(cita)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+# =========================================================================
+# VIEWSET DE CITAS RECURRENTES
+# =========================================================================
+class CitaRecurrenteViewSet(viewsets.ModelViewSet):
+    queryset = CitaRecurrente.objects.all().order_by('fecha_inicio')
+    serializer_class = CitaRecurrenteSerializer
+    permission_classes = [IsAuthenticated]
+    filterset_fields = ['paciente', 'estudiante', 'docente', 'gabinete', 'activa']
+
+    def perform_create(self, serializer):
+        cita_recurrente = serializer.save()
+        
+        from datetime import datetime as dt
+        
+        fecha_hora = dt.combine(cita_recurrente.fecha_inicio, cita_recurrente.hora)
+        
+        Cita.objects.create(
+            paciente=cita_recurrente.paciente,
+            estudiante=cita_recurrente.estudiante,
+            docente=cita_recurrente.docente,
+            gabinete=cita_recurrente.gabinete,
+            motivo=cita_recurrente.motivo,
+            fecha_hora=fecha_hora,
+            duracion_estimada=cita_recurrente.duracion_estimada,
+            cita_recurrente=cita_recurrente,
+            estado='RESERVADA'
+        )
+
+
+# =========================================================================
+# VIEWSET DE CONFIGURACIÓN DE ALERTAS
+# =========================================================================
+class ConfiguracionAlertasViewSet(viewsets.ModelViewSet):
+    queryset = ConfiguracionAlertas.objects.all()
+    serializer_class = ConfiguracionAlertasSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        obj, created = ConfiguracionAlertas.objects.get_or_create(pk=1)
+        return ConfiguracionAlertas.objects.filter(pk=1)
+
+
+# =========================================================================
+# VIEWSET DE AUDITORÍA DE CITAS
+# =========================================================================
+class AuditoriaCitaViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = AuditoriaCita.objects.all()
+    serializer_class = AuditoriaCitaSerializer
+    permission_classes = [IsAuthenticated]
+    filterset_fields = ['cita', 'tipo_cambio', 'usuario']
+
+
+# =========================================================================
+# VIEWSET DE HISTÓRICO DE ABANDONO
+# =========================================================================
+class HistoricoAbandonoPacienteViewSet(viewsets.ModelViewSet):
+    queryset = HistoricoAbandonoPaciente.objects.all()
+    serializer_class = HistoricoAbandonoPacienteSerializer
+    permission_classes = [IsAuthenticated]
+    filterset_fields = ['paciente', 'reactivado']
+
+    @action(detail=True, methods=['post'])
+    def reactivar(self, request, pk=None):
+        """Reactiva un paciente abandonado"""
+        abandono = self.get_object()
+        
+        if abandono.reactivado:
+            return Response(
+                {'error': 'El paciente ya ha sido reactivado'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        paciente = abandono.paciente
+        paciente.alerta_abandono = False
+        paciente.activo = True
+        paciente.inasistencias = 0
+        paciente.save()
+        
+        abandono.reactivado = True
+        abandono.fecha_reactivacion = timezone.now()
+        abandono.save()
+        
+        serializer = self.get_serializer(abandono)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    
+    # =========================================================================
+# RADIOGRAFIAS
+# =========================================================================
+class ImagenClinicaViewSet(viewsets.ModelViewSet):
+    queryset = ImagenClinica.objects.all()
+    serializer_class = ImagenClinicaSerializer
+    permission_classes = [IsAuthenticated]
+    def get_queryset(self):
+        # Permite filtrar en el frontend usando: /api/imagenes/?paciente=ID
+        paciente_id = self.request.query_params.get('paciente')
+        if paciente_id:
+            return self.queryset.filter(paciente_id=paciente_id)
+        return self.queryset
+
+    def perform_create(self, serializer):
+        # Asigna automáticamente el estudiante que está logueado
+        serializer.save(estudiante=self.request.user)

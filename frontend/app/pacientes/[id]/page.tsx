@@ -1,7 +1,10 @@
 "use client"
 
 import { useState, use, useEffect } from "react"
-import { ArrowLeft, User, Stethoscope, Activity, FileText, Save, ClipboardList } from "lucide-react"
+import { 
+    ArrowLeft, User, Stethoscope, Activity, FileText, 
+    Save, ClipboardList, ImageIcon, UploadCloud 
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,100 +17,95 @@ import { TabPeriodoncia } from "@/components/tabs-expediente/tab-periodoncia"
 import { TabPeriodontogramaGrafico } from "@/components/tabs-expediente/tab-periodontograma-grafico"
 import { TabHistorialTratamientos } from "@/components/tabs-expediente/tab-historial-tratamientos"
 
+// MODULO 5: IMÁGENES
+import VisorRadiologico from "@/components/imagenes/VisorRadiologico"
+import ImageUpload from "@/components/imagenes/ImageUpload"
+import ExploradorImagenes from "@/components/imagenes/ExploradorImagenes"       
+
 export default function ExpedientePacientePage({ params }: { params: Promise<{ id: string }> }) {
     const router = useRouter();
-
-    // 1. Desempaquetamos los params usando la función use()
     const unwrappedParams = use(params);
-    // 2. Ahora sí podemos acceder al id sin que Next.js se queje
     const pacienteId = unwrappedParams.id;
 
-    // --- 1. ESTADO GLOBAL DEL FORMULARIO ---
+    // --- ESTADOS ---
     const [formData, setFormData] = useState({
-        familiares: {},
-        personales: {},
-        no_patologicos: {},
-        ginecologicos: {},
-        habitos: {},
-        antecedentes_periodontales: {},
-        examen_periodontal: {},
-        historia_odontopediatrica: {},
-        prostodoncia_removible: {},
-        prostodoncia_fija: {},
-        protocolo_quirurgico: {},
-        examen_clinico_fisico: {}
+        familiares: {}, personales: {}, no_patologicos: {}, ginecologicos: {},
+        habitos: {}, antecedentes_periodontales: {}, examen_periodontal: {},
+        historia_odontopediatrica: {}, prostodoncia_removible: {},
+        prostodoncia_fija: {}, protocolo_quirurgico: {}, examen_clinico_fisico: {}
     });
-
+    const [paciente, setPaciente] = useState<any>(null);
+    const [imagenes, setImagenes] = useState([]);
     const [guardando, setGuardando] = useState(false);
+    const [cargando, setCargando] = useState(true);
 
-    // Datos de prueba (Luego haremos un GET al backend)
-    const paciente = {
-        nombres: "Isacc Leonardo",
-        apellido_paterno: "Mealla",
-        ci: "13970664",
-        edad: 21,
-        sexo: "Masculino"
-    }
+    // --- CARGA DE DATOS (PACIENTE, ANTECEDENTES E IMÁGENES) ---
+    const cargarPaciente = async (id: string) => {
+        try {
+            const token = localStorage.getItem('access_token');
+            const res = await fetch(`http://localhost:8000/api/pacientes/${id}/`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setPaciente(data);
+            }
+        } catch (error) { 
+            console.error("Error cargando datos del paciente:", error); 
+        }
+    };
 
-    // --- NUEVO: FUNCIÓN PARA CARGAR DATOS AL INICIAR ---
+    const cargarImagenes = async () => {
+        try {
+            const token = localStorage.getItem('access_token');
+            const res = await fetch(`http://localhost:8000/api/imagenes/?paciente=${pacienteId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setImagenes(Array.isArray(data) ? data : (data.results || []));
+            }
+        } catch (error) { console.error("Error cargando imágenes:", error); }
+    };
+
     useEffect(() => {
         const cargarExpediente = async () => {
             try {
-                const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-                
-                // Hacemos un GET a la misma ruta para traer lo que ya está guardado
+                const token = localStorage.getItem('access_token');
                 const response = await fetch(`http://localhost:8000/api/pacientes/${pacienteId}/antecedentes/`, {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': token ? `Bearer ${token}` : '',
-                        'Content-Type': 'application/json'
-                    }
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
                 });
-
                 if (response.ok) {
                     const datosGuardados = await response.json();
-                    
-                    // Actualizamos el estado combinando la estructura base con los datos de Django
-                    setFormData(prev => ({
-                        ...prev,
-                        ...datosGuardados
-                    }));
-                } else if (response.status !== 404) {
-                    console.error("Error al cargar los datos:", await response.text());
+                    setFormData(prev => ({ ...prev, ...datosGuardados }));
                 }
-            } catch (error) {
-                console.error("Error de red al intentar cargar el expediente:", error);
-            }
+            } catch (error) { console.error("Error cargando expediente:", error); }
         };
 
         if (pacienteId) {
-            cargarExpediente();
+            setCargando(true);
+            Promise.all([
+                cargarPaciente(pacienteId),
+                cargarExpediente(),
+                cargarImagenes()
+            ]).finally(() => setCargando(false));
         }
     }, [pacienteId]);
 
-    // --- 2. FUNCIÓN MAESTRA PARA ACTUALIZAR CAMPOS ---
+    // --- FUNCIONES DE ACCIÓN ---
     const handleInputChange = (seccion: string, campo: string, valor: any) => {
         setFormData((prev) => ({
             ...prev,
-            [seccion]: {
-                ...prev[seccion as keyof typeof prev],
-                [campo]: valor
-            }
+            [seccion]: { ...prev[seccion as keyof typeof prev], [campo]: valor }
         }));
     };
 
-// --- 3. FUNCIÓN PARA ENVIAR A DJANGO ---
     const guardarExpediente = async () => {
         setGuardando(true);
         try {
-            const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-
-            // 🌟 LA MAGIA DE LA LIMPIEZA:
-            // Hacemos una copia de los datos para no modificar el estado original
+            const token = localStorage.getItem('access_token');
             const dataParaEnviar = JSON.parse(JSON.stringify(formData));
             
-            // Recorremos todas las secciones y eliminamos el 'id' y 'paciente' 
-            // para que Django no colapse al hacer el update_or_create
             Object.keys(dataParaEnviar).forEach(seccion => {
                 if (dataParaEnviar[seccion]) {
                     delete dataParaEnviar[seccion].id;
@@ -117,33 +115,25 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
 
             const response = await fetch(`http://localhost:8000/api/pacientes/${pacienteId}/antecedentes/`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': token ? `Bearer ${token}` : '' 
-                },
-                // 🌟 ENVIAMOS LA DATA LIMPIA, SIN IDs
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify(dataParaEnviar)
             });
 
-            if (response.ok) {
-                alert("¡Expediente guardado con éxito! 🎉");
-            } else {
-                const errorData = await response.json();
-                console.error("Error al guardar:", errorData);
-                alert("Hubo un error al guardar. Revisa la consola.");
-            }
-        } catch (error) {
-            console.error("Error de red:", error);
-            alert("Error de conexión con el servidor.");
-        } finally {
-            setGuardando(false);
-        }
+            if (response.ok) alert("¡Expediente guardado con éxito! 🎉");
+        } catch (error) { alert("Error de conexión con el servidor."); } 
+        finally { setGuardando(false); }
     }
 
     return (
         <div className="min-h-screen bg-slate-50 p-6 flex flex-col space-y-6">
 
-            {/* --- ENCABEZADO Y BOTÓN DE REGRESO --- */}
+            {cargando || !paciente ? (
+                <div className="flex justify-center items-center py-20">
+                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
+                </div>
+            ) : (
+            <>
+            {/* --- ENCABEZADO --- */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
                     <Button variant="outline" size="icon" onClick={() => router.back()}>
@@ -158,23 +148,16 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
                     </div>
                 </div>
 
-                {/* --- NUEVO BOTÓN MAESTRO PARA GUARDAR --- */}
-                <Button
-                    onClick={guardarExpediente}
-                    disabled={guardando}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
-                >
+                <Button onClick={guardarExpediente} disabled={guardando} className="bg-blue-600 hover:bg-blue-700 text-white">
                     <Save className="h-4 w-4 mr-2" />
                     {guardando ? "Guardando..." : "Guardar Expediente"}
                 </Button>
             </div>
 
-            {/* --- EL HUB DE PESTAÑAS GIGANTES --- */}
+            {/* --- TABS PRINCIPALES (AHORA 5 COLUMNAS) --- */}
             <Tabs defaultValue="historia" className="w-full flex-1 flex flex-col">
 
-                {/* LA BARRA DE NAVEGACIÓN PRINCIPAL */}
-                <TabsList className="grid w-full grid-cols-4 h-14 bg-white border shadow-sm rounded-xl">
-   
+                <TabsList className="grid w-full grid-cols-5 h-14 bg-white border shadow-sm rounded-xl p-1">
                     <TabsTrigger value="historia" className="text-md data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700">
                         <FileText className="h-4 w-4 mr-2" /> Historia Clínica
                     </TabsTrigger>
@@ -187,7 +170,9 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
                     <TabsTrigger value="tratamientos" className="text-md data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700">
                         <ClipboardList className="h-4 w-4 mr-2" /> Tratamientos
                     </TabsTrigger>
-
+                    <TabsTrigger value="imagenes" className="text-md data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700">
+                        <ImageIcon className="h-4 w-4 mr-2" /> Imágenes/RX
+                    </TabsTrigger>
                 </TabsList>
 
                 {/* --- CONTENIDO: HISTORIA CLÍNICA --- */}
@@ -195,29 +180,20 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
                     <Card className="h-full border-emerald-100 shadow-sm">
                         <CardHeader className="bg-emerald-50/50 border-b">
                             <CardTitle className="text-emerald-800">Historia Clínica Detallada</CardTitle>
-                            <CardDescription>Exámenes físicos, Hábitos, Odontopediatría y Periodoncia.</CardDescription>
                         </CardHeader>
                         <CardContent className="p-6">
-
-                            {/* SUB-PESTAÑAS DE LA HISTORIA CLÍNICA */}
                             <Tabs defaultValue="evaluacion" className="w-full">
                                 <TabsList className="grid w-full grid-cols-3 mb-6 bg-slate-100">
                                     <TabsTrigger value="evaluacion">Evaluación y Hábitos</TabsTrigger>
                                     <TabsTrigger value="odontopediatria">Odontopediatría</TabsTrigger>
                                     <TabsTrigger value="periodoncia">Enf. Periodontales</TabsTrigger>
                                 </TabsList>
-
-                                {/* 1. SUB-PESTAÑA: EVALUACIÓN Y HÁBITOS */}
                                 <TabsContent value="evaluacion">
                                     <TabEvaluacionGeneral formData={formData} onChange={handleInputChange} />
                                 </TabsContent>
-
-                                {/* 2. SUB-PESTAÑA: ODONTOPEDIATRÍA */}
                                 <TabsContent value="odontopediatria">
                                     <TabOdontopediatria formData={formData} onChange={handleInputChange} />
                                 </TabsContent>
-
-                                {/* 3. SUB-PESTAÑA: PERIODONCIA (Textos) */}
                                 <TabsContent value="periodoncia">
                                     <TabPeriodoncia formData={formData} onChange={handleInputChange} />
                                 </TabsContent>
@@ -229,16 +205,15 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
                 {/* --- CONTENIDO: ODONTOGRAMA 3D --- */}
                 <TabsContent value="odontograma" className="mt-6">
                     <Card className="h-[600px] flex items-center justify-center bg-slate-900">
-                        <p className="text-slate-400">Espacio reservado para Canvas de Three.js (Odontograma)</p>
+                        <p className="text-slate-400 font-mono">THREE.JS CANVAS: ODONTOGRAMA EN TIEMPO REAL</p>
                     </Card>
                 </TabsContent>
 
-                {/* --- CONTENIDO: PERIODONTOGRAMA GRÁFICO --- */}
+                {/* --- CONTENIDO: PERIODONTOGRAMA --- */}
                 <TabsContent value="periodontograma" className="mt-6 flex-1">
-                    <Card className="min-h-full border-rose-100 shadow-sm">
+                    <Card className="border-rose-100 shadow-sm">
                         <CardHeader className="bg-rose-50/50 border-b">
                             <CardTitle className="text-rose-800">Periodontograma Gráfico</CardTitle>
-                            <CardDescription>Registro de márgenes, sondaje, placa y sangrado por pieza dental.</CardDescription>
                         </CardHeader>
                         <CardContent className="p-6">
                             <TabPeriodontogramaGrafico />
@@ -246,12 +221,11 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
                     </Card>
                 </TabsContent>
 
-                {/* --- CONTENIDO: HISTORIAL DE TRATAMIENTOS --- */}
+                {/* --- CONTENIDO: TRATAMIENTOS --- */}
                 <TabsContent value="tratamientos" className="mt-6 flex-1">
-                    <Card className="min-h-full border-indigo-100 shadow-sm">
+                    <Card className="border-indigo-100 shadow-sm">
                         <CardHeader className="bg-indigo-50/50 border-b">
-                            <CardTitle className="text-indigo-800">Historial de Tratamientos</CardTitle>
-                            <CardDescription>Registro cronológico de visitas, procedimientos y evidencias del paciente.</CardDescription>
+                            <CardTitle className="text-indigo-800">Plan de Tratamiento</CardTitle>
                         </CardHeader>
                         <CardContent className="p-6 bg-slate-50">
                             <TabHistorialTratamientos pacienteId={pacienteId} />
@@ -259,7 +233,39 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
                     </Card>
                 </TabsContent>
 
+                {/* --- NUEVO CONTENIDO: MÓDULO 5 IMÁGENES Y RAYOS X --- */}
+                <TabsContent value="imagenes" className="mt-6 flex-1">
+                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-full">
+                        {/* Columna Izquierda: Panel de Carga */}
+                        <div className="lg:col-span-1 space-y-4">
+                            <Card className="border-blue-100 shadow-sm">
+                                <CardHeader className="bg-blue-50/50 border-b">
+                                    <CardTitle className="text-sm flex items-center gap-2">
+                                        <UploadCloud className="w-4 h-4" /> Adquisición de Imagen
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="pt-4">
+                                    <ImageUpload pacienteId={pacienteId} onUploadSuccess={cargarImagenes} />
+                                </CardContent>
+                            </Card>
+                            
+                            <Card className="p-4 bg-blue-50 border-blue-100">
+                                <p className="text-xs text-blue-800 font-medium italic">
+                                    "Recuerde etiquetar correctamente la pieza dental y el plano de corte para capturas CBCT."
+                                </p>
+                            </Card>
+                        </div>
+                        
+                        {/* Columna Derecha: Visor Avanzado */}
+                        <div className="lg:col-span-3">
+                            <VisorRadiologico imagenes={imagenes} />
+                        </div>
+                    </div>
+                </TabsContent>
+
             </Tabs>
+            </>
+            )}
         </div>
     )
 }

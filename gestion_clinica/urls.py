@@ -24,7 +24,15 @@ from .views import (
     EvidenciaViewSet,
     TransferenciaViewSet,
     # --- AGREGADO: VIEWSET DE SILLONES ---
-    SillonViewSet 
+    SillonViewSet,
+    # --- AGREGADO: VIEWSET DE CITAS ---
+    CitaViewSet,
+    # --- NUEVOS VIEWSETS (AGENDAMIENTO AVANZADO) ---
+    CitaRecurrenteViewSet,
+    ConfiguracionAlertasViewSet,
+    AuditoriaCitaViewSet,
+    # --- AGREGADO: VIEWSET PARA HISTÓRICO DE ABANDONO DE PACIENTES ---
+    HistoricoAbandonoPacienteViewSet
 )
 
 # Creamos el router automático
@@ -58,6 +66,19 @@ router.register(r'transferencias', TransferenciaViewSet, basename='transferencia
 
 # --- AGREGADO: RUTA PARA SILLONES ---
 router.register(r'sillones', SillonViewSet, basename='sillon')
+
+# --- AGREGADO: RUTA PARA CITAS ---
+router.register(r'citas', CitaViewSet, basename='cita')
+
+# --- NUEVAS RUTAS: AGENDAMIENTO AVANZADO ---
+router.register(r'citas-recurrentes', CitaRecurrenteViewSet, basename='cita-recurrente')
+router.register(r'configuracion-alertas', ConfiguracionAlertasViewSet, basename='configuracion-alertas')
+router.register(r'auditoria-citas', AuditoriaCitaViewSet, basename='auditoria-cita')
+router.register(r'historico-abandono', HistoricoAbandonoPacienteViewSet, basename='historico-abandono')
+
+# ----- AGREGADO: RUTA PARA IMÁGENES CLÍNICAS -----
+router.register(r'imagenes', views.ImagenClinicaViewSet, basename='imagenes')
+
 
 urlpatterns = [
     # Las rutas automáticas (CRUD completo para usuarios, pacientes, tablas y tratamientos)

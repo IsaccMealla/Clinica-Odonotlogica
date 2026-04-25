@@ -102,16 +102,20 @@ function DashboardUI() {
   const scroll = useScroll();
   const cardRef = useRef<HTMLDivElement>(null);
 
-  useFrame(() => {
-    if (cardRef.current) {
-      // Limitamos la rotación para que sea elegante y no se deforme
-      const offset = scroll.offset; 
-      const rotation = THREE.MathUtils.lerp(-5, 5, offset);
-      const scale = THREE.MathUtils.lerp(0.95, 1, Math.sin(offset * Math.PI));
-      
-      cardRef.current.style.transform = `perspective(1000px) rotateY(${rotation}deg) scale(${scale})`;
-    }
-  });
+  React.useEffect(() => {
+    const updateCardTransform = () => {
+      if (cardRef.current) {
+        const offset = scroll.offset; 
+        const rotation = THREE.MathUtils.lerp(-5, 5, offset);
+        const scale = THREE.MathUtils.lerp(0.95, 1, Math.sin(offset * Math.PI));
+        
+        cardRef.current.style.transform = `perspective(1000px) rotateY(${rotation}deg) scale(${scale})`;
+      }
+    };
+
+    const interval = setInterval(updateCardTransform, 16);
+    return () => clearInterval(interval);
+  }, [scroll]);
 
   return (
     <div className="w-full text-white selection:bg-cyan-500/30">

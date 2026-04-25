@@ -1,9 +1,12 @@
 import uuid
-from django.db import models
-from datetime import date
-from django.conf import settings # Importante para relacionar con CustomUser
-from django.utils import timezone
+from datetime import date, timedelta
 
+from django.conf import settings
+from django.db import models
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from django.utils import timezone
+import os
 from django.contrib.auth.models import AbstractUser
 
 # ==========================================
@@ -86,6 +89,9 @@ class Paciente(models.Model):
     
     fecha_ultima_consulta = models.DateField(blank=True, null=True)
     motivo_ultima_consulta = models.TextField(blank=True, null=True)
+
+    inasistencias = models.IntegerField(default=0, help_text="Número de citas no asistidas")
+    alerta_abandono = models.BooleanField(default=False, help_text="Indica si el paciente está en alerta por abandono")
 
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
@@ -284,6 +290,22 @@ class AntecedentesPeriodontales(SeguimientoAcademico):
     class Meta:
         verbose_name = "Antecedente Periodontal"
         verbose_name_plural = "Antecedentes Periodontales"
+
+class HistoriaClinica(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    paciente = models.ForeignKey('Paciente', on_delete=models.CASCADE, related_name='historias_clinicas')
+    titulo = models.CharField(max_length=255, default='Acta de abandono', help_text='Título del registro clínico')
+    descripcion = models.TextField(blank=True, null=True)
+    creado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='historias_clinicas_creadas')
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Historia Clínica'
+        verbose_name_plural = 'Historias Clínicas'
+
+    def __str__(self):
+        return f"Historia Clínica - {self.paciente}"
 
 class HistoriaOdontopediatrica(SeguimientoAcademico):
     paciente = models.OneToOneField('Paciente', on_delete=models.CASCADE, related_name='historia_odontopediatrica')
@@ -759,3 +781,231 @@ class Sillon(models.Model):
 
     def __str__(self):
         return f"{self.nombre} - {self.estado.upper()}"
+
+# ==========================================
+# 7. CITAS (Agendamiento)
+# ==========================================
+class Cita(models.Model):
+    ESTADOS_CITA = [
+        ('RESERVADA', 'Reservada'),
+        ('CONFIRMADA', 'Confirmada'),
+        ('EN_ESPERA', 'En Espera'),
+        ('ATENDIENDO', 'Atendiendo'),
+        ('NO_ASISTIO', 'No Asistió'),
+        ('CANCELADA', 'Cancelada'),
+    ]
+
+    RAZONES_CANCELACION = [
+        ('PACIENTE', 'Cancelada por Paciente'),
+        ('ESTUDIANTE', 'Cancelada por Estudiante'),
+        ('DOCENTE', 'Cancelada por Docente'),
+        ('MANTENIMIENTO', 'Cancelada por Mantenimiento'),
+        ('OTRA', 'Otra Razón'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    paciente = models.ForeignKey('Paciente', on_delete=models.CASCADE, related_name='citas')
+    estudiante = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.RESTRICT, related_name='citas_estudiante', limit_choices_to={'rol': 'ESTUDIANTE'})
+    docente = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.RESTRICT, related_name='citas_docente', limit_choices_to={'rol': 'DOCENTE'})
+    gabinete = models.ForeignKey('Sillon', on_delete=models.RESTRICT, related_name='citas')
+    motivo = models.ForeignKey('Tratamiento', on_delete=models.CASCADE, related_name='citas')
+    
+    fecha_hora = models.DateTimeField(help_text="Fecha y hora de la cita")
+    estado = models.CharField(max_length=20, choices=ESTADOS_CITA, default='RESERVADA')
+    check_in_time = models.DateTimeField(blank=True, null=True, help_text="Hora de check-in del paciente")
+    duracion_estimada = models.IntegerField(default=30, help_text="Duración estimada en minutos")
+    
+    # Campos de cancelación
+    cancelada_en = models.DateTimeField(blank=True, null=True, help_text="Fecha y hora de cancelación")
+    razon_cancelacion = models.CharField(max_length=20, choices=RAZONES_CANCELACION, blank=True, null=True)
+    motivo_cancelacion = models.TextField(blank=True, null=True, help_text="Descripción del motivo de cancelación")
+    cancelada_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='citas_canceladas')
+    
+    # Cita recurrente
+    cita_recurrente = models.ForeignKey('CitaRecurrente', on_delete=models.SET_NULL, null=True, blank=True, related_name='citas')
+    
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Cita {self.fecha_hora} - {self.paciente} ({self.estado})"
+
+    class Meta:
+        verbose_name = "Cita"
+        verbose_name_plural = "Citas"
+        ordering = ['fecha_hora']
+
+
+@receiver(post_save, sender=Cita)
+def actualizar_inasistencias_y_alerta(sender, instance, **kwargs):
+    paciente = instance.paciente
+    no_asistio_count = Cita.objects.filter(paciente=paciente, estado='NO_ASISTIO').count()
+    paciente.inasistencias = no_asistio_count
+    paciente.alerta_abandono = no_asistio_count >= 3
+    paciente.save(update_fields=['inasistencias', 'alerta_abandono'])
+
+
+# ==========================================
+# CITAS RECURRENTES
+# ==========================================
+class CitaRecurrente(models.Model):
+    FRECUENCIAS = [
+        ('DIARIA', 'Diaria'),
+        ('SEMANAL', 'Semanal'),
+        ('QUINCENAL', 'Quincenal'),
+        ('MENSUAL', 'Mensual'),
+    ]
+
+    DIAS_SEMANA = [
+        ('0', 'Lunes'),
+        ('1', 'Martes'),
+        ('2', 'Miércoles'),
+        ('3', 'Jueves'),
+        ('4', 'Viernes'),
+        ('5', 'Sábado'),
+        ('6', 'Domingo'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    paciente = models.ForeignKey('Paciente', on_delete=models.CASCADE, related_name='citas_recurrentes')
+    estudiante = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.RESTRICT, related_name='citas_recurrentes_estudiante', limit_choices_to={'rol': 'ESTUDIANTE'})
+    docente = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.RESTRICT, related_name='citas_recurrentes_docente', limit_choices_to={'rol': 'DOCENTE'})
+    gabinete = models.ForeignKey('Sillon', on_delete=models.RESTRICT, related_name='citas_recurrentes')
+    motivo = models.ForeignKey('Tratamiento', on_delete=models.CASCADE, related_name='citas_recurrentes')
+
+    # Configuración de recurrencia
+    frecuencia = models.CharField(max_length=20, choices=FRECUENCIAS, default='SEMANAL')
+    hora = models.TimeField(help_text="Hora del día para la cita")
+    dias_semana = models.CharField(max_length=20, blank=True, null=True, help_text="Día(s) de la semana (0-6)")
+    duracion_estimada = models.IntegerField(default=30, help_text="Duración estimada en minutos")
+
+    # Fechas de rango
+    fecha_inicio = models.DateField(help_text="Fecha de inicio de la recurrencia")
+    fecha_fin = models.DateField(blank=True, null=True, help_text="Fecha de fin (si no está rellena, es indefinida)")
+    max_ocurrencias = models.IntegerField(blank=True, null=True, help_text="Número máximo de citas a generar")
+
+    # Control
+    activa = models.BooleanField(default=True)
+    ultima_generacion = models.DateTimeField(auto_now=True)
+
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'citas_recurrentes'
+        ordering = ['fecha_inicio']
+
+    def __str__(self):
+        return f"Cita Recurrente {self.frecuencia} - {self.paciente}"
+
+
+# ==========================================
+# CONFIGURACIÓN DE ALERTAS
+# ==========================================
+class ConfiguracionAlertas(models.Model):
+    """Configuración global de alertas para la clínica"""
+    
+    minutos_espera_alerta = models.IntegerField(default=15, help_text="Minutos de espera antes de generar alerta roja")
+    inasistencias_alerta_abandono = models.IntegerField(default=3, help_text="Número de inasistencias para activar alerta de abandono")
+    dias_notificacion_previa = models.IntegerField(default=1, help_text="Días antes de la cita para enviar notificación")
+    
+    activa = models.BooleanField(default=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'configuracion_alertas'
+        verbose_name = "Configuración de Alertas"
+        verbose_name_plural = "Configuración de Alertas"
+
+    def __str__(self):
+        return "Configuración de Alertas del Sistema"
+
+
+# ==========================================
+# AUDITORÍA DE CITAS
+# ==========================================
+class AuditoriaCita(models.Model):
+    TIPOS_CAMBIO = [
+        ('CREACION', 'Creación'),
+        ('ACTUALIZACION', 'Actualización'),
+        ('CANCELACION', 'Cancelación'),
+        ('CHECK_IN', 'Check-in'),
+        ('CAMBIO_ESTADO', 'Cambio de Estado'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    cita = models.ForeignKey('Cita', on_delete=models.CASCADE, related_name='auditoria')
+    tipo_cambio = models.CharField(max_length=20, choices=TIPOS_CAMBIO)
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
+    
+    # Detalles del cambio
+    campos_modificados = models.JSONField(default=dict, help_text="JSON con los campos que se modificaron")
+    valores_anteriores = models.JSONField(default=dict, help_text="JSON con valores anteriores")
+    valores_nuevos = models.JSONField(default=dict, help_text="JSON con valores nuevos")
+    
+    descripcion = models.TextField(blank=True, null=True)
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'auditoria_citas'
+        ordering = ['-creado_en']
+
+    def __str__(self):
+        return f"Auditoría {self.tipo_cambio} - Cita {self.cita.id}"
+
+
+# ==========================================
+# HISTÓRICO DE ABANDONO DE PACIENTES
+# ==========================================
+class HistoricoAbandonoPaciente(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    paciente = models.ForeignKey('Paciente', on_delete=models.CASCADE, related_name='historico_abandonos')
+    
+    # Información del abandono
+    fecha_abandono = models.DateTimeField(auto_now_add=True)
+    inasistencias_totales = models.IntegerField(help_text="Número de inasistencias que provocaron el abandono")
+    
+    # Notas
+    nota_coordinacion = models.TextField(blank=True, null=True, help_text="Observaciones de coordinación")
+    usuario_que_registro = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='abandonos_registrados')
+    
+    # Reinicio
+    reactivado = models.BooleanField(default=False)
+    fecha_reactivacion = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        db_table = 'historico_abandono_pacientes'
+        ordering = ['-fecha_abandono']
+
+    def __str__(self):
+        return f"Abandono {self.paciente} - {self.fecha_abandono}"
+
+# ==========================================
+# MODULO 5 RADIOGRAFIAS
+# ==========================================
+
+def upload_to_paciente(instance, filename):
+    # Esto guardará los archivos en: evidencias_clinicas/IUP_PACIENTE/CATEGORIA/archivo.jpg
+    paciente_id = str(instance.paciente.id)
+    return os.path.join('evidencias_clinicas', paciente_id, instance.categoria, filename)
+
+class ImagenClinica(models.Model):
+    CATEGORIAS = [
+        ('FACIAL', 'Fotografía Facial'),
+        ('INTRAORAL', 'Fotografía Intraoral'),
+        ('PSP', 'Radiografía Placa de Fósforo'),
+        ('CBCT', 'Captura de Tomografía'),
+        ('PROCESO', 'Seguimiento de Proceso/Laboratorio'),
+        ('FINAL', 'Resultado Final (Post-tratamiento)'),
+    ]
+
+    paciente = models.ForeignKey('Paciente', on_delete=models.CASCADE, related_name='imagenes')
+    estudiante = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    archivo = models.ImageField(upload_to=upload_to_paciente)
+    categoria = models.CharField(max_length=20, choices=CATEGORIAS)
+    pieza_dental = models.IntegerField(null=True, blank=True) # Para radiografías o intraorales
+    descripcion = models.TextField(blank=True)
+    fecha_adquisicion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Imagen Clínica"
+        verbose_name_plural = "Imágenes Clínicas"

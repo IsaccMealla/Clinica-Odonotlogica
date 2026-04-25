@@ -19,7 +19,9 @@ from .models import (
     AvanceClinico, 
     Evidencia, 
     Transferencia,
-    Sillon  # <-- NUEVO MODELO IMPORTADO AQUÍ
+    Sillon,  # <-- NUEVO MODELO IMPORTADO AQUÍ
+    Cita , # <-- NUEVO MODELO IMPORTADO AQUÍ
+    ImagenClinica
 )
 
 User = get_user_model()
@@ -243,3 +245,116 @@ class SillonSerializer(serializers.ModelSerializer):
     # Esta función empaqueta [x, y, z] para que React Fiber lo lea correctamente
     def get_posicion(self, obj):
         return [obj.posicion_x, obj.posicion_y, obj.posicion_z]
+
+# =========================================================================
+# 7. Serializer de Citas
+# =========================================================================
+class CitaSerializer(serializers.ModelSerializer):
+    paciente_nombre = serializers.CharField(source='paciente.__str__', read_only=True)
+    estudiante_nombre = serializers.CharField(source='estudiante.get_full_name', read_only=True)
+    docente_nombre = serializers.CharField(source='docente.get_full_name', read_only=True)
+    gabinete_nombre = serializers.CharField(source='gabinete.nombre', read_only=True)
+    motivo_nombre = serializers.CharField(source='motivo.nombre_tratamiento', read_only=True)
+    cancelada_por_nombre = serializers.CharField(source='cancelada_por.get_full_name', read_only=True)
+
+    class Meta:
+        model = Cita
+        fields = [
+            'id', 'paciente', 'paciente_nombre', 'estudiante', 'estudiante_nombre', 
+            'docente', 'docente_nombre', 'gabinete', 'gabinete_nombre', 
+            'motivo', 'motivo_nombre', 'fecha_hora', 'estado', 'check_in_time', 
+            'duracion_estimada', 'cita_recurrente',
+            'cancelada_en', 'razon_cancelacion', 'motivo_cancelacion', 'cancelada_por', 'cancelada_por_nombre',
+            'creado_en', 'actualizado_en'
+        ]
+
+
+from rest_framework import serializers
+from .models import CitaRecurrente, ConfiguracionAlertas, AuditoriaCita, HistoricoAbandonoPaciente
+
+
+# =========================================================================
+# SERIALIZERS PARA CITAS RECURRENTES
+# =========================================================================
+class CitaRecurrenteSerializer(serializers.ModelSerializer):
+    paciente_nombre = serializers.CharField(source='paciente.__str__', read_only=True)
+    estudiante_nombre = serializers.CharField(source='estudiante.get_full_name', read_only=True)
+    docente_nombre = serializers.CharField(source='docente.get_full_name', read_only=True)
+    gabinete_nombre = serializers.CharField(source='gabinete.nombre', read_only=True)
+    motivo_nombre = serializers.CharField(source='motivo.nombre_tratamiento', read_only=True)
+    citas_generadas = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CitaRecurrente
+        fields = [
+            'id', 'paciente', 'paciente_nombre', 'estudiante', 'estudiante_nombre',
+            'docente', 'docente_nombre', 'gabinete', 'gabinete_nombre',
+            'motivo', 'motivo_nombre', 'frecuencia', 'hora', 'dias_semana',
+            'duracion_estimada', 'fecha_inicio', 'fecha_fin', 'max_ocurrencias',
+            'activa', 'citas_generadas', 'ultima_generacion', 'creado_en'
+        ]
+
+    def get_citas_generadas(self, obj):
+        return obj.citas.count()
+
+
+# =========================================================================
+# SERIALIZERS PARA CONFIGURACI� N DE ALERTAS
+# =========================================================================
+class ConfiguracionAlertasSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ConfiguracionAlertas
+        fields = [
+            'id', 'minutos_espera_alerta', 'inasistencias_alerta_abandono',
+            'dias_notificacion_previa', 'activa', 'actualizado_en'
+        ]
+
+
+# =========================================================================
+# SERIALIZERS PARA AUDITORÍA DE CITAS
+# =========================================================================
+class AuditoriaCitaSerializer(serializers.ModelSerializer):
+    usuario_nombre = serializers.CharField(source='usuario.get_full_name', read_only=True)
+
+    class Meta:
+        model = AuditoriaCita
+        fields = [
+            'id', 'cita', 'tipo_cambio', 'usuario', 'usuario_nombre',
+            'campos_modificados', 'valores_anteriores', 'valores_nuevos',
+            'descripcion', 'creado_en'
+        ]
+
+
+# =========================================================================
+# SERIALIZERS PARA HIST� RICO DE ABANDONO
+# =========================================================================
+class HistoricoAbandonoPacienteSerializer(serializers.ModelSerializer):
+    paciente_nombre = serializers.CharField(source='paciente.__str__', read_only=True)
+    usuario_nombre = serializers.CharField(source='usuario_que_registro.get_full_name', read_only=True)
+
+    class Meta:
+        model = HistoricoAbandonoPaciente
+        fields = [
+            'id', 'paciente', 'paciente_nombre', 'fecha_abandono',
+            'inasistencias_totales', 'nota_coordinacion', 'usuario_que_registro',
+            'usuario_nombre', 'reactivado', 'fecha_reactivacion'
+        ]
+
+# =========================================================================
+# SERIALIZERS RADIOGRAFIAS
+# =========================================================================
+
+class ImagenClinicaSerializer(serializers.ModelSerializer):
+    # Aseguramos que el paciente se reciba como el ID (UUID)
+    paciente = serializers.PrimaryKeyRelatedField(queryset=Paciente.objects.all())
+
+    class Meta:
+        model = ImagenClinica
+        fields = [
+            'id', 'paciente', 'archivo', 'categoria', 
+            'pieza_dental', 'descripcion', 'fecha_adquisicion'
+           ]
+        # ESTO ES LO MÁS IMPORTANTE:
+        # Quitamos 'estudiante' de los campos requeridos en el POST
+        read_only_fields = ['id', 'estudiante', 'fecha_adquisicion']
+    

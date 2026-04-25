@@ -12,7 +12,18 @@ from .models import (
     ProstodonciaRemovible,
     ProstodonciaFija,
     ProtocoloQuirurgico,
-    ExamenClinicoFisico
+    ExamenClinicoFisico,
+    # Nuevos modelos
+    Cita,
+    CitaRecurrente,
+    ConfiguracionAlertas,
+    AuditoriaCita,
+    HistoricoAbandonoPaciente,
+    Sillon,
+    Tratamiento,
+    AvanceClinico,
+    Evidencia,
+    Transferencia
 )
 
 # Registramos el modelo principal
@@ -31,3 +42,17 @@ admin.site.register(ProstodonciaRemovible)
 admin.site.register(ProstodonciaFija)
 admin.site.register(ProtocoloQuirurgico)
 admin.site.register(ExamenClinicoFisico)
+
+# Registramos modelos de agendamiento y citas
+admin.site.register(Cita)
+admin.site.register(CitaRecurrente)
+admin.site.register(ConfiguracionAlertas)
+admin.site.register(AuditoriaCita)
+admin.site.register(HistoricoAbandonoPaciente)
+
+# Registramos modelos relacionados
+admin.site.register(Sillon)
+admin.site.register(Tratamiento)
+admin.site.register(AvanceClinico)
+admin.site.register(Evidencia)
+admin.site.register(Transferencia)

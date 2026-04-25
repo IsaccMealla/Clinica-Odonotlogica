@@ -22,7 +22,7 @@ const items = [
   { title: "Pacientes", url: "/pacientes", icon: Users, roles: ["ADMIN", "DOCENTE", "RECEPCIONISTA"] },
   { title: "Mis Pacientes", url: "/mis-pacientes", icon: UserCheck, roles: ["ESTUDIANTE"] },
   { title: "Asignaciones", url: "/asignacion", icon: ClipboardList, roles: ["ADMIN", "DOCENTE"] },
-  { title: "Agenda", url: "/agenda", icon: Calendar, roles: ["ADMIN", "DOCENTE", "RECEPCIONISTA", "ESTUDIANTE"] },
+  { title: "Agenda", url: "/citas", icon: Calendar, roles: ["ADMIN", "DOCENTE", "RECEPCIONISTA", "ESTUDIANTE"] },
   { title: "Tratamientos", url: "/tratamientos", icon: Syringe, roles: ["ADMIN", "DOCENTE", "ESTUDIANTE"] },
   { title: "Reportes 3D", url: "/reportes", icon: BarChart3, roles: ["ADMIN", "DOCENTE"] },
   { title: "Mantenimiento", url: "/mantenimiento", icon: Wrench, roles: ["ADMIN", "DOCENTE", "ESTUDIANTE", "RECEPCIONISTA"] },
