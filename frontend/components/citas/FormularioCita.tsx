@@ -6,16 +6,22 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Plus } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Plus, AlertTriangle } from "lucide-react"
+import { useSoundPlayer } from "@/hooks/useSoundPlayer"
 import { Paciente, Usuario, Tratamiento, Sillon, Cita } from "@/types/cita"
 
 interface FormularioCitaProps {
   onCitaCreated: () => void
   citaEditar?: Cita
+  citasExistentes?: Cita[]
 }
 
-export function FormularioCita({ onCitaCreated, citaEditar }: FormularioCitaProps) {
+export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = [] }: FormularioCitaProps) {
+  const { playSound } = useSoundPlayer()
   const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [conflicto, setConflicto] = useState<string>('')
   const [formData, setFormData] = useState({
     paciente: '',
     estudiante: '',
@@ -37,13 +43,13 @@ export function FormularioCita({ onCitaCreated, citaEditar }: FormularioCitaProp
       fetchData()
       if (citaEditar) {
         setFormData({
-          paciente: citaEditar.paciente,
-          estudiante: citaEditar.estudiante,
-          docente: citaEditar.docente,
-          gabinete: citaEditar.gabinete,
-          motivo: citaEditar.motivo,
-          fecha_hora: citaEditar.fecha_hora.slice(0, 16), // formato datetime-local
-          duracion_estimada: citaEditar.duracion_estimada
+          paciente: citaEditar.paciente?.toString() || '',
+          estudiante: citaEditar.estudiante?.toString() || '',
+          docente: citaEditar.docente?.toString() || '',
+          gabinete: citaEditar.gabinete?.toString() || '',
+          motivo: citaEditar.motivo?.toString() || '',
+          fecha_hora: citaEditar.fecha_hora ? citaEditar.fecha_hora.slice(0, 16) : '',
+          duracion_estimada: citaEditar.duracion_estimada || 30
         })
       }
     }
@@ -58,13 +64,8 @@ export function FormularioCita({ onCitaCreated, citaEditar }: FormularioCitaProp
   const fetchData = async () => {
     try {
       const token = localStorage.getItem('access_token')
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-      }
-
-      if (token) {
-        headers.Authorization = `Bearer ${token}`
-      }
+      const headers: HeadersInit = { 'Content-Type': 'application/json' }
+      if (token) headers.Authorization = `Bearer ${token}`
 
       const [pacRes, estRes, docRes, tratRes, silRes] = await Promise.all([
         fetch('http://127.0.0.1:8000/api/pacientes/', { headers }),
@@ -74,45 +75,78 @@ export function FormularioCita({ onCitaCreated, citaEditar }: FormularioCitaProp
         fetch('http://127.0.0.1:8000/api/sillones/', { headers })
       ])
 
-      // Validar respuestas antes de parsejar JSON
-      const pacJson = pacRes.ok ? await pacRes.json() : {}
-      const estJson = estRes.ok ? await estRes.json() : {}
-      const docJson = docRes.ok ? await docRes.json() : {}
-      const tratJson = tratRes.ok ? await tratRes.json() : {}
-      const silJson = silRes.ok ? await silRes.json() : {}
-
-      if (!pacRes.ok) console.error('Pacientes fetch failed:', pacRes.status)
-      if (!estRes.ok) console.error('Estudiantes fetch failed:', estRes.status)
-      if (!docRes.ok) console.error('Docentes fetch failed:', docRes.status)
-      if (!tratRes.ok) console.error('Tratamientos fetch failed:', tratRes.status)
-      if (!silRes.ok) console.error('Sillones fetch failed:', silRes.status)
-
-      setPacientes(normalizeList(pacJson))
-      setEstudiantes(normalizeList(estJson))
-      setDocentes(normalizeList(docJson).filter((u: Usuario) => u.rol === 'DOCENTE'))
-      setTratamientos(normalizeList(tratJson))
-      setSillones(normalizeList(silJson))
+      setPacientes(normalizeList(await pacRes.json()))
+      setEstudiantes(normalizeList(await estRes.json()))
+      setDocentes(normalizeList(await docRes.json()).filter((u: Usuario) => u.rol === 'DOCENTE'))
+      setTratamientos(normalizeList(await tratRes.json()))
+      setSillones(normalizeList(await silRes.json()))
+      
     } catch (error) {
       console.error('Error fetching data:', error)
-      setPacientes([])
-      setEstudiantes([])
-      setDocentes([])
-      setTratamientos([])
-      setSillones([])
     }
+  }
+
+  // Validar conflictos de horario
+  const validarConflictosHorario = () => {
+    setConflicto('')
+    
+    if (!formData.paciente || !formData.estudiante || !formData.fecha_hora) {
+      setConflicto('⚠️ Faltan campos obligatorios para agendar la cita.')
+      return false
+    }
+
+    const citasParaValidar = citasExistentes.length > 0 ? citasExistentes : []
+
+    const citaPaciente = citasParaValidar.find(cita => {
+      if (citaEditar && cita.id === citaEditar.id) return false
+      const citaStart = new Date(cita.fecha_hora).getTime()
+      const citaEnd = citaStart + ((cita.duracion_estimada || 30) * 60000)
+      const nuevaStart = new Date(formData.fecha_hora).getTime()
+      const nuevaEnd = nuevaStart + (formData.duracion_estimada * 60000)
+      
+      return cita.paciente?.toString() === formData.paciente && !(nuevaEnd <= citaStart || nuevaStart >= citaEnd)
+    })
+
+    const citaEstudiante = citasParaValidar.find(cita => {
+      if (citaEditar && cita.id === citaEditar.id) return false
+      const citaStart = new Date(cita.fecha_hora).getTime()
+      const citaEnd = citaStart + ((cita.duracion_estimada || 30) * 60000)
+      const nuevaStart = new Date(formData.fecha_hora).getTime()
+      const nuevaEnd = nuevaStart + (formData.duracion_estimada * 60000)
+      
+      return cita.estudiante?.toString() === formData.estudiante && !(nuevaEnd <= citaStart || nuevaStart >= citaEnd)
+    })
+
+    if (citaPaciente) {
+      setConflicto(`⚠️ El paciente ya tiene una cita en ese horario (${new Date(citaPaciente.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`)
+      return false
+    }
+
+    if (citaEstudiante) {
+      setConflicto(`⚠️ El estudiante ya tiene una cita en ese horario (${new Date(citaEstudiante.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`)
+      return false
+    }
+
+    return true
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    if (!validarConflictosHorario()) return
+
+    setLoading(true)
+    
+    // Debug para ver qué se envía exactamente al backend
+    console.log("Payload enviado:", formData)
+
     try {
       const url = citaEditar
         ? `http://127.0.0.1:8000/api/citas/${citaEditar.id}/`
         : 'http://127.0.0.1:8000/api/citas/'
 
-      const method = citaEditar ? 'PUT' : 'POST'
-
       const response = await fetch(url, {
-        method,
+        method: citaEditar ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('access_token')}`
@@ -121,6 +155,7 @@ export function FormularioCita({ onCitaCreated, citaEditar }: FormularioCitaProp
       })
 
       if (response.ok) {
+        playSound('exito')
         setOpen(false)
         setFormData({
           paciente: '',
@@ -131,45 +166,64 @@ export function FormularioCita({ onCitaCreated, citaEditar }: FormularioCitaProp
           fecha_hora: '',
           duracion_estimada: 30
         })
+        setConflicto('')
         onCitaCreated()
+      } else {
+        const errorData = await response.json()
+        console.error("Error del servidor (Django):", errorData)
+        setConflicto(`Error del servidor: ${JSON.stringify(errorData)}`)
       }
     } catch (error) {
       console.error('Error saving cita:', error)
+      setConflicto('Error de conexión con el servidor.')
+    } finally {
+      setLoading(false)
     }
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
+        <Button className="bg-blue-600 hover:bg-blue-700">
           <Plus className="w-4 h-4 mr-2" />
           {citaEditar ? 'Editar Cita' : 'Nueva Cita'}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{citaEditar ? 'Editar Cita' : 'Nueva Cita'}</DialogTitle>
+          <DialogTitle>{citaEditar ? 'Editar Cita Clínica' : 'Programar Nueva Cita'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="paciente">Paciente</Label>
+          {conflicto && (
+            <Alert className="border-red-500 bg-red-50">
+              <AlertTriangle className="h-4 w-4 text-red-600" />
+              <AlertDescription className="text-red-800 ml-2 font-medium break-words">
+                {conflicto}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* PACIENTE */}
+            <div className="space-y-1">
+              <Label htmlFor="paciente">Paciente <span className="text-red-500">*</span></Label>
               <Select value={formData.paciente} onValueChange={(value) => setFormData({...formData, paciente: value})}>
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar paciente" />
                 </SelectTrigger>
                 <SelectContent>
-                  {pacientes.map(paciente => (
-                    <SelectItem key={paciente.id} value={paciente.id}>
-                      {paciente.apellido_paterno} {paciente.nombres}
+                  {pacientes.map(p => (
+                    <SelectItem key={p.id} value={p.id.toString()}>
+                      {p.apellido_paterno} {p.nombres}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            <div>
-              <Label htmlFor="estudiante">Estudiante</Label>
+            {/* ESTUDIANTE */}
+            <div className="space-y-1">
+              <Label htmlFor="estudiante">Estudiante Asignado <span className="text-red-500">*</span></Label>
               <Select value={formData.estudiante} onValueChange={(value) => setFormData({...formData, estudiante: value})}>
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar estudiante" />
@@ -184,8 +238,9 @@ export function FormularioCita({ onCitaCreated, citaEditar }: FormularioCitaProp
               </Select>
             </div>
 
-            <div>
-              <Label htmlFor="docente">Docente</Label>
+            {/* DOCENTE */}
+            <div className="space-y-1">
+              <Label htmlFor="docente">Docente Supervisor</Label>
               <Select value={formData.docente} onValueChange={(value) => setFormData({...formData, docente: value})}>
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar docente" />
@@ -200,23 +255,25 @@ export function FormularioCita({ onCitaCreated, citaEditar }: FormularioCitaProp
               </Select>
             </div>
 
-            <div>
-              <Label htmlFor="gabinete">Gabinete</Label>
+            {/* GABINETE / SILLÓN */}
+            <div className="space-y-1">
+              <Label htmlFor="gabinete">Gabinete / Sillón</Label>
               <Select value={formData.gabinete} onValueChange={(value) => setFormData({...formData, gabinete: value})}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar gabinete" />
+                  <SelectValue placeholder={sillones.length > 0 ? "Seleccionar gabinete" : "Sin gabinetes en la base de datos"} />
                 </SelectTrigger>
                 <SelectContent>
                   {sillones.map(sillon => (
                     <SelectItem key={sillon.id} value={sillon.id.toString()}>
-                      {sillon.nombre}
+                      {sillon.nombre || `Gabinete ${sillon.numero}`} {sillon.estado ? `(${sillon.estado})` : ''}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            <div>
+            {/* MOTIVO / TRATAMIENTO */}
+            <div className="space-y-1">
               <Label htmlFor="motivo">Motivo (Tratamiento)</Label>
               <Select value={formData.motivo} onValueChange={(value) => setFormData({...formData, motivo: value})}>
                 <SelectTrigger>
@@ -224,7 +281,7 @@ export function FormularioCita({ onCitaCreated, citaEditar }: FormularioCitaProp
                 </SelectTrigger>
                 <SelectContent>
                   {tratamientos.map(trat => (
-                    <SelectItem key={trat.id} value={trat.id}>
+                    <SelectItem key={trat.id} value={trat.id.toString()}>
                       {trat.nombre_tratamiento}
                     </SelectItem>
                   ))}
@@ -232,8 +289,9 @@ export function FormularioCita({ onCitaCreated, citaEditar }: FormularioCitaProp
               </Select>
             </div>
 
-            <div>
-              <Label htmlFor="fecha_hora">Fecha y Hora</Label>
+            {/* FECHA Y HORA */}
+            <div className="space-y-1">
+              <Label htmlFor="fecha_hora">Fecha y Hora <span className="text-red-500">*</span></Label>
               <Input
                 id="fecha_hora"
                 type="datetime-local"
@@ -243,25 +301,26 @@ export function FormularioCita({ onCitaCreated, citaEditar }: FormularioCitaProp
               />
             </div>
 
-            <div>
+            {/* DURACIÓN */}
+            <div className="space-y-1">
               <Label htmlFor="duracion">Duración Estimada (min)</Label>
               <Input
                 id="duracion"
                 type="number"
                 value={formData.duracion_estimada}
-                onChange={(e) => setFormData({...formData, duracion_estimada: parseInt(e.target.value)})}
+                onChange={(e) => setFormData({...formData, duracion_estimada: parseInt(e.target.value) || 30})}
                 min="15"
-                max="120"
+                max="180"
               />
             </div>
           </div>
 
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-3 pt-4 border-t mt-6">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancelar
             </Button>
-            <Button type="submit">
-              {citaEditar ? 'Actualizar' : 'Crear'} Cita
+            <Button type="submit" disabled={loading} className="bg-green-600 hover:bg-green-700 text-white min-w-[120px]">
+              {loading ? 'Procesando...' : (citaEditar ? 'Actualizar Cita' : 'Confirmar Cita')}
             </Button>
           </div>
         </form>

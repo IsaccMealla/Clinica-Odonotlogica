@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { useSoundPlayer } from "@/hooks/useSoundPlayer"
 import {
   Select,
   SelectContent,
@@ -27,6 +28,7 @@ interface NuevoPacienteProps {
 }
 
 export function NuevoPaciente({ onPacienteCreado }: NuevoPacienteProps) {
+  const { playSound } = useSoundPlayer()
   const [abierto, setAbierto] = useState(false)
   const [cargando, setCargando] = useState(false)
 
@@ -88,6 +90,7 @@ export function NuevoPaciente({ onPacienteCreado }: NuevoPacienteProps) {
       })
 
       if (res.ok) {
+        playSound("exito")
         setAbierto(false)
         // 👇 Llamamos a la recarga de tabla en vez de router.refresh()
         if (onPacienteCreado) {

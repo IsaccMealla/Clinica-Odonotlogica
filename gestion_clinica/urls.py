@@ -32,7 +32,12 @@ from .views import (
     ConfiguracionAlertasViewSet,
     AuditoriaCitaViewSet,
     # --- AGREGADO: VIEWSET PARA HISTÓRICO DE ABANDONO DE PACIENTES ---
-    HistoricoAbandonoPacienteViewSet
+    HistoricoAbandonoPacienteViewSet,
+    # --- MÓDULO 6: FORMACIÓN Y SUPERVISIÓN ---
+    ConfiguracionCupoViewSet,
+    AsignacionCasoViewSet,
+    SolicitudSupervisionViewSet,
+    EvaluacionDesempeñoViewSet,
 )
 
 # Creamos el router automático
@@ -78,6 +83,12 @@ router.register(r'historico-abandono', HistoricoAbandonoPacienteViewSet, basenam
 
 # ----- AGREGADO: RUTA PARA IMÁGENES CLÍNICAS -----
 router.register(r'imagenes', views.ImagenClinicaViewSet, basename='imagenes')
+
+# ========== MÓDULO 6: FORMACIÓN Y SUPERVISIÓN ==========
+router.register(r'configuracion-cupo', ConfiguracionCupoViewSet, basename='configuracion-cupo')
+router.register(r'asignacion-caso', AsignacionCasoViewSet, basename='asignacion-caso')
+router.register(r'solicitud-supervision', SolicitudSupervisionViewSet, basename='solicitud-supervision')
+router.register(r'evaluacion-desempeño', EvaluacionDesempeñoViewSet, basename='evaluacion-desempeño')
 
 
 urlpatterns = [

@@ -101,7 +101,7 @@ export default function CitasPage() {
                   <CardTitle>Programación de Práctica Clínica</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <FormularioCita onCitaCreated={fetchCitas} />
+                  <FormularioCita onCitaCreated={fetchCitas} citasExistentes={citas} />
                 </CardContent>
               </Card>
             </div>
@@ -112,24 +112,24 @@ export default function CitasPage() {
         </TabsContent>
 
         {/* PESTAÑA 2: MONITOR 3D (GABINETES) */}
-        <TabsContent value="monitor-3d">
-          <Card className="min-h-[600px]">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Estado de Unidades Dentales</CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">Mapa en tiempo real de la clínica</p>
-              </div>
-              <div className="flex gap-4 text-xs">
-                <span className="flex items-center gap-1">🟢 Libre</span>
-                <span className="flex items-center gap-1">🟠 Espera</span>
-                <span className="flex items-center gap-1">🔴 Atendiendo</span>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Gabinetes3D citas={citasHoy} />
-            </CardContent>
-          </Card>
-        </TabsContent>
+       <TabsContent value="monitor-3d">
+  <Card className="min-h-[600px]">
+    <CardHeader className="flex flex-row items-center justify-between">
+      <div>
+        <CardTitle>Estado de Unidades Dentales</CardTitle>
+        <p className="text-sm text-muted-foreground mt-1">Mapa en tiempo real de la clínica</p>
+      </div>
+      <div className="flex gap-4 text-xs">
+        <span className="flex items-center gap-1">🟢 Libre</span>
+        <span className="flex items-center gap-1">🟠 Espera</span>
+        <span className="flex items-center gap-1">🔴 Atendiendo</span>
+      </div>
+    </CardHeader>
+    <CardContent>
+      <Gabinetes3D citasHoy={citasHoy} onCitaUpdate={fetchCitas} />
+    </CardContent>
+  </Card>
+</TabsContent>
 
         {/* PESTAÑA 3: CALENDARIO COMPLETO */}
         <TabsContent value="calendario">

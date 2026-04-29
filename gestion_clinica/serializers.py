@@ -326,7 +326,7 @@ class AuditoriaCitaSerializer(serializers.ModelSerializer):
 
 
 # =========================================================================
-# SERIALIZERS PARA HIST� RICO DE ABANDONO
+# SERIALIZERS PARA HISTRICO DE ABANDONO
 # =========================================================================
 class HistoricoAbandonoPacienteSerializer(serializers.ModelSerializer):
     paciente_nombre = serializers.CharField(source='paciente.__str__', read_only=True)
@@ -357,4 +357,72 @@ class ImagenClinicaSerializer(serializers.ModelSerializer):
         # ESTO ES LO MÁS IMPORTANTE:
         # Quitamos 'estudiante' de los campos requeridos en el POST
         read_only_fields = ['id', 'estudiante', 'fecha_adquisicion']
+
+
+# =========================================================================
+# SERIALIZERS MÓDULO 6: FORMACIÓN Y SUPERVISIÓN
+# =========================================================================
+
+from .models import ConfiguracionCupo, AsignacionCaso, SolicitudSupervision, EvaluacionDesempeño
+
+
+class ConfiguracionCupoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ConfiguracionCupo
+        fields = [
+            'id', 'asignatura', 'procedimiento', 'cupo_minimo', 'cupo_maximo',
+            'activo', 'creado_en', 'actualizado_en'
+        ]
+
+
+class AsignacionCasoSerializer(serializers.ModelSerializer):
+    paciente_nombre = serializers.CharField(source='paciente.__str__', read_only=True)
+    estudiante_nombre = serializers.CharField(source='estudiante.get_full_name', read_only=True)
+    porcentaje_avance = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AsignacionCaso
+        fields = [
+            'id', 'paciente', 'paciente_nombre', 'estudiante', 'estudiante_nombre',
+            'asignatura', 'procedimiento_principal', 'estado', 'fecha_asignacion',
+            'fecha_completacion', 'procedimientos_aprobados', 'porcentaje_avance',
+            'fecha_ultima_actualizacion_avance'
+        ]
+
+    def get_porcentaje_avance(self, obj):
+        return obj.calcular_porcentaje_avance()
+
+
+class SolicitudSupervisionSerializer(serializers.ModelSerializer):
+    asignacion_caso_paciente = serializers.CharField(source='asignacion_caso.paciente.__str__', read_only=True)
+    asignacion_caso_estudiante = serializers.CharField(source='asignacion_caso.estudiante.get_full_name', read_only=True)
+    docente_nombre = serializers.CharField(source='docente_supervisor.get_full_name', read_only=True)
+
+    class Meta:
+        model = SolicitudSupervision
+        fields = [
+            'id', 'asignacion_caso', 'asignacion_caso_paciente', 'asignacion_caso_estudiante',
+            'tipo_hito', 'estado', 'docente_supervisor', 'docente_nombre',
+            'descripcion_solicitud', 'observaciones_docente',
+            'fecha_solicitud', 'fecha_aprobacion'
+        ]
+
+
+class EvaluacionDesempeñoSerializer(serializers.ModelSerializer):
+    solicitud_supervision_hito = serializers.CharField(source='solicitud_supervision.get_tipo_hito_display', read_only=True)
+    estudiante_nombre = serializers.CharField(source='solicitud_supervision.asignacion_caso.estudiante.get_full_name', read_only=True)
+    promedio_criterios = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EvaluacionDesempeño
+        fields = [
+            'id', 'solicitud_supervision', 'solicitud_supervision_hito', 'estudiante_nombre',
+            'calificacion', 'alerta_temprana', 'motivo_detalle',
+            'manejo_tecnica', 'bioseguridad', 'comunicacion_paciente',
+            'cumplimiento_tiempo', 'documentacion', 'promedio_criterios',
+            'fecha_evaluacion', 'actualizado_en'
+        ]
+
+    def get_promedio_criterios(self, obj):
+        return obj.promedio_criterios
     

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { useSoundPlayer } from "@/hooks/useSoundPlayer"
 import {
   Select,
   SelectContent,
@@ -29,6 +30,7 @@ interface NuevoUsuarioProps {
 
 export function NuevoUsuario({ onUsuarioCreado }: NuevoUsuarioProps) {
   const router = useRouter()
+  const { playSound } = useSoundPlayer()
   const [abierto, setAbierto] = useState(false)
   const [cargando, setCargando] = useState(false)
 
@@ -70,6 +72,7 @@ export function NuevoUsuario({ onUsuarioCreado }: NuevoUsuarioProps) {
       })
 
       if (res.ok) {
+        playSound("exito")
         setAbierto(false)
         setFormData({ email: "", password: "", first_name: "", last_name: "", rol: "" })
         if (onUsuarioCreado) onUsuarioCreado()

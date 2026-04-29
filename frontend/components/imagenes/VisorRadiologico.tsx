@@ -15,6 +15,7 @@ import {
   Columns, 
   FileCode2 
 } from "lucide-react"
+import DicomViewer from "./DicomViewer"
 
 interface Props {
   imagenes: any[] // Lista de imágenes del paciente (IUP)
@@ -119,21 +120,26 @@ export default function VisorRadiologico({ imagenes }: { imagenes: any[] }) {
         </TabsContent>
 
         {/* --- VISTA 3: DICOM VIEWER --- */}
-        <TabsContent value="dicom" className="bg-black rounded-xl h-[600px] flex flex-col items-center justify-center border-4 border-slate-900">
-           <div className="text-center space-y-4">
+        <TabsContent value="dicom" className="bg-black rounded-xl h-[600px] border-4 border-slate-900 overflow-hidden">
+          {imagenes.length > 0 ? (
+            <DicomViewer 
+              imageIds={imagenes.map(img => img.archivo)} 
+              patientName={imagenes[0]?.paciente_nombre || "Paciente Anónimo"}
+              enableSync={false}
+            />
+          ) : (
+            <div className="flex items-center justify-center h-full text-center space-y-4">
               <div className="w-20 h-20 bg-primary/20 rounded-full flex items-center justify-center mx-auto">
                 <FileCode2 className="w-10 h-10 text-primary" />
               </div>
-              <h3 className="text-white font-bold">Visor DICOM Nativo</h3>
-              <p className="text-slate-400 text-sm max-w-xs">
-                Cargando motor de visualización para placas de fósforo (PSP) y capturas CBCT...
-              </p>
-              <Button variant="outline" className="text-white border-white/20">
-                Abrir en Pantalla Completa
-              </Button>
-           </div>
-           {/* Aquí se montaría el contenedor para Cornerstone.js o DWV */}
-           <div id="dicom-container" className="w-full h-full hidden"></div>
+              <div>
+                <h3 className="text-white font-bold">Visor DICOM Profesional</h3>
+                <p className="text-slate-400 text-sm max-w-xs">
+                  No hay imágenes cargadas para este paciente.
+                </p>
+              </div>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </Card>

@@ -5,6 +5,7 @@ import { UploadCloud, FileImage, X, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { useSoundPlayer } from "@/hooks/useSoundPlayer"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface Props {
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export default function ImageUpload({ pacienteId, onUploadSuccess }: Props) {
+  const { playSound } = useSoundPlayer()
   const [file, setFile] = useState<File | null>(null)
   const [categoria, setCategoria] = useState<string>("")
   const [pieza, setPieza] = useState<string>("")
@@ -50,6 +52,7 @@ export default function ImageUpload({ pacienteId, onUploadSuccess }: Props) {
       })
 
       if (res.ok) {
+        playSound("exito")
         setFile(null)
         setCategoria("")
         setPieza("")

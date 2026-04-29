@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { toast } from "sonner"
+import { useSoundPlayer } from "@/hooks/useSoundPlayer"
 
 // --- BASE DE DATOS DE CHISTES Y CURIOSIDADES ---
 const byteCuriosities = [
@@ -27,6 +28,7 @@ const byteCuriosities = [
 
 export default function LoginPage() {
   const router = useRouter()
+  const { playSound } = useSoundPlayer()
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle")
   const [errorMessage, setErrorMessage] = useState("")
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
@@ -166,6 +168,7 @@ export default function LoginPage() {
         localStorage.setItem("access_token", data.access)
         localStorage.setItem("refresh_token", data.refresh)
         
+        playSound("login")
         setStatus("success")
         toast.success("¡Acceso concedido! Bienvenido.")
         
@@ -174,11 +177,13 @@ export default function LoginPage() {
           router.push("/dashboard")
         }, 1500)
       } else {
+        playSound("errorlogin")
         setStatus("error")
         setErrorMessage("Usuario o contraseña incorrectos. Intenta de nuevo.")
       }
     } catch (error) {
       console.error("Error:", error)
+      playSound("errorlogin")
       setStatus("error")
       setErrorMessage("No se pudo conectar con el servidor de la clínica.")
     }

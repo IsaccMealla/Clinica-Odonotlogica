@@ -38,7 +38,7 @@ export default function ListaEsperaCard({ citasEspera, onCheckIn }: ListaEsperaC
     return () => clearInterval(interval)
   }, [citasEspera])
 
-  const handleCheckIn = async (citaId: number) => {
+  const handleCheckIn = async (citaId: string | number) => {
     try {
       const response = await fetch(`http://127.0.0.1:8000/api/citas/${citaId}/check_in/`, {
         method: 'POST',

@@ -1009,3 +1009,212 @@ class ImagenClinica(models.Model):
     class Meta:
         verbose_name = "Imagen Clínica"
         verbose_name_plural = "Imágenes Clínicas"
+
+
+# ==========================================
+# MÓDULO 6: FORMACIÓN Y SUPERVISIÓN
+# ==========================================
+
+class ConfiguracionCupo(models.Model):
+    """
+    Define los cupos requeridos por asignatura/procedimiento
+    Ej: Endodoncia I requiere 2 procedimientos
+    """
+    PROCEDIMIENTOS = [
+        ('PROFILAXIS', 'Profilaxis'),
+        ('ENDODONCIA', 'Endodoncia'),
+        ('ORTODONCIA', 'Ortodoncia'),
+        ('PERIODONCIA', 'Periodoncia'),
+        ('EXODONCIA', 'Exodoncia'),
+        ('RESTAURACION', 'Restauración'),
+        ('PROTODONCIA_FIJA', 'Prostodoncia Fija'),
+        ('PROTODONCIA_REMOVIBLE', 'Prostodoncia Removible'),
+        ('CIRUGIA', 'Cirugía'),
+        ('ODONTOPEDIATRIA', 'Odontopediatría'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    asignatura = models.CharField(max_length=100, help_text="Ej: Endodoncia I, Periodoncia II")
+    procedimiento = models.CharField(max_length=30, choices=PROCEDIMIENTOS)
+    cupo_minimo = models.IntegerField(default=1, help_text="Número mínimo de procedimientos requeridos")
+    cupo_maximo = models.IntegerField(default=10, help_text="Número máximo recomendado")
+    
+    activo = models.BooleanField(default=True)
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'configuracion_cupo'
+        verbose_name = "Configuración de Cupo"
+        verbose_name_plural = "Configuraciones de Cupo"
+        unique_together = ('asignatura', 'procedimiento')
+
+    def __str__(self):
+        return f"{self.asignatura} - {self.get_procedimiento_display()}: {self.cupo_minimo}-{self.cupo_maximo}"
+
+
+class AsignacionCaso(models.Model):
+    """
+    Vincula un Paciente (caso) con un Estudiante
+    Incluye historial de transferencias y estado del caso
+    """
+    ESTADOS_CASO = [
+        ('ACTIVO', 'Activo'),
+        ('PAUSADO', 'Pausado'),
+        ('TRANSFERIDO', 'Transferido'),
+        ('COMPLETADO', 'Completado'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    paciente = models.ForeignKey(Paciente, on_delete=models.CASCADE, related_name='asignaciones_caso')
+    estudiante = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.RESTRICT, related_name='casos_asignados', limit_choices_to={'rol': 'ESTUDIANTE'})
+    
+    asignatura = models.CharField(max_length=100, help_text="Ej: Endodoncia I, Periodoncia II")
+    procedimiento_principal = models.CharField(max_length=30, choices=ConfiguracionCupo.PROCEDIMIENTOS)
+    
+    estado = models.CharField(max_length=20, choices=ESTADOS_CASO, default='ACTIVO')
+    fecha_asignacion = models.DateTimeField(auto_now_add=True)
+    fecha_completacion = models.DateTimeField(blank=True, null=True)
+    
+    # Para calcular avance
+    procedimientos_aprobados = models.IntegerField(default=0, help_text="Número de procedimientos aprobados por docente")
+    fecha_ultima_actualizacion_avance = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'asignacion_caso'
+        verbose_name = "Asignación de Caso"
+        verbose_name_plural = "Asignaciones de Caso"
+        ordering = ['-fecha_asignacion']
+
+    def __str__(self):
+        return f"{self.paciente} asignado a {self.estudiante} - {self.asignatura}"
+
+    def calcular_porcentaje_avance(self):
+        """Calcula el porcentaje de avance del estudiante en este caso"""
+        try:
+            config = ConfiguracionCupo.objects.get(
+                asignatura=self.asignatura,
+                procedimiento=self.procedimiento_principal
+            )
+            porcentaje = (self.procedimientos_aprobados / config.cupo_minimo) * 100
+            return min(porcentaje, 100)  # Máximo 100%
+        except ConfiguracionCupo.DoesNotExist:
+            return 0
+
+
+class SolicitudSupervision(models.Model):
+    """
+    Solicitudes de supervisión para hitos específicos: Diagnóstico, Inicio, Cierre
+    La firma del docente queda registrada en docente_supervisor + timestamp en fecha_aprobacion
+    """
+    TIPOS_HITO = [
+        ('DIAGNOSTICO', 'Diagnóstico'),
+        ('INICIO', 'Inicio del Procedimiento'),
+        ('CIERRE', 'Cierre del Procedimiento'),
+    ]
+
+    ESTADOS_SOLICITUD = [
+        ('PENDIENTE', 'Pendiente de Revisión'),
+        ('APROBADO', 'Aprobado por Docente'),
+        ('RECHAZADO', 'Rechazado / Con Observaciones'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    asignacion_caso = models.ForeignKey(AsignacionCaso, on_delete=models.CASCADE, related_name='solicitudes_supervision')
+    
+    tipo_hito = models.CharField(max_length=20, choices=TIPOS_HITO, help_text="En qué etapa del procedimiento se requiere supervisión")
+    estado = models.CharField(max_length=20, choices=ESTADOS_SOLICITUD, default='PENDIENTE')
+    
+    # Firma electrónica (docente supervisor)
+    docente_supervisor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='supervisiones_realizadas',
+        limit_choices_to={'rol': 'DOCENTE'}
+    )
+    
+    descripcion_solicitud = models.TextField(help_text="Descripción del procedimiento/diagnóstico a supervisar")
+    observaciones_docente = models.TextField(blank=True, null=True, help_text="Observaciones del docente al rechazar")
+    
+    fecha_solicitud = models.DateTimeField(auto_now_add=True)
+    fecha_aprobacion = models.DateTimeField(blank=True, null=True, help_text="Timestamp de la firma electrónica")
+
+    class Meta:
+        db_table = 'solicitud_supervision'
+        verbose_name = "Solicitud de Supervisión"
+        verbose_name_plural = "Solicitudes de Supervisión"
+        ordering = ['-fecha_solicitud']
+
+    def __str__(self):
+        return f"Supervisión {self.get_tipo_hito_display()} - {self.asignacion_caso.paciente}"
+
+
+class EvaluacionDesempeño(models.Model):
+    """
+    Evaluación de desempeño del estudiante vinculada a la supervisión
+    Incluye alerta temprana de bajo desempeño
+    """
+    CALIFICACIONES = [
+        (5, 'Excelente'),
+        (4, 'Muy Bueno'),
+        (3, 'Bueno'),
+        (2, 'Regular'),
+        (1, 'Insuficiente'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    solicitud_supervision = models.OneToOneField(SolicitudSupervision, on_delete=models.CASCADE, related_name='evaluacion')
+    
+    calificacion = models.IntegerField(choices=CALIFICACIONES, default=3)
+    alerta_temprana = models.BooleanField(default=False, help_text="Marca bajo desempeño detectado")
+    motivo_detalle = models.TextField(blank=True, null=True, help_text="Detalle de la razón de alerta temprana")
+    
+    # Criterios de evaluación
+    manejo_tecnica = models.IntegerField(choices=CALIFICACIONES, default=3)
+    bioseguridad = models.IntegerField(choices=CALIFICACIONES, default=3)
+    comunicacion_paciente = models.IntegerField(choices=CALIFICACIONES, default=3)
+    cumplimiento_tiempo = models.IntegerField(choices=CALIFICACIONES, default=3)
+    documentacion = models.IntegerField(choices=CALIFICACIONES, default=3)
+    
+    fecha_evaluacion = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'evaluacion_desempeño'
+        verbose_name = "Evaluación de Desempeño"
+        verbose_name_plural = "Evaluaciones de Desempeño"
+
+    def __str__(self):
+        return f"Evaluación - {self.solicitud_supervision.asignacion_caso.estudiante} ({self.get_calificacion_display()})"
+
+    @property
+    def promedio_criterios(self):
+        """Calcula el promedio de todos los criterios"""
+        criterios = [
+            self.manejo_tecnica,
+            self.bioseguridad,
+            self.comunicacion_paciente,
+            self.cumplimiento_tiempo,
+            self.documentacion
+        ]
+        return sum(criterios) / len(criterios)
+    
+    
+class AsignacionPaciente(models.Model):
+    paciente = models.ForeignKey('Paciente', on_delete=models.CASCADE, related_name='asignaciones')
+    
+    # CAMBIAMOS EL RELATED_NAME AQUÍ:
+    estudiante = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name='asignaciones_registro' # <-- Nombre único
+    )
+    
+    docente = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        related_name='supervisiones_casos'
+    )
+    # ... resto de campos

@@ -730,3 +730,276 @@ class ImagenClinicaViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         # Asigna automáticamente el estudiante que está logueado
         serializer.save(estudiante=self.request.user)
+
+
+# =========================================================================
+# MÓDULO 6: VIEWSETS DE FORMACIÓN Y SUPERVISIÓN
+# =========================================================================
+
+from rest_framework.permissions import BasePermission
+
+
+class IsCoordinador(BasePermission):
+    """Permiso: Solo Coordinador puede acceder"""
+    def has_permission(self, request, view):
+        return request.user and (request.user.is_superuser or getattr(request.user, 'rol', '') in ['ADMIN', 'ADMINISTRADOR', 'DOCENTE'])
+
+
+class IsDocente(BasePermission):
+    """Permiso: Solo Docente puede acceder"""
+    def has_permission(self, request, view):
+        return request.user and (request.user.is_superuser or getattr(request.user, 'rol', '') == 'DOCENTE')
+
+
+class IsEstudiante(BasePermission):
+    """Permiso: Solo Estudiante puede acceder"""
+    def has_permission(self, request, view):
+        return request.user and (request.user.is_superuser or getattr(request.user, 'rol', '') == 'ESTUDIANTE')
+
+
+class ConfiguracionCupoViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet para gestionar configuraciones de cupo por asignatura
+    Acceso: Coordinador/Docente
+    """
+    queryset = ConfiguracionCupo.objects.all()
+    serializer_class = ConfiguracionCupoSerializer
+    permission_classes = [IsAuthenticated, IsCoordinador]
+
+    def get_queryset(self):
+        # Filtrar solo activos
+        activo = self.request.query_params.get('activo')
+        qs = ConfiguracionCupo.objects.all()
+        if activo is not None:
+            qs = qs.filter(activo=activo.lower() == 'true')
+        return qs
+
+
+class AsignacionCasoViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet para gestionar asignaciones de casos
+    Acceso: Coordinador (crea/actualiza), Estudiante (lee sus propios casos)
+    """
+    serializer_class = AsignacionCasoSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        
+        # Superusuario o Coordinador ven todos
+        if user.is_superuser or getattr(user, 'rol', '') in ['ADMIN', 'ADMINISTRADOR']:
+            return AsignacionCaso.objects.all().order_by('-fecha_asignacion')
+        
+        # Estudiante solo ve sus propias asignaciones
+        if getattr(user, 'rol', '') == 'ESTUDIANTE':
+            return AsignacionCaso.objects.filter(estudiante=user).order_by('-fecha_asignacion')
+        
+        # Docente ve todos (para supervisar)
+        if getattr(user, 'rol', '') == 'DOCENTE':
+            return AsignacionCaso.objects.all().order_by('-fecha_asignacion')
+        
+        return AsignacionCaso.objects.none()
+
+    def perform_create(self, serializer):
+        """Solo Coordinador puede crear asignaciones"""
+        if not (self.request.user.is_superuser or getattr(self.request.user, 'rol', '') in ['ADMIN', 'ADMINISTRADOR']):
+            raise PermissionError('Solo el coordinador puede asignar casos')
+        serializer.save()
+
+    @action(detail=False, methods=['get'])
+    def mis_asignaciones(self, request):
+        """Endpoint para que el estudiante vea sus casos asignados"""
+        if getattr(request.user, 'rol', '') != 'ESTUDIANTE':
+            return Response({'error': 'Solo estudiantes pueden acceder'}, status=status.HTTP_403_FORBIDDEN)
+        
+        asignaciones = AsignacionCaso.objects.filter(estudiante=request.user, estado='ACTIVO')
+        serializer = self.get_serializer(asignaciones, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def alumnos_retrasados(self, request):
+        """
+        Reporte de alumnos retrasados (avance < al esperado)
+        Acceso: Coordinador
+        """
+        if not (request.user.is_superuser or getattr(request.user, 'rol', '') in ['ADMIN', 'ADMINISTRADOR']):
+            return Response({'error': 'Solo el coordinador puede ver este reporte'}, status=status.HTTP_403_FORBIDDEN)
+        
+        retrasados = []
+        asignaciones = AsignacionCaso.objects.filter(estado='ACTIVO')
+        
+        for asignacion in asignaciones:
+            porcentaje = asignacion.calcular_porcentaje_avance()
+            # Consideramos retrasado si tiene menos del 50% del cupo
+            if porcentaje < 50:
+                retrasados.append({
+                    'id': str(asignacion.id),
+                    'estudiante': asignacion.estudiante.get_full_name(),
+                    'paciente': str(asignacion.paciente),
+                    'asignatura': asignacion.asignatura,
+                    'porcentaje_avance': round(porcentaje, 2),
+                    'procedimientos_aprobados': asignacion.procedimientos_aprobados,
+                    'dias_activo': (timezone.now() - asignacion.fecha_asignacion).days
+                })
+        
+        return Response(retrasados)
+
+
+class SolicitudSupervisionViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet para solicitudes de supervisión
+    Hitos: Diagnóstico, Inicio, Cierre
+    """
+    serializer_class = SolicitudSupervisionSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        
+        # Estudiante: ve sus propias solicitudes
+        if getattr(user, 'rol', '') == 'ESTUDIANTE':
+            return SolicitudSupervision.objects.filter(
+                asignacion_caso__estudiante=user
+            ).order_by('-fecha_solicitud')
+        
+        # Docente: ve solicitudes pendientes de su supervisión
+        if getattr(user, 'rol', '') == 'DOCENTE':
+            return SolicitudSupervision.objects.filter(
+                estado='PENDIENTE'
+            ).order_by('-fecha_solicitud')
+        
+        # Admin/Coordinador: ven todas
+        if user.is_superuser or getattr(user, 'rol', '') in ['ADMIN', 'ADMINISTRADOR']:
+            return SolicitudSupervision.objects.all().order_by('-fecha_solicitud')
+        
+        return SolicitudSupervision.objects.none()
+
+    def perform_create(self, serializer):
+        """Estudiante crea la solicitud"""
+        asignacion = serializer.validated_data['asignacion_caso']
+        if asignacion.estudiante != self.request.user:
+            raise PermissionError('Solo el estudiante asignado puede solicitar supervisión')
+        serializer.save()
+
+    @action(detail=True, methods=['post'])
+    def aprobar(self, request, pk=None):
+        """Docente aprueba la solicitud (firma electrónica)"""
+        if getattr(request.user, 'rol', '') != 'DOCENTE':
+            return Response({'error': 'Solo docentes pueden aprobar'}, status=status.HTTP_403_FORBIDDEN)
+        
+        solicitud = self.get_object()
+        
+        if solicitud.estado != 'PENDIENTE':
+            return Response(
+                {'error': f'Solicitud ya está en estado {solicitud.estado}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        solicitud.estado = 'APROBADO'
+        solicitud.docente_supervisor = request.user
+        solicitud.fecha_aprobacion = timezone.now()
+        solicitud.save()
+        
+        # Incrementar procedimientos aprobados
+        asignacion = solicitud.asignacion_caso
+        asignacion.procedimientos_aprobados += 1
+        asignacion.save()
+        
+        # Crear evaluación por defecto si no existe
+        if not hasattr(solicitud, 'evaluacion'):
+            EvaluacionDesempeño.objects.create(solicitud_supervision=solicitud)
+        
+        serializer = self.get_serializer(solicitud)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def rechazar(self, request, pk=None):
+        """Docente rechaza la solicitud"""
+        if getattr(request.user, 'rol', '') != 'DOCENTE':
+            return Response({'error': 'Solo docentes pueden rechazar'}, status=status.HTTP_403_FORBIDDEN)
+        
+        solicitud = self.get_object()
+        observaciones = request.data.get('observaciones', '')
+        
+        solicitud.estado = 'RECHAZADO'
+        solicitud.observaciones_docente = observaciones
+        solicitud.save()
+        
+        serializer = self.get_serializer(solicitud)
+        return Response(serializer.data)
+
+
+class EvaluacionDesempeñoViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet para evaluaciones de desempeño
+    Incluye alerta temprana de bajo desempeño
+    """
+    serializer_class = EvaluacionDesempeñoSerializer
+    permission_classes = [IsAuthenticated, IsDocente]
+
+    def get_queryset(self):
+        user = self.request.user
+        
+        # Docente ve evaluaciones de sus supervisiones
+        if getattr(user, 'rol', '') == 'DOCENTE':
+            return EvaluacionDesempeño.objects.filter(
+                solicitud_supervision__docente_supervisor=user
+            ).order_by('-fecha_evaluacion')
+        
+        # Admin ve todas
+        if user.is_superuser or getattr(user, 'rol', '') in ['ADMIN', 'ADMINISTRADOR']:
+            return EvaluacionDesempeño.objects.all().order_by('-fecha_evaluacion')
+        
+        return EvaluacionDesempeño.objects.none()
+
+    def perform_update(self, serializer):
+        """Al actualizar evaluación, verificar alerta temprana y notificar"""
+        evaluacion = serializer.save()
+        
+        # Si se marca alerta temprana, crear notificación
+        if evaluacion.alerta_temprana and evaluacion.motivo_detalle:
+            # Aquí se dispara la notificación a Coordinación Clínica
+            self._crear_notificacion_alerta_temprana(evaluacion)
+
+    def _crear_notificacion_alerta_temprana(self, evaluacion):
+        """Crea una notificación inmediata a Coordinación Clínica"""
+        from .models import Notificacion  # Asumiendo que existe modelo Notificacion
+        
+        try:
+            # Obtener coordinadores/admins
+            coordinadores = User.objects.filter(rol__in=['ADMIN', 'ADMINISTRADOR'])
+            
+            mensaje = f"""
+            ⚠️ ALERTA TEMPRANA DE BAJO DESEMPEÑO
+            
+            Estudiante: {evaluacion.solicitud_supervision.asignacion_caso.estudiante.get_full_name()}
+            Paciente: {evaluacion.solicitud_supervision.asignacion_caso.paciente}
+            Hito: {evaluacion.solicitud_supervision.get_tipo_hito_display()}
+            
+            Motivo: {evaluacion.motivo_detalle}
+            Calificación: {evaluacion.get_calificacion_display()}
+            Promedio de Criterios: {evaluacion.promedio_criterios:.1f}
+            """
+            
+            for coordinador in coordinadores:
+                Notificacion.objects.create(
+                    usuario=coordinador,
+                    titulo='Alerta Temprana de Bajo Desempeño',
+                    mensaje=mensaje,
+                    tipo='ALERTA',
+                    prioridad='ALTA',
+                    relacionado_con=f'evaluacion_{evaluacion.id}'
+                )
+        except Exception as e:
+            # Log silencioso si el modelo de notificación no existe
+            print(f"No se pudo crear notificación: {e}")
+
+    @action(detail=False, methods=['get'])
+    def alertas_activas(self, request):
+        """Obtiene todas las alertas tempranas activas"""
+        if not (request.user.is_superuser or getattr(request.user, 'rol', '') in ['ADMIN', 'ADMINISTRADOR']):
+            return Response({'error': 'Solo administradores'}, status=status.HTTP_403_FORBIDDEN)
+        
+        alertas = EvaluacionDesempeño.objects.filter(alerta_temprana=True).order_by('-fecha_evaluacion')
+        serializer = self.get_serializer(alertas, many=True)
+        return Response(serializer.data)

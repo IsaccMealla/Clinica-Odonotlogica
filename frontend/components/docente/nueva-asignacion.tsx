@@ -13,6 +13,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
+import { useSoundPlayer } from "@/hooks/useSoundPlayer" // Importamos tu hook de sonido
 
 interface Props {
   pacientes: any[];
@@ -22,6 +23,7 @@ interface Props {
 }
 
 export function NuevaAsignacion({ pacientes, estudiantes, token, onSuccess }: Props) {
+  const { playSound } = useSoundPlayer() // Inicializamos el reproductor
   const [abierto, setAbierto] = useState(false)
   const [cargando, setCargando] = useState(false)
   const [formData, setFormData] = useState({ pacienteId: "", estudianteId: "" })
@@ -41,11 +43,13 @@ export function NuevaAsignacion({ pacientes, estudiantes, token, onSuccess }: Pr
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`,
         },
-        // Enviamos el ID del estudiante como número
         body: JSON.stringify({ estudiante_asignado: parseInt(formData.estudianteId) }),
       })
 
       if (res.ok) {
+        // REPRODUCIR SONIDO DE ÉXITO
+        playSound('exito') 
+        
         setAbierto(false)
         setFormData({ pacienteId: "", estudianteId: "" })
         onSuccess() // Refresca la tabla
@@ -69,7 +73,7 @@ export function NuevaAsignacion({ pacientes, estudiantes, token, onSuccess }: Pr
           <Plus className="h-4 w-4" /> Nueva Asignación
         </Button>
       </DialogTrigger>
-      {/* Ajustamos el ancho a max-w-md o sm para que sea más pequeño */}
+      
       <DialogContent className="sm:max-w-[400px]"> 
         <form onSubmit={handleSubmit}>
           <DialogHeader>
@@ -90,7 +94,6 @@ export function NuevaAsignacion({ pacientes, estudiantes, token, onSuccess }: Pr
                 required
               >
                 <option value="">-- Seleccionar Paciente --</option>
-                {/* Solo mostramos los que NO tienen estudiante asignado aún */}
                 {pacientes.filter(p => !p.estudiante_asignado).map(p => (
                   <option key={p.id} value={p.id}>
                     {p.nombres} {p.apellido_paterno}
@@ -122,8 +125,16 @@ export function NuevaAsignacion({ pacientes, estudiantes, token, onSuccess }: Pr
             <Button type="button" variant="outline" onClick={() => setAbierto(false)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={cargando} className="bg-blue-600">
-              {cargando ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : <UserPlus className="h-4 w-4 mr-2" />}
+            <Button 
+              type="submit" 
+              disabled={cargando} 
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {cargando ? (
+                <Loader2 className="animate-spin h-4 w-4 mr-2" />
+              ) : (
+                <UserPlus className="h-4 w-4 mr-2" />
+              )}
               Asignar
             </Button>
           </DialogFooter>
