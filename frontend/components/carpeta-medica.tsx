@@ -1,12 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { 
   ClipboardList, Activity, Users, Home, Venus, Save, 
-  AlertTriangle, HeartPulse, Droplets, Edit3, Trash2, X 
+  AlertTriangle, HeartPulse, Droplets, Edit3, Trash2, X, Download
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { exportCarpetaMedicaPDF } from "@/lib/exporters/pdf-exporter"
+// 👇 Importamos DialogDescription
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -30,6 +32,36 @@ export function CarpetaMedica({ paciente }: { paciente: any }) {
     ginecologicos: paciente.antecedentes_ginecologicos || {},
   })
 
+  // Guardar referencia de los datos actuales del paciente (del API)
+  const [pacienteActual, setPacienteActual] = useState(paciente)
+
+  // 👇 NUEVO: Cargar datos cuando el modal se abre
+  useEffect(() => {
+    if (open) {
+      const cargarDatos = async () => {
+        try {
+          const token = localStorage.getItem("access_token")
+          const res = await fetch(`http://localhost:8000/api/pacientes/${paciente.id}/`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          })
+          if (res.ok) {
+            const pacienteActualizado = await res.json()
+            setPacienteActual(pacienteActualizado)
+            setData({
+              familiares: pacienteActualizado.antecedentes_familiares || {},
+              personales: pacienteActualizado.antecedentes_personales || {},
+              no_patologicos: pacienteActualizado.antecedentes_no_patologicos || {},
+              ginecologicos: pacienteActualizado.antecedentes_ginecologicos || {},
+            })
+          }
+        } catch (error) {
+          console.error("Error cargando datos:", error)
+        }
+      }
+      cargarDatos()
+    }
+  }, [open, paciente.id])
+
   const handleCheckChange = (section: string, field: string, value: boolean) => {
     setData((prev) => ({
       ...prev,
@@ -52,18 +84,30 @@ export function CarpetaMedica({ paciente }: { paciente: any }) {
   const guardarAntecedentes = async () => {
     setLoading(true)
     try {
+      // Usando la llave correcta encontrada en tu login
+      const token = localStorage.getItem("access_token") 
+
       const res = await fetch(`http://localhost:8000/api/pacientes/${paciente.id}/antecedentes/`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify(data),
       })
+      
       if (res.ok) {
         toast.success("Expediente actualizado")
         setIsEditing(false)
         setOpen(false)
         router.refresh()
+      } else {
+        console.error("Fallo al guardar, status:", res.status)
+        toast.error("Hubo un error al guardar los datos. Revisa si tu sesión sigue activa.")
       }
-    } catch (e) { toast.error("Error de servidor") }
+    } catch (e) { 
+      toast.error("Error de servidor") 
+    }
     finally { setLoading(false) }
   }
 
@@ -85,13 +129,34 @@ export function CarpetaMedica({ paciente }: { paciente: any }) {
                 <ClipboardList className="text-blue-600 h-6 w-6" />
                 Expediente: {paciente.nombres} {paciente.apellido_paterno}
               </DialogTitle>
+              
+              {/* 👇 Agregado para cumplir accesibilidad y quitar el Warning de la consola */}
+              <DialogDescription className="sr-only">
+                Detalles y antecedentes médicos del paciente.
+              </DialogDescription>
+
               <p className="text-xs font-bold text-slate-500 mt-1 uppercase">
                 CI: {paciente.ci} | {paciente.edad} años | {paciente.sexo}
               </p>
             </div>
-            <Button onClick={() => setIsEditing(!isEditing)} variant={isEditing ? "destructive" : "outline"}>
-              {isEditing ? <><X className="mr-2 h-4 w-4"/> Cancelar</> : <><Edit3 className="mr-2 h-4 w-4"/> Editar</>}
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => {
+                  // Pasar el paciente completo del API con todos los antecedentes
+                  exportCarpetaMedicaPDF(pacienteActual)
+                  toast.success("Carpeta médica descargada")
+                }} 
+                variant="outline"
+                className="text-blue-600 hover:bg-blue-50"
+                title="Descargar Carpeta Médica en PDF"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Descargar
+              </Button>
+              <Button onClick={() => setIsEditing(!isEditing)} variant={isEditing ? "destructive" : "outline"}>
+                {isEditing ? <><X className="mr-2 h-4 w-4"/> Cancelar</> : <><Edit3 className="mr-2 h-4 w-4"/> Editar</>}
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -117,7 +182,7 @@ export function CarpetaMedica({ paciente }: { paciente: any }) {
             <ScrollArea className="h-full w-full bg-slate-50/30">
               <div className="p-8 pb-20">
                 
-                {/* --- SECCIÓN PERSONALES (LA LARGA) --- */}
+                {/* --- SECCIÓN PERSONALES --- */}
                 <TabsContent value="personales" className="m-0 space-y-8">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2"><Label>Estado Salud</Label><Input disabled={!isEditing} value={data.personales.estado_salud || ""} onChange={(e) => handleInputChange("personales", "estado_salud", e.target.value)} className="bg-white" /></div>

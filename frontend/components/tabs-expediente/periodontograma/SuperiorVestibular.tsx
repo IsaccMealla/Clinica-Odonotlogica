@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react"
+import React from "react"
 import { Input } from "@/components/ui/input"
+import { usePeriodontograma } from "@/context/PeriodontogramaContext"
 
 type DienteData = {
   movilidad: string;
@@ -82,24 +83,36 @@ const getMovilidadEstilo = (grado: string) => {
 };
 
 export function SuperiorVestibular() {
-  const [datos, setDatos] = useState(estadoInicial);
+  const { datos, setDatos } = usePeriodontograma();
+
+  const datosVestibular = datos.datos_vestibular_superior as Record<number, DienteData>;
 
   const updateDiente = (pieza: number, campo: keyof DienteData, valor: any) => {
-    setDatos(prev => ({ ...prev, [pieza]: { ...prev[pieza], [campo]: valor } }));
+    setDatos({
+      ...datos,
+      datos_vestibular_superior: {
+        ...datosVestibular,
+        [pieza]: { ...datosVestibular[pieza], [campo]: valor }
+      }
+    });
   };
 
   const updateArray = (pieza: number, campo: 'sangrado' | 'supuracion' | 'margen' | 'sondaje', index: number, valor: any) => {
-    setDatos(prev => {
-      const nuevoArray = [...prev[pieza][campo]] as any;
-      nuevoArray[index] = valor;
-      return { ...prev, [pieza]: { ...prev[pieza], [campo]: nuevoArray } };
+    const nuevoArray = [...datosVestibular[pieza][campo]] as any;
+    nuevoArray[index] = campo === 'margen' || campo === 'sondaje' ? Number(valor) : valor;
+    setDatos({
+      ...datos,
+      datos_vestibular_superior: {
+        ...datosVestibular,
+        [pieza]: { ...datosVestibular[pieza], [campo]: nuevoArray }
+      }
     });
   };
 
   // --- CONSTANTES MATEMÁTICAS ---
   const viewBoxAncho = 790;
   const viewBoxAlto = 162;
-  const altoCanvas = 280; 
+  const altoCanvas = 210; // ❤️ AJUSTADO A 210 PARA MANTENER LA PROPORCIÓN
   
   // 📍 [EDITAR AQUÍ]: Altura de la línea recta azul/roja. 
   // Aumenta el número para bajar la línea, disminúyelo para subirla.
@@ -110,7 +123,7 @@ export function SuperiorVestibular() {
   const ptsSondajeArr: string[] = [];
 
   dientesSuperiores.forEach((pieza) => {
-    const d = datos[pieza];
+    const d = datosVestibular[pieza];
     const xs = coordenadasX[pieza];
     
     xs.forEach((x, index) => {
@@ -150,18 +163,19 @@ export function SuperiorVestibular() {
             <div className="h-10 border-b border-slate-300 flex items-center px-3 text-blue-700">Margen (MG)</div>
             <div className="h-10 border-b border-slate-300 flex items-center px-3 text-red-700">Sondaje (PS)</div>
             <div className="h-10 border-b-2 border-slate-400 flex items-center px-3 bg-emerald-50 text-emerald-700 shadow-inner">NIC (Inserción)</div>
-            <div className="h-[280px] flex items-center justify-center text-slate-400 bg-white border-r-2 border-slate-300">
+            <div className="h-[210px] flex items-center justify-center text-slate-400 bg-white border-r-2 border-slate-300"> {/* ❤️ AJUSTADO A 210px */}
               Gráfico 2D
             </div>
           </div>
 
           {/* COLUMNA 2: DATOS Y GRÁFICO */}
-          <div className="flex flex-col shrink-0 min-w-[1200px]" style={{ width: '100%' }}>
+          {/* ❤️ ANCHO FIJO A 1000px PARA EVITAR EL ESTIRAMIENTO HORIZONTAL */}
+          <div className="flex flex-col shrink-0 w-[1000px]">
             
             {/* TABLA DE INPUTS */}
             <div className="flex w-full">
               {dientesSuperiores.map((pieza) => {
-                const d = datos[pieza];
+                const d = datosVestibular[pieza];
                 const nic = [
                   (Number(d.margen[0]) || 0) + (Number(d.sondaje[0]) || 0),
                   (Number(d.margen[1]) || 0) + (Number(d.sondaje[1]) || 0),
@@ -249,7 +263,7 @@ export function SuperiorVestibular() {
 
                 {/* 2. RENDERIZADO DE IMPLANTES (Tapan la grilla y la imagen base gracias a su fondo sólido) */}
                 {dientesSuperiores.map((pieza) => {
-                  if (!datos[pieza].implante) return null;
+                  if (!datosVestibular[pieza].implante) return null;
                   
                   const ancho = anchosDientes[pieza];
                   const centroX = coordenadasX[pieza][1];
@@ -289,7 +303,7 @@ export function SuperiorVestibular() {
                 
                 {/* 5. PUNTOS Y MARCADORES (Sangrado, supuración) */}
                 {dientesSuperiores.map((pieza) => {
-                  const d = datos[pieza];
+                  const d = datosVestibular[pieza];
                   const xs = coordenadasX[pieza];
                   
                   return xs.map((x, index) => {

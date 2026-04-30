@@ -20,7 +20,6 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { useRouter } from "next/navigation"
-import { Badge } from "@/components/ui/badge"
 
 export function PapeleraPacientes() {
   const [eliminados, setEliminados] = useState([])
@@ -31,10 +30,20 @@ export function PapeleraPacientes() {
   const cargarEliminados = async () => {
     setCargando(true)
     try {
-      const res = await fetch("http://localhost:8000/api/pacientes/papelera/")
+      const token = localStorage.getItem("access_token") || ""
+      const res = await fetch("http://localhost:8000/api/pacientes/papelera/", {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` // Agregado el token
+        }
+      })
+      
       if (res.ok) {
         const data = await res.json()
-        setEliminados(data)
+        // Extraemos 'results' si Django envía paginación
+        setEliminados(data.results || data)
+      } else {
+        console.error("Error de autorización al cargar papelera")
       }
     } catch (error) {
       console.error("Error al cargar papelera:", error)
@@ -46,12 +55,20 @@ export function PapeleraPacientes() {
   // Función para restaurar (POST al endpoint de Django)
   const handleRestaurar = async (id: string) => {
     try {
+      const token = localStorage.getItem("access_token") || ""
       const res = await fetch(`http://localhost:8000/api/pacientes/${id}/restaurar/`, {
         method: "POST",
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` // Agregado el token
+        }
       })
+      
       if (res.ok) {
         cargarEliminados() // Refrescar la lista de la papelera
         router.refresh()   // Refrescar la tabla principal de fondo
+      } else {
+        alert("Error de permisos al intentar restaurar")
       }
     } catch (error) {
       alert("No se pudo restaurar al paciente")
@@ -64,11 +81,19 @@ export function PapeleraPacientes() {
     if (!confirmar) return
 
     try {
+      const token = localStorage.getItem("access_token") || ""
       const res = await fetch(`http://localhost:8000/api/pacientes/${id}/`, {
         method: "DELETE",
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` // Agregado el token
+        }
       })
+      
       if (res.ok) {
         cargarEliminados()
+      } else {
+        alert("Error de permisos al eliminar definitivamente")
       }
     } catch (error) {
       alert("Error al eliminar definitivamente")

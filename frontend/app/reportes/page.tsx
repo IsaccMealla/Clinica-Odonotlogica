@@ -1,351 +1,279 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as Tooltip2D, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from "recharts"
-import { Users, TrendingUp, Activity, Stethoscope, BadgeDollarSign, HeartPulse, Filter } from "lucide-react"
-import { Canvas, useFrame } from "@react-three/fiber"
-import { OrbitControls, Text, Environment, Html, Sparkles, RoundedBox } from "@react-three/drei"
-import * as THREE from "three"
+import { useState, useEffect } from "react"
+import { Loader2, Calendar, Download, Activity, Target, Filter } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
-// --- DATOS ---
-const datosMensuales = [
-  { mes: "Ene", pacientes: 120, ingresos: 4500, egresos: 2000 },
-  { mes: "Feb", pacientes: 135, ingresos: 5200, egresos: 2100 },
-  { mes: "Mar", pacientes: 110, ingresos: 3900, egresos: 1800 },
-  { mes: "Abr", pacientes: 165, ingresos: 6800, egresos: 2500 },
-  { mes: "May", pacientes: 190, ingresos: 8100, egresos: 2800 },
-  { mes: "Jun", pacientes: 175, ingresos: 7200, egresos: 2600 },
-]
+// Importamos nuestros componentes actualizados
+import { MetricasTarjetas } from "@/components/reportes/metricas-tarjetas"
+import { GraficoFinanciero } from "@/components/reportes/grafico-financiero"
+import { Grafico3DEspecialidades } from "@/components/reportes/grafico-3d-especialidades"
 
-// --- COMPONENTE THREE.JS: BARRA DE ESTADÍSTICA ---
-function Barra3D({ position, color, height, label, detalle, isActive, isAnyActive }: { position: [number, number, number], color: string, height: number, label: string, detalle: string, isActive: boolean, isAnyActive: boolean }) {
-  const meshRef = useRef<THREE.Mesh>(null)
-  const [hovered, setHover] = useState(false)
+import PantallaCarga3D from "@/components/PantallaCarga3D"
 
-  useFrame((state) => {
-    if (meshRef.current) {
-      meshRef.current.position.y = (height / 2) + Math.sin(state.clock.elapsedTime * 2 + position[0]) * 0.05;
-      const targetOpacity = isAnyActive && !isActive ? 0.2 : 1;
-      const material = meshRef.current.material as THREE.MeshPhysicalMaterial;
-      material.opacity = THREE.MathUtils.lerp(material.opacity, targetOpacity, 0.1);
-    }
-  })
+export default function DashboardReportesPage() {
+  // Estados para la carga y gráficos estáticos (financiero)
+  const [cargando, setCargando] = useState(true);
+  const [flujoMensual, setFlujoMensual] = useState<any[]>([]);
 
-  const isFocused = hovered || isActive;
+  // Estados interactivos para el Gráfico 3D y Tarjetas Reales
+  const [datos3D, setDatos3D] = useState<any[]>([]);
+  const [metricasActivas, setMetricasActivas] = useState<string[]>([]);
+  const [coloresPersonalizados, setColoresPersonalizados] = useState<Record<string, string>>({});
+  
+  // 🔥 FILTROS PRINCIPALES
+  const [filtroTiempo, setFiltroTiempo] = useState('mes');
+  const [filtroTipo, setFiltroTipo] = useState('clinico');
 
-  return (
-    <group>
-      <mesh 
-        ref={meshRef} 
-        position={[position[0], height / 2, position[2]]}
-        onPointerOver={() => setHover(true)}
-        onPointerOut={() => setHover(false)}
-        onClick={() => { if(meshRef.current) meshRef.current.scale.y = 1.1; setTimeout(() => { if(meshRef.current) meshRef.current.scale.y = 1 }, 150) }}
-      >
-        <boxGeometry args={[0.9, height, 0.9]} />
-        <meshPhysicalMaterial color={isFocused ? "#ffffff" : color} roughness={0.1} metalness={0.4} clearcoat={0.8} transparent={true} opacity={1} />
-        
-        {isFocused && (
-          <Html position={[0, height / 2 + 0.3, 0]} center zIndexRange={[100, 0]}>
-            <div className="bg-slate-900/90 text-white text-xs px-3 py-2 rounded-lg shadow-xl backdrop-blur-sm border border-slate-700 whitespace-nowrap pointer-events-none transition-all duration-300 transform scale-100">
-              <p className="font-bold text-rose-400">{label}</p>
-              <p>{detalle}</p>
-            </div>
-          </Html>
-        )}
-      </mesh>
-      {}
-      <Text position={[position[0], -0.4, position[2]]} fontSize={0.25} color="#1f2937" anchorY="top" maxWidth={1.2} textAlign="center">{label}</Text>
-    </group>
-  )
-}
+  // 🔥 NUEVOS FILTROS ESPECÍFICOS BASADOS EN TUS MODELOS DE DJANGO
+  const [filtroEstadoCarpeta, setFiltroEstadoCarpeta] = useState('todos'); // Modelo: SeguimientoAcademico
+  const [filtroRolUsuario, setFiltroRolUsuario] = useState('todos'); // Modelo: CustomUser
 
-// --- COMPONENTE THREE.JS: DIENTE INTERACTIVO (CON ROTACIÓN POR TECLADO) ---
-function Diente3D({ modoCaries, cariesPositions, onAddCaries, tieneTornillo }: { modoCaries: boolean, cariesPositions: [number, number, number][], onAddCaries: (pos: [number, number, number]) => void, tieneTornillo: boolean }) {
-  const dienteRef = useRef<THREE.Group>(null);
-  const targetRotation = useRef({ x: 0, y: 0 });
-
-  // Controlar rotación con flechas del teclado
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const speed = 0.3; // Velocidad de giro
-      if (e.key === "ArrowLeft") targetRotation.current.y -= speed;
-      if (e.key === "ArrowRight") targetRotation.current.y += speed;
-      if (e.key === "ArrowUp") targetRotation.current.x -= speed;
-      if (e.key === "ArrowDown") targetRotation.current.x += speed;
+    const fetchDatos = async () => {
+      setCargando(true);
+      try {
+        // Efecto visual de carga para la presentación
+        await new Promise(r => setTimeout(r, 5000)); 
+
+        const token = localStorage.getItem("access_token");
+        const headers: HeadersInit = {
+          "Content-Type": "application/json",
+        };
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`; 
+        }
+
+        // Construimos la URL dinámica enviando todos los filtros al backend
+        const url = `http://localhost:8000/api/reportes/estadisticas/?tipo=${filtroTipo}&tiempo=${filtroTiempo}&estado_carpeta=${filtroEstadoCarpeta}&rol=${filtroRolUsuario}`;
+
+        const res = await fetch(url, {
+          method: "GET",
+          headers: headers,
+        });
+
+        if (res.ok) {
+          const dataReal = await res.json();
+          setDatos3D(dataReal);
+          
+          setMetricasActivas(dataReal.map((d: any) => d.nombre));
+          
+          const coloresIniciales: Record<string, string> = {};
+          dataReal.forEach((d: any) => {
+            if (!coloresPersonalizados[d.nombre]) {
+              coloresIniciales[d.nombre] = d.color;
+            }
+          });
+          setColoresPersonalizados(prev => ({ ...prev, ...coloresIniciales }));
+        } else {
+          // Si el backend falla o aún no tiene esta ruta, cargamos datos de respaldo para que tu presentación no se caiga
+          cargarDatosDeRespaldo();
+        }
+
+        // Flujo financiero simulado
+        setFlujoMensual([
+          { mes: "Ene", ingresos: 4500 },
+          { mes: "Feb", ingresos: 5200 },
+          { mes: "Mar", ingresos: 3900 },
+          { mes: "Abr", ingresos: 6800 },
+          { mes: "May", ingresos: 8100 },
+          { mes: "Jun", ingresos: 9500 },
+        ]);
+
+      } catch (error) {
+        console.error("Error cargando reportes", error);
+        cargarDatosDeRespaldo(); // Respaldo de emergencia
+      } finally {
+        setCargando(false);
+      }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+    fetchDatos();
+  }, [filtroTipo, filtroTiempo, filtroEstadoCarpeta, filtroRolUsuario]); // Se ejecuta al cambiar cualquier filtro
 
-  useFrame((state) => {
-    if (dienteRef.current) {
-      // Animación de flotar (solo en Y)
-      dienteRef.current.position.y = Math.sin(state.clock.elapsedTime) * 0.1;
-      
-      // Aplicar la rotación del teclado suavemente (Lerp)
-      dienteRef.current.rotation.y = THREE.MathUtils.lerp(dienteRef.current.rotation.y, targetRotation.current.y, 0.1);
-      dienteRef.current.rotation.x = THREE.MathUtils.lerp(dienteRef.current.rotation.x, targetRotation.current.x, 0.1);
-    }
-  })
+  // Función de seguridad por si tu backend Django aún no devuelve los datos exactos hoy
+  const cargarDatosDeRespaldo = () => {
+    const datosMuestra = filtroTipo === 'clinico' 
+      ? [
+          { nombre: "Carpetas en Revisión", valor: 28, color: "#f59e0b" },
+          { nombre: "Trabajos Observados", valor: 7, color: "#ef4444" },
+          { nombre: "Tratamientos Derivados", valor: 14, color: "#0ea5e9" },
+        ]
+      : [
+          { nombre: "Docentes Activos", valor: 12, color: "#6366f1" },
+          { nombre: "Estudiantes en Clínica", valor: 45, color: "#8b5cf6" },
+          { nombre: "Pacientes Sin Asignar", valor: 15, color: "#14b8a6" },
+        ];
+    setDatos3D(datosMuestra);
+    setMetricasActivas(datosMuestra.map(d => d.nombre));
+  };
 
-  const handleCariesClick = (e: any) => {
-    if (modoCaries && dienteRef.current) {
-      e.stopPropagation();
-      const localPoint = dienteRef.current.worldToLocal(e.point.clone());
-      onAddCaries([localPoint.x, localPoint.y, localPoint.z]);
-    }
+  // --- FUNCIONES DE INTERACTIVIDAD ---
+  const toggleMetrica = (nombre: string) => {
+    setMetricasActivas(prev => prev.includes(nombre) ? prev.filter(m => m !== nombre) : [...prev, nombre]);
+  };
+
+  const cambiarColor = (e: React.ChangeEvent<HTMLInputElement>, nombre: string) => {
+    e.stopPropagation(); 
+    setColoresPersonalizados(prev => ({ ...prev, [nombre]: e.target.value }));
+  };
+
+  const datosParaGrafico = datos3D
+    .filter(d => metricasActivas.includes(d.nombre))
+    .map(d => ({
+      ...d,
+      color: coloresPersonalizados[d.nombre] || d.color
+    }));
+
+  // --- PANTALLA DE CARGA ---
+// --- PANTALLA DE CARGA ---
+  if (cargando && datos3D.length === 0) {
+    return (
+      <div className="p-6 h-screen flex items-center justify-center">
+        <PantallaCarga3D 
+          texto="Generando Analíticas..." 
+          subtexto="Cruzando datos de historias clínicas y rendimiento académico"
+          alturaClase="h-[80vh]" // Le damos la altura que ya tenías pensada
+        />
+      </div>
+    );
   }
 
   return (
-    <group ref={dienteRef}>
-      {/* Corona del diente */}
-      <RoundedBox 
-        args={[1.5, 1.5, 1.5]} 
-        radius={0.3} 
-        smoothness={4} 
-        position={[0, 0.5, 0]}
-        onPointerDown={handleCariesClick}
-        onPointerOver={() => { if(modoCaries) document.body.style.cursor = 'crosshair' }}
-        onPointerOut={() => { document.body.style.cursor = 'default' }}
-      >
-        <meshPhysicalMaterial color="#ffffff" roughness={0.1} clearcoat={0.5} />
-      </RoundedBox>
-
-      {/* Raíces */}
-      {!tieneTornillo && (
-        <>
-          <mesh position={[-0.35, -0.8, 0]}>
-            <coneGeometry args={[0.35, 1.5, 16]} />
-            <meshPhysicalMaterial color="#ffffff" roughness={0.1} />
-          </mesh>
-          <mesh position={[0.35, -0.8, 0]}>
-            <coneGeometry args={[0.35, 1.5, 16]} />
-            <meshPhysicalMaterial color="#ffffff" roughness={0.1} />
-          </mesh>
-        </>
-      )}
-
-      {/* Renderizar TODAS las caries */}
-      {cariesPositions.map((pos, index) => (
-        <mesh key={index} position={pos}>
-          <sphereGeometry args={[0.18, 16, 16]} />
-          <meshStandardMaterial color="#291c19" roughness={0.9} />
-        </mesh>
-      ))}
-
-      {/* Tornillo de Implante */}
-      {tieneTornillo && (
-        <group position={[0, -1, 0]}>
-          <mesh>
-            <cylinderGeometry args={[0.25, 0.15, 2, 16]} />
-            <meshStandardMaterial color="#94a3b8" metalness={1} roughness={0.2} />
-          </mesh>
-          {[...Array(5)].map((_, i) => (
-            <mesh key={i} position={[0, -0.6 + i * 0.3, 0]}>
-              <torusGeometry args={[0.26, 0.05, 16, 32]} />
-              <meshStandardMaterial color="#64748b" metalness={1} roughness={0.3} />
-            </mesh>
-          ))}
-        </group>
-      )}
-    </group>
-  )
-}
-
-// --- PÁGINA PRINCIPAL ---
-export default function DashboardReportesPage() {
-  const [filtroEspecialidad, setFiltroEspecialidad] = useState<string | null>(null);
-  
-  // Estados para el simulador del diente
-  const [modoCaries, setModoCaries] = useState(false);
-  const [cariesPositions, setCariesPositions] = useState<[number, number, number][]>([]);
-  const [tieneTornillo, setTieneTornillo] = useState(false);
-
-  const especialidades3D = [
-    { label: "General", color: "#0ea5e9", height: 2, pos: [-2.5, 0, 0], det: "450 Consultas" },
-    { label: "Ortodoncia", color: "#8b5cf6", height: 4, pos: [0, 0, 0], det: "920 Ajustes" },
-    { label: "Periodoncia", color: "#f43f5e", height: 1.5, pos: [2.5, 0, 0], det: "120 Tratamientos" },
-    { label: "Cirugía", color: "#10b981", height: 2.8, pos: [0, 0, -2.5], det: "Extracciones: 85" },
-  ];
-
-  return (
-    <div className="min-h-screen bg-slate-50 p-6 md:p-8 flex flex-col space-y-8">
+    <div className="min-h-screen p-2 md:p-6 flex flex-col space-y-8 animate-in fade-in duration-700">
       
-      {/* HEADER */}
-      <div className="flex justify-between items-end">
+      {/* HEADER PRINCIPAL */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Centro de Analítica</h1>
-          <p className="text-muted-foreground mt-1">Monitoreo clínico, financiero y de pacientes en tiempo real.</p>
+          <h1 className="text-4xl font-extrabold text-slate-950 tracking-tight">Centro de Analítica Avanzada</h1>
+          <p className="text-slate-600 mt-2 text-lg">Monitoreo clínico, institucional y financiero en tiempo real.</p>
+        </div>
+        <div className="flex gap-3">
+          <Button variant="outline" className="bg-white hover:bg-slate-50 text-slate-800 border-slate-200 pointer-events-none px-6">
+            <Calendar className="mr-2 h-5 w-5 text-emerald-600" /> 
+            {filtroTiempo === 'mes' ? 'Este Mes' : filtroTiempo === 'hoy' ? 'Hoy' : filtroTiempo === 'semana' ? 'Esta Semana' : 'Histórico'}
+          </Button>
+          <Button className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 shadow-md shadow-emerald-200">
+            <Download className="mr-2 h-5 w-5" /> Exportar Reporte
+          </Button>
         </div>
       </div>
 
-      {/* TARJETAS DE MÉTRICAS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-         {[
-          { title: "Pacientes Atendidos", value: "895", desc: "+12% este mes", icon: Users, color: "text-blue-600", bg: "bg-blue-100" },
-          { title: "Tratamientos Exitosos", value: "1,420", desc: "98% de satisfacción", icon: HeartPulse, color: "text-rose-600", bg: "bg-rose-100" },
-          { title: "Casos de Riesgo", value: "18%", desc: "Atención prioritaria", icon: Activity, color: "text-amber-600", bg: "bg-amber-100" },
-          { title: "Ingresos", value: "$8.1k", desc: "+24% vs mes anterior", icon: BadgeDollarSign, color: "text-emerald-600", bg: "bg-emerald-100" },
-        ].map((stat, index) => (
-          <Card key={index} className="border-none shadow-sm hover:shadow-md transition-shadow bg-white">
-            <CardContent className="p-6 flex items-center space-x-4">
-              <div className={`p-4 rounded-xl ${stat.bg} ${stat.color}`}><stat.icon className="h-6 w-6" /></div>
-              <div>
-                <p className="text-sm font-medium text-slate-500">{stat.title}</p>
-                <h3 className="text-2xl font-bold text-slate-800">{stat.value}</h3>
-                <p className="text-xs text-slate-400 mt-1">{stat.desc}</p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+      <div className="w-full bg-white rounded-3xl shadow-sm border border-slate-100 p-4 md:p-6 min-h-[450px] flex flex-col overflow-hidden">
+        <GraficoFinanciero datos={flujoMensual} />
       </div>
 
-      {/* TERCERA FILA: GRÁFICAS */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <Card className="lg:col-span-2 shadow-sm border-none bg-white">
-          <CardHeader>
-            <CardTitle>Flujo Financiero Anual</CardTitle>
-            <CardDescription>Ingresos vs Egresos</CardDescription>
-          </CardHeader>
-          <CardContent className="h-[350px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={datosMensuales}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="mes" axisLine={false} tickLine={false} />
-                <YAxis axisLine={false} tickLine={false} />
-                <Tooltip2D contentStyle={{borderRadius: '8px', border: 'none'}} />
-                <Area type="monotone" dataKey="ingresos" stroke="#10b981" fill="#10b981" fillOpacity={0.2} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Gráfica 3D (Ajustada para fondos claros) */}
-        <Card className="shadow-lg bg-white border border-gray-200 relative overflow-hidden flex flex-col">
-          <CardHeader className="relative z-10 pb-2">
-            <CardTitle className="text-gray-900 flex items-center justify-between">
-              Análisis 3D
-              {filtroEspecialidad && (
-                <button onClick={() => setFiltroEspecialidad(null)} className="text-xs bg-gray-200 hover:bg-gray-300 text-black font-bold px-2 py-1 rounded transition-colors">
-                  Limpiar
-                </button>
-              )}
-            </CardTitle>
-            
-            <div className="flex flex-wrap gap-2 mt-2">
-              <Filter className="w-4 h-4 text-gray-500 mt-1 mr-1" />
-              {especialidades3D.map(esp => (
-                <button
-                  key={esp.label}
-                  onClick={() => setFiltroEspecialidad(filtroEspecialidad === esp.label ? null : esp.label)}
-                  className={`text-xs px-3 py-1.5 rounded-full transition-all border-2 font-bold ${
-                    filtroEspecialidad === esp.label 
-                      ? "bg-rose-100 border-rose-500 text-rose-700" 
-                      : "bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200"
-                  }`}
-                >
-                  {esp.label}
-                </button>
-              ))}
-            </div>
-          </CardHeader>
+      {/* SECCIÓN 2: DASHBOARD INTERACTIVO 3D */}
+      <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-10 min-h-[750px] flex flex-col">
+        
+        {/* CONTROLES DEL DASHBOARD (FILTROS DINÁMICOS) */}
+        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-10 border-b border-slate-100 pb-6 gap-4">
+          <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-3">
+            <Filter className="text-blue-500 h-7 w-7" /> 
+            Filtros de Análisis
+          </h2>
           
-          <CardContent className="flex-grow relative z-10 p-0 h-[300px]">
-            <Canvas camera={{ position: [0, 5, 9], fov: 45 }}>
-              <Environment preset="city" />
-              <ambientLight intensity={0.8} />
-              <directionalLight position={[10, 20, 10]} intensity={1.5} />
-              
-              <group position={[0, -1.5, 0]}>
-                {especialidades3D.map((esp, i) => (
-                  <Barra3D 
-                    key={i} position={esp.pos as [number, number, number]} height={esp.height} color={esp.color} label={esp.label} detalle={esp.det} isActive={filtroEspecialidad === esp.label} isAnyActive={filtroEspecialidad !== null}
-                  />
-                ))}
-                <mesh position={[0, -0.15, 0]}>
-                  <cylinderGeometry args={[4.5, 4.5, 0.1, 64]} />
-                  <meshStandardMaterial color="#e2e8f0" roughness={0.8} />
-                </mesh>
-              </group>
-
-              <OrbitControls enableZoom={false} autoRotate={!filtroEspecialidad} autoRotateSpeed={0.5} maxPolarAngle={Math.PI / 2.1} />
-            </Canvas>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* CUARTA FILA: SIMULADOR INTERACTIVO */}
-      <div className="grid grid-cols-1 mt-8">
-        <Card className="shadow-lg border border-gray-200 bg-white overflow-hidden">
-          <CardHeader>
-            <CardTitle>Simulador Clínico 3D</CardTitle>
-            <CardDescription>Usa las <b>flechas de tu teclado</b> (⬅️ ➡️ ⬆️ ⬇️) para girar el diente en 3D.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col md:flex-row gap-6 h-[400px]">
+          <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
             
-            {/* Controles: BOTONES TOTALMENTE REDISEÑADOS (Sin blancos, letras negras) */}
-            <div className="flex flex-col gap-4 w-full md:w-1/3 justify-center">
-              
-              <button 
-                onClick={() => setModoCaries(!modoCaries)}
-                className={`p-3 rounded-lg font-extrabold transition-all duration-300 shadow-sm border-2 ${
-                  modoCaries 
-                    ? 'bg-amber-400 border-amber-600 text-black' 
-                    : 'bg-gray-100 border-gray-400 text-gray-900 hover:bg-gray-200'
-                }`}
+            <select 
+              value={filtroTipo} 
+              onChange={(e) => {
+                setFiltroTipo(e.target.value);
+                // Reseteamos los subfiltros al cambiar de vista
+                setFiltroEstadoCarpeta('todos');
+                setFiltroRolUsuario('todos');
+              }}
+              disabled={cargando}
+              className="bg-slate-900 text-white border-transparent rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-semibold cursor-pointer shadow-md"
+            >
+              <option value="clinico">Vista Clínica (Tratamientos y Carpetas)</option>
+              <option value="usuarios">Vista Institucional (Usuarios y Pacientes)</option>
+            </select>
+            
+            {filtroTipo === 'clinico' && (
+              <select 
+                value={filtroEstadoCarpeta} 
+                onChange={(e) => setFiltroEstadoCarpeta(e.target.value)}
+                disabled={cargando}
+                className="bg-indigo-50 border border-indigo-200 text-indigo-800 rounded-xl px-4 py-3 text-sm focus:ring-indigo-500 outline-none font-semibold cursor-pointer animate-in fade-in zoom-in duration-300"
               >
-                {modoCaries ? "🎯 Modo Caries (Usa Flechas para girar)" : "Activar Pincel de Caries"}
-              </button>
+                <option value="todos">Estado Docente: Todos</option>
+                <option value="BORRADOR">Estado: En Borrador (Editando)</option>
+                <option value="REVISION">Estado: Pendiente de Revisión</option>
+                <option value="APROBADO">Estado: Aprobado por Docente</option>
+                <option value="RECHAZADO">Estado: Rechazado / Observado</option>
+              </select>
+            )}
 
-              <button 
-                onClick={() => setTieneTornillo(!tieneTornillo)}
-                className={`p-3 rounded-lg font-extrabold transition-all duration-300 shadow-sm border-2 ${
-                  tieneTornillo 
-                    ? 'bg-indigo-300 border-indigo-600 text-black' 
-                    : 'bg-gray-100 border-gray-400 text-gray-900 hover:bg-gray-200'
-                }`}
+        
+            {filtroTipo === 'usuarios' && (
+              <select 
+                value={filtroRolUsuario} 
+                onChange={(e) => setFiltroRolUsuario(e.target.value)}
+                disabled={cargando}
+                className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl px-4 py-3 text-sm focus:ring-emerald-500 outline-none font-semibold cursor-pointer animate-in fade-in zoom-in duration-300"
               >
-                {tieneTornillo ? "Remover Implante" : "Colocar Implante"}
-              </button>
+                <option value="todos">Roles: Todos los Usuarios</option>
+                <option value="ESTUDIANTE">Rol: Estudiantes Clínicos</option>
+                <option value="DOCENTE">Rol: Docentes Supervisores</option>
+                <option value="RECEPCIONISTA">Rol: Recepcionistas</option>
+              </select>
+            )}
 
-              <button 
-                onClick={() => { setCariesPositions([]); setTieneTornillo(false); setModoCaries(false); }}
-                className="p-3 rounded-lg font-extrabold bg-red-100 border-2 border-red-500 text-red-700 hover:bg-red-200 transition-all mt-4 shadow-sm"
-              >
-                Limpiar Diente
-              </button>
-            </div>
+            {/* 3. SELECTOR DE TIEMPO  */}
+            <select 
+              value={filtroTiempo} 
+              onChange={(e) => setFiltroTiempo(e.target.value)}
+              disabled={cargando}
+              className="bg-slate-100 border border-slate-200 text-slate-800 rounded-xl px-4 py-3 text-sm focus:ring-slate-400 outline-none font-semibold cursor-pointer"
+            >
+              <option value="hoy">Tiempo: Hoy</option>
+              <option value="semana">Tiempo: Esta Semana</option>
+              <option value="mes">Tiempo: Este Mes</option>
+              <option value="siempre">Tiempo: Histórico</option>
+            </select>
+          </div>
+        </div>
 
-            {/* Canvas de Three.js */}
-            <div className="w-full md:w-2/3 bg-gray-50 rounded-xl relative overflow-hidden shadow-inner border-2 border-gray-200">
-              {modoCaries && (
-                <div className="absolute top-4 left-4 z-10 bg-amber-400 text-black border border-amber-600 px-3 py-1 rounded-full text-xs font-bold animate-pulse shadow-md">
-                  Gira con las flechas del teclado y haz clic para pintar
-                </div>
-              )}
-              
-              <Canvas camera={{ position: [0, 1, 4], fov: 50 }}>
-                <Environment preset="studio" />
-                <ambientLight intensity={0.8} />
-                <directionalLight position={[5, 5, 5]} intensity={1} />
-                
-                <Diente3D 
-                  modoCaries={modoCaries} 
-                  cariesPositions={cariesPositions} 
-                  onAddCaries={(pos) => setCariesPositions(prev => [...prev, pos])}
-                  tieneTornillo={tieneTornillo} 
-                />
-                
-                {/* Desactivamos el OrbitControls para que no pelee con las flechas del teclado */}
-                <OrbitControls enableZoom={true} enableRotate={!modoCaries} enablePan={false} />
-              </Canvas>
-            </div>
+        {/* CONTENEDOR LADO A LADO */}
+        <div className="flex flex-col md:flex-row gap-10 flex-grow">
+          
+          {/* LADO IZQUIERDO: Tarjetas Selectoras */}
+          <div className="w-full md:w-1/3 xl:w-1/4 flex flex-col gap-5">
+            {cargando ? (
+              <div className="flex flex-col justify-center items-center flex-grow bg-slate-50 rounded-2xl border border-slate-200">
+                <Loader2 className="animate-spin text-blue-500 h-10 w-10 mb-3" />
+                <span className="text-base font-semibold text-slate-600">Calculando métricas...</span>
+              </div>
+            ) : datos3D.length > 0 ? (
+              <MetricasTarjetas 
+                datos={datos3D} 
+                activas={metricasActivas} 
+                onToggle={toggleMetrica} 
+                colores={coloresPersonalizados} 
+                onColorChange={cambiarColor} 
+              />
+            ) : (
+              <div className="text-center p-8 text-slate-600 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-center flex-grow">
+                No hay registros para este filtro.
+              </div>
+            )}
+          </div>
 
-          </CardContent>
-        </Card>
+          {/* LADO DERECHO: Gráfico 3D */}
+          <div className="w-full md:w-2/3 xl:w-3/4 min-h-[550px] flex items-center justify-center bg-slate-50 rounded-2xl border border-slate-200 relative overflow-hidden flex-grow shadow-inner">
+            {datosParaGrafico.length > 0 ? (
+              <Grafico3DEspecialidades datos={datosParaGrafico} />
+            ) : (
+              <div className="text-center text-slate-400 p-10 flex flex-col items-center">
+                <Target className="h-16 w-16 mx-auto mb-5 opacity-30" />
+                <p className="text-2xl font-semibold">Esperando selección</p>
+                <p className="text-base mt-2">Active las métricas en el panel izquierdo.</p>
+              </div>
+            )}
+          </div>
+
+        </div>
       </div>
 
     </div>

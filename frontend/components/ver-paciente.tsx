@@ -1,4 +1,4 @@
-"use  client"
+"use client"
 
 import { Eye } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -10,12 +10,10 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 
-// Recibimos los datos de UN solo paciente
 export function VerPaciente({ paciente }: { paciente: any }) {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        {/* El botón es un icono sin fondo que se pinta al pasar el mouse */}
         <Button variant="ghost" size="icon" className="hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950">
           <Eye className="h-4 w-4" />
           <span className="sr-only">Ver detalles</span>

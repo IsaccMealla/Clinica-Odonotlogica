@@ -1,10 +1,73 @@
 import uuid
-from django.db import models
-from datetime import date
+from datetime import date, timedelta
 
+from django.conf import settings
+from django.db import models
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from django.utils import timezone
+import os
+from django.contrib.auth.models import AbstractUser
+
+# ==========================================
+# MODELO DE USUARIO PERSONALIZADO
+# ==========================================
+class CustomUser(AbstractUser):
+    ROLES = [
+        ('ADMIN', 'Administrador'),
+        ('DOCENTE', 'Docente / Odontólogo'),
+        ('RECEPCIONISTA', 'Recepcionista'),
+        ('ESTUDIANTE', 'Estudiante'),
+    ]
+    rol = models.CharField(max_length=20, choices=ROLES, default='ESTUDIANTE')
+
+    def __str__(self):
+        return f"{self.username} ({self.get_rol_display()})"
+# ==========================================
+# 0. CLASE ABSTRACTA DE AUDITORÍA ACADÉMICA
+# ==========================================
+class SeguimientoAcademico(models.Model):
+    """
+    Plantilla base para cualquier registro que requiera nota o firma del docente.
+    """
+    ESTADOS_APROBACION = [
+        ('BORRADOR', 'Borrador (Editando)'),
+        ('REVISION', 'Pendiente de Revisión'),
+        ('APROBADO', 'Aprobado por Docente'),
+        ('RECHAZADO', 'Rechazado / Con Observaciones'),
+    ]
+
+    estudiante = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.RESTRICT, related_name="%(class)s_creados")
+    docente_supervisor = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.SET_NULL, 
+        null=True, blank=True, 
+        related_name="%(class)s_supervisados", 
+        limit_choices_to={'rol': 'DOCENTE'}
+    )
+    
+    estado_academico = models.CharField(max_length=20, choices=ESTADOS_APROBACION, default='BORRADOR')
+    comentarios_docente = models.TextField(blank=True, null=True, help_text="Observaciones si rechaza el trabajo")
+    fecha_aprobacion = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        abstract = True
+
+
+# ==========================================
 # 1. PACIENTE
+# ==========================================
 class Paciente(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    # --- ASIGNACIÓN DE CLÍNICA ---
+    estudiante_asignado = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.RESTRICT, 
+        related_name='pacientes_asignados',
+        limit_choices_to={'rol': 'ESTUDIANTE'},
+        null=True, blank=True
+    )
 
     ci = models.CharField(max_length=20, unique=True, verbose_name="Cédula de Identidad")
     nombres = models.CharField(max_length=100)
@@ -27,10 +90,14 @@ class Paciente(models.Model):
     fecha_ultima_consulta = models.DateField(blank=True, null=True)
     motivo_ultima_consulta = models.TextField(blank=True, null=True)
 
+    inasistencias = models.IntegerField(default=0, help_text="Número de citas no asistidas")
+    alerta_abandono = models.BooleanField(default=False, help_text="Indica si el paciente está en alerta por abandono")
+
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
 
-    activo = models.BooleanField(default=True) # <-- Nuevo campo para borrado lógico
+    activo = models.BooleanField(default=True)
+    
     class Meta:
         db_table = 'pacientes'
         ordering = ['apellido_paterno', 'nombres']
@@ -45,39 +112,35 @@ class Paciente(models.Model):
             return hoy.year - self.fecha_nacimiento.year - ((hoy.month, hoy.day) < (self.fecha_nacimiento.month, self.fecha_nacimiento.day))
         return None
 
-# 2. ANTECEDENTES FAMILIARES
-class AntecedentePatologicoFamiliar(models.Model):
+
+# ==========================================
+# 2. ANTECEDENTES (OneToOneField - Únicos por paciente)
+# ==========================================
+class AntecedentePatologicoFamiliar(SeguimientoAcademico):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     paciente = models.OneToOneField(Paciente, on_delete=models.CASCADE, related_name='antecedentes_familiares')
 
     alergia = models.BooleanField(default=False)
     alergia_familiar = models.CharField(max_length=150, blank=True, null=True)
     alergia_obs = models.TextField(blank=True, null=True)
-
     asma_bronquial = models.BooleanField(default=False)
     asma_familiar = models.CharField(max_length=150, blank=True, null=True)
     asma_obs = models.TextField(blank=True, null=True)
-
     cardiologicos = models.BooleanField(default=False)
     cardiologicos_familiar = models.CharField(max_length=150, blank=True, null=True)
     cardiologicos_obs = models.TextField(blank=True, null=True)
-
     oncologicos = models.BooleanField(default=False)
     oncologicos_familiar = models.CharField(max_length=150, blank=True, null=True)
     oncologicos_obs = models.TextField(blank=True, null=True)
-
     discrasias_sanguineas = models.BooleanField(default=False)
     discrasias_familiar = models.CharField(max_length=150, blank=True, null=True)
     discrasias_obs = models.TextField(blank=True, null=True)
-
     diabetes = models.BooleanField(default=False)
     diabetes_familiar = models.CharField(max_length=150, blank=True, null=True)
     diabetes_obs = models.TextField(blank=True, null=True)
-
     hipertension_arterial = models.BooleanField(default=False)
     hipertension_familiar = models.CharField(max_length=150, blank=True, null=True)
     hipertension_obs = models.TextField(blank=True, null=True)
-
     renales = models.BooleanField(default=False)
     renales_familiar = models.CharField(max_length=150, blank=True, null=True)
     renales_obs = models.TextField(blank=True, null=True)
@@ -88,19 +151,16 @@ class AntecedentePatologicoFamiliar(models.Model):
     class Meta:
         db_table = 'antecedentes_familiares'
 
-# 3. ANTECEDENTES PERSONALES
-class AntecedentePatologicoPersonal(models.Model):
+class AntecedentePatologicoPersonal(SeguimientoAcademico):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     paciente = models.OneToOneField(Paciente, on_delete=models.CASCADE, related_name='antecedentes_personales')
 
     estado_salud = models.CharField(max_length=100, blank=True, null=True)
     fecha_ultimo_examen_medico = models.DateField(blank=True, null=True)
-
     bajo_tratamiento_medico = models.BooleanField(default=False)
     tratamiento_obs = models.TextField(blank=True, null=True)
     toma_medicamentos = models.BooleanField(default=False)
     medicamentos_obs = models.TextField(blank=True, null=True)
-
     sangra_excesivamente = models.BooleanField(default=False)
     sangrado_obs = models.TextField(blank=True, null=True)
     problema_sanguineo = models.BooleanField(default=False)
@@ -115,7 +175,6 @@ class AntecedentePatologicoPersonal(models.Model):
     vitamina_k_obs = models.TextField(blank=True, null=True)
     transfusion_sanguinea = models.BooleanField(default=False)
     transfusion_obs = models.TextField(blank=True, null=True)
-
     intervencion_quirurgica = models.BooleanField(default=False)
     quirurgica_obs = models.TextField(blank=True, null=True)
     problemas_oncologicos = models.BooleanField(default=False)
@@ -126,11 +185,9 @@ class AntecedentePatologicoPersonal(models.Model):
     corazon_obs = models.TextField(blank=True, null=True)
     hepatitis = models.BooleanField(default=False)
     hepatitis_obs = models.TextField(blank=True, null=True)
-
     tension_arterial = models.BooleanField(default=False)
     tension_arterial_tipo = models.CharField(max_length=50, blank=True, null=True)
     tension_obs = models.TextField(blank=True, null=True)
-
     aftas_herpes = models.BooleanField(default=False)
     aftas_herpes_obs = models.TextField(blank=True, null=True)
     consumo_drogas = models.BooleanField(default=False)
@@ -139,7 +196,6 @@ class AntecedentePatologicoPersonal(models.Model):
     venereas_obs = models.TextField(blank=True, null=True)
     vih_positivo = models.BooleanField(default=False)
     vih_obs = models.TextField(blank=True, null=True)
-
     alergia_penicilina = models.BooleanField(default=False)
     alergia_anestesia = models.BooleanField(default=False)
     alergia_aspirina = models.BooleanField(default=False)
@@ -155,8 +211,7 @@ class AntecedentePatologicoPersonal(models.Model):
     class Meta:
         db_table = 'antecedentes_personales'
 
-# 4. ANTECEDENTES NO PATOLÓGICOS
-class AntecedenteNoPatologicoPersonal(models.Model):
+class AntecedenteNoPatologicoPersonal(SeguimientoAcademico):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     paciente = models.OneToOneField(Paciente, on_delete=models.CASCADE, related_name='antecedentes_no_patologicos')
 
@@ -164,14 +219,12 @@ class AntecedenteNoPatologicoPersonal(models.Model):
     respira_boca_obs = models.TextField(blank=True, null=True)
     consume_citricos = models.BooleanField(default=False)
     citricos_obs = models.TextField(blank=True, null=True)
-
     muerde_unas_labios = models.BooleanField(default=False)
     muerde_unas_obs = models.TextField(blank=True, null=True)
     muerde_objetos = models.BooleanField(default=False)
     muerde_objetos_obs = models.TextField(blank=True, null=True)
     apretamiento_dentario = models.BooleanField(default=False)
     apretamiento_obs = models.TextField(blank=True, null=True)
-
     fuma = models.BooleanField(default=False)
     fuma_cantidad_diaria = models.CharField(max_length=100, blank=True, null=True)
     fuma_obs = models.TextField(blank=True, null=True)
@@ -182,15 +235,13 @@ class AntecedenteNoPatologicoPersonal(models.Model):
     class Meta:
         db_table = 'antecedentes_no_patologicos'
 
-# 5. ANTECEDENTES GINECOLÓGICOS
-class AntecedenteGinecologico(models.Model):
+class AntecedenteGinecologico(SeguimientoAcademico):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     paciente = models.OneToOneField(Paciente, on_delete=models.CASCADE, related_name='antecedentes_ginecologicos')
 
     posibilidad_embarazo = models.BooleanField(default=False)
     embarazo_meses = models.CharField(max_length=50, blank=True, null=True)
     embarazo_obs = models.TextField(blank=True, null=True)
-
     toma_anticonceptivos = models.BooleanField(default=False)
     anticonceptivos_obs = models.TextField(blank=True, null=True)
 
@@ -200,17 +251,11 @@ class AntecedenteGinecologico(models.Model):
     class Meta:
         db_table = 'antecedentes_ginecologicos'
 
-
-# Historia clinica
-class Habitos(models.Model):
-    # Relación 1 a 1 con el paciente
+class Habitos(SeguimientoAcademico):
     paciente = models.OneToOneField('Paciente', on_delete=models.CASCADE, related_name='habitos')
     
-    # Textos
     tecnica_cepillado = models.CharField(max_length=255, blank=True, null=True, verbose_name="Técnica de cepillado")
     elementos_higiene = models.CharField(max_length=255, blank=True, null=True, help_text="Ej: enjuagues, hilo dental, palillo dental, otros")
-    
-    # Booleanos (Sí / No)
     onicofagia = models.BooleanField(default=False, verbose_name="Onicofagia (Muerde uñas)")
     interposicion_lingual = models.BooleanField(default=False)
     bruxismo = models.BooleanField(default=False)
@@ -220,8 +265,6 @@ class Habitos(models.Model):
     fuma = models.BooleanField(default=False)
     bebe = models.BooleanField(default=False, verbose_name="Bebe alcohol")
     interposicion_objetos = models.BooleanField(default=False)
-    
-    # Otros
     otros_habitos = models.TextField(blank=True, null=True, verbose_name="Otros hábitos")
 
     def __str__(self):
@@ -231,12 +274,9 @@ class Habitos(models.Model):
         verbose_name = "Hábito"
         verbose_name_plural = "Hábitos"
 
-
-class AntecedentesPeriodontales(models.Model):
-    # Relación 1 a 1 con el paciente
+class AntecedentesPeriodontales(SeguimientoAcademico):
     paciente = models.OneToOneField('Paciente', on_delete=models.CASCADE, related_name='antecedentes_periodontales')
     
-    # Booleanos (Sí / No)
     sangrado_espontaneo = models.BooleanField(default=False, verbose_name="Sangrado Espontáneo")
     sangrado_provocado = models.BooleanField(default=False, verbose_name="Sangrado Provocado")
     movilidad = models.BooleanField(default=False, verbose_name="Movilidad Dental")
@@ -251,28 +291,25 @@ class AntecedentesPeriodontales(models.Model):
         verbose_name = "Antecedente Periodontal"
         verbose_name_plural = "Antecedentes Periodontales"
 
-
-# ¡AQUÍ ESTÁ LA CLASE QUE FALTABA!
-class ExamenPeriodontal(models.Model):
-    paciente = models.OneToOneField('Paciente', on_delete=models.CASCADE, related_name='examen_periodontal')
-    
-    caracteristica_encia = models.CharField(max_length=255, blank=True, null=True, verbose_name="Característica de la encía")
-    color = models.CharField(max_length=100, blank=True, null=True)
-    textura = models.CharField(max_length=100, blank=True, null=True)
-    consistencia = models.CharField(max_length=100, blank=True, null=True)
-
-    def __str__(self):
-        return f"Examen Periodontal de {self.paciente}"
+class HistoriaClinica(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    paciente = models.ForeignKey('Paciente', on_delete=models.CASCADE, related_name='historias_clinicas')
+    titulo = models.CharField(max_length=255, default='Acta de abandono', help_text='Título del registro clínico')
+    descripcion = models.TextField(blank=True, null=True)
+    creado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='historias_clinicas_creadas')
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = "Examen Periodontal"
-        verbose_name_plural = "Exámenes Periodontales"
+        verbose_name = 'Historia Clínica'
+        verbose_name_plural = 'Historias Clínicas'
 
-        
-class HistoriaOdontopediatrica(models.Model):
+    def __str__(self):
+        return f"Historia Clínica - {self.paciente}"
+
+class HistoriaOdontopediatrica(SeguimientoAcademico):
     paciente = models.OneToOneField('Paciente', on_delete=models.CASCADE, related_name='historia_odontopediatrica')
 
-    # --- DATOS CLÍNICOS Y PERSONALES ---
     apodo = models.CharField(max_length=100, blank=True, null=True, verbose_name="¿Cómo llaman al niño en casa?")
     hobbie = models.CharField(max_length=200, blank=True, null=True)
     nombre_padres = models.CharField(max_length=255, blank=True, null=True, verbose_name="Nombre de padre o madre")
@@ -280,7 +317,6 @@ class HistoriaOdontopediatrica(models.Model):
     nombre_representante = models.CharField(max_length=255, blank=True, null=True)
     telefono_representante = models.CharField(max_length=50, blank=True, null=True)
 
-    # --- ANTECEDENTES PERSONALES Y PERINATALES ---
     duracion_parto = models.CharField(max_length=100, blank=True, null=True)
     edad_madre_embarazo = models.CharField(max_length=50, blank=True, null=True)
     numero_embarazo = models.IntegerField(blank=True, null=True)
@@ -291,7 +327,6 @@ class HistoriaOdontopediatrica(models.Model):
     observaciones_nacimiento = models.TextField(blank=True, null=True)
     tratamiento_medico_actual = models.TextField(blank=True, null=True)
 
-    # --- DESARROLLO PSICOMOTOR ---
     edad_sento = models.CharField(max_length=50, blank=True, null=True)
     edad_gateo = models.CharField(max_length=50, blank=True, null=True)
     edad_paro = models.CharField(max_length=50, blank=True, null=True)
@@ -301,7 +336,6 @@ class HistoriaOdontopediatrica(models.Model):
     evolucion_escolar = models.CharField(max_length=255, blank=True, null=True)
     vacunas = models.CharField(max_length=255, blank=True, null=True)
 
-    # Hábitos infantiles (Check + Observación)
     biberon = models.BooleanField(default=False)
     biberon_obs = models.CharField(max_length=255, blank=True, null=True)
     chupon = models.BooleanField(default=False)
@@ -321,7 +355,6 @@ class HistoriaOdontopediatrica(models.Model):
     otros_habitos_inf = models.BooleanField(default=False)
     otros_habitos_inf_obs = models.CharField(max_length=255, blank=True, null=True)
 
-    # --- HÁBITOS DE HIGIENE BUCAL ---
     veces_cepilla_dia = models.CharField(max_length=50, blank=True, null=True)
     cuando_cepilla = models.CharField(max_length=100, blank=True, null=True)
     usa_enjuague = models.BooleanField(default=False)
@@ -333,7 +366,6 @@ class HistoriaOdontopediatrica(models.Model):
     experiencia_positiva = models.BooleanField(default=True, verbose_name="¿Experiencia positiva?")
     por_que_experiencia = models.TextField(blank=True, null=True)
 
-    # --- ALIMENTACIÓN PRIMER AÑO ---
     lactancia_materna = models.BooleanField(default=False)
     edad_lactancia_materna = models.CharField(max_length=50, blank=True, null=True)
     lactancia_artificial = models.BooleanField(default=False)
@@ -342,16 +374,14 @@ class HistoriaOdontopediatrica(models.Model):
     edad_lactancia_mixta = models.CharField(max_length=50, blank=True, null=True)
     obs_alimentacion = models.TextField(blank=True, null=True)
 
-    # --- EXAMEN FÍSICO Y DENTICIÓN ---
     peso = models.CharField(max_length=50, blank=True, null=True)
     talla = models.CharField(max_length=50, blank=True, null=True)
     temperatura = models.CharField(max_length=50, blank=True, null=True)
     presion_arterial = models.CharField(max_length=50, blank=True, null=True)
     frecuencia_respiratoria = models.CharField(max_length=50, blank=True, null=True)
     frecuencia_cardiaca = models.CharField(max_length=50, blank=True, null=True)
-    tipo_denticion = models.CharField(max_length=100, blank=True, null=True, help_text="Temporal, Mixta, Permanente")
+    tipo_denticion = models.CharField(max_length=100, blank=True, null=True)
 
-    # --- OCLUSIÓN Y ANÁLISIS FACIAL ---
     competencia_labial = models.CharField(max_length=100, blank=True, null=True)
     tipo_perfil = models.CharField(max_length=100, blank=True, null=True)
     linea_media = models.CharField(max_length=100, blank=True, null=True)
@@ -359,7 +389,6 @@ class HistoriaOdontopediatrica(models.Model):
     tipo_arco_baume = models.CharField(max_length=100, blank=True, null=True)
     relacion_molar_angle = models.CharField(max_length=100, blank=True, null=True)
     relacion_canina = models.CharField(max_length=100, blank=True, null=True)
-    # Booleanos Oclusión
     mordida_abierta = models.BooleanField(default=False)
     apinamiento = models.BooleanField(default=False)
     mordida_cubierta = models.BooleanField(default=False)
@@ -374,16 +403,13 @@ class HistoriaOdontopediatrica(models.Model):
     obs_oclusion = models.TextField(blank=True, null=True)
     anomalias_formacion_dental = models.TextField(blank=True, null=True)
 
-    # --- ANÁLISIS CONDUCTUAL ---
-    tipo_escobar = models.CharField(max_length=100, blank=True, null=True, help_text="Colaborador, No colaborador, Colaborador en potencia")
-    # Rasgos del niño
+    tipo_escobar = models.CharField(max_length=100, blank=True, null=True)
     rasgo_timido = models.BooleanField(default=False)
     rasgo_agresivo = models.BooleanField(default=False)
     rasgo_mimado = models.BooleanField(default=False)
     rasgo_miedoso = models.BooleanField(default=False)
     rasgo_desafiante = models.BooleanField(default=False)
     rasgo_lloroso = models.BooleanField(default=False)
-    # Rasgos de los padres
     padres_cooperador = models.BooleanField(default=False)
     padres_despreocupado = models.BooleanField(default=False)
     padres_sobreprotector = models.BooleanField(default=False)
@@ -393,138 +419,14 @@ class HistoriaOdontopediatrica(models.Model):
 
     def __str__(self):
         return f"Historia Odontopediátrica de {self.paciente}"
-    
-class ProstodonciaRemovible(models.Model):
-    paciente = models.OneToOneField('Paciente', on_delete=models.CASCADE, related_name='prostodoncia_removible')
-
-    # --- ANTECEDENTES PROTÉSICOS ---
-    portador_protesis = models.CharField(max_length=50, blank=True, null=True, help_text="Parcial, Total")
-    experiencia_protesica = models.CharField(max_length=50, blank=True, null=True, help_text="Favorable, Desfavorable")
-    tiempo_uso_protesis = models.CharField(max_length=100, blank=True, null=True, verbose_name="Tiempo que porta la prótesis")
-
-    # --- RELACIÓN ALVEOLAR ---
-    tamano_labio = models.CharField(max_length=50, blank=True, null=True, help_text="Largo, mediano, corto")
-    tamano_lengua = models.CharField(max_length=50, blank=True, null=True, help_text="Grande, mediana, pequeña")
-    examen_radiografico = models.TextField(blank=True, null=True)
-    diagnostico_removible = models.TextField(blank=True, null=True)
-    pronostico_removible = models.TextField(blank=True, null=True)
-
-    # --- PROCEDIMIENTO ---
-    impresiones_iniciales = models.BooleanField(default=False)
-    impresiones_finales = models.BooleanField(default=False)
-    relaciones_intermaxilares = models.BooleanField(default=False)
-    enfilado_y_articulado = models.BooleanField(default=False)
-    terminado = models.BooleanField(default=False)
-    observaciones_procedimiento = models.TextField(blank=True, null=True)
-
-    def __str__(self):
-        return f"Prostodoncia Removible de {self.paciente}"
-
-    class Meta:
-        verbose_name = "Prostodoncia Removible"
-        verbose_name_plural = "Prostodoncias Removibles"
 
 
-class ProstodonciaFija(models.Model):
-    paciente = models.OneToOneField('Paciente', on_delete=models.CASCADE, related_name='prostodoncia_fija')
+# ==========================================
+# 3. EXÁMENES Y TRATAMIENTOS (ForeignKey - Pueden ser múltiples)
+# ==========================================
+class ExamenClinicoFisico(SeguimientoAcademico):
+    paciente = models.ForeignKey('Paciente', on_delete=models.CASCADE, related_name='examenes_clinicos_fisicos')
 
-    # --- OCLUSIÓN ---
-    tipo_oclusion = models.CharField(max_length=100, blank=True, null=True)
-    apinamiento_dental = models.CharField(max_length=100, blank=True, null=True)
-    rotacion = models.CharField(max_length=100, blank=True, null=True)
-    sobreerupcion = models.CharField(max_length=100, blank=True, null=True)
-    diastemas = models.CharField(max_length=100, blank=True, null=True)
-    relacion_centrica = models.CharField(max_length=100, blank=True, null=True)
-
-    # --- EXPLORACIÓN RADIOLÓGICA ---
-    nivel_hueso_alveolar = models.CharField(max_length=255, blank=True, null=True)
-    proporcion_coronaria = models.CharField(max_length=255, blank=True, null=True)
-    ley_de_ante = models.CharField(max_length=255, blank=True, null=True)
-    
-    # Raíz (Lo dividí en 3 para que sea más fácil llenarlo en el formulario)
-    raiz_longitud = models.CharField(max_length=100, blank=True, null=True)
-    raiz_configuracion = models.CharField(max_length=100, blank=True, null=True)
-    raiz_direccion = models.CharField(max_length=100, blank=True, null=True)
-    
-    cresta_alveolar_osea = models.CharField(max_length=255, blank=True, null=True)
-    altura_coronaria = models.CharField(max_length=255, blank=True, null=True)
-    
-    # Booleanos de exploración
-    trauma_oclusion = models.BooleanField(default=False)
-    espacios_edentulos = models.BooleanField(default=False)
-    
-    pilares = models.CharField(max_length=255, blank=True, null=True)
-    curva_spee = models.CharField(max_length=255, blank=True, null=True)
-    
-    # --- DIAGNÓSTICO Y PLAN ---
-    diagnostico_radiologico = models.TextField(blank=True, null=True)
-    diagnostico_clinico = models.TextField(blank=True, null=True)
-    plan_tratamiento = models.TextField(blank=True, null=True)
-
-    # --- PROCEDIMIENTOS FIJA ---
-    toma_impresiones_cementado = models.CharField(max_length=255, blank=True, null=True)
-    pruebas_iniciales = models.BooleanField(default=False)
-    control = models.BooleanField(default=False)
-    prueba_final = models.BooleanField(default=False)
-
-    def __str__(self):
-        return f"Prostodoncia Fija de {self.paciente}"
-
-    class Meta:
-        verbose_name = "Prostodoncia Fija"
-        verbose_name_plural = "Prostodoncias Fijas"
-
-
-class ProtocoloQuirurgico(models.Model):
-    paciente = models.OneToOneField('Paciente', on_delete=models.CASCADE, related_name='protocolo_quirurgico')
-
-    # --- DATOS DEL EQUIPO Y PROCEDIMIENTO ---
-    cirujano = models.CharField(max_length=255, blank=True, null=True)
-    anestesiologo = models.CharField(max_length=255, blank=True, null=True)
-    ayudantes = models.CharField(max_length=255, blank=True, null=True)
-    instrumentista = models.CharField(max_length=255, blank=True, null=True)
-    circulantes = models.CharField(max_length=255, blank=True, null=True)
-    docente = models.CharField(max_length=255, blank=True, null=True, verbose_name="Docente a cargo")
-    
-    tecnica_anestesia = models.CharField(max_length=255, blank=True, null=True)
-    duracion_cirugia = models.CharField(max_length=100, blank=True, null=True, help_text="Ej: 1 hora 30 min")
-    
-    diagnostico_pre_operatorio = models.TextField(blank=True, null=True)
-    diagnostico_post_operatorio = models.TextField(blank=True, null=True)
-    observaciones = models.TextField(blank=True, null=True)
-
-    # --- HALLAZGOS PRE QUIRÚRGICOS ---
-    hallazgos_clinicos = models.TextField(blank=True, null=True, verbose_name="Hallazgos Clínicos")
-    hallazgos_radiograficos = models.TextField(blank=True, null=True, verbose_name="Hallazgos Radiográficos")
-    hallazgos_laboratoriales = models.TextField(blank=True, null=True, verbose_name="Hallazgos Laboratoriales")
-    otros_hallazgos_pre = models.TextField(blank=True, null=True, verbose_name="Otros Hallazgos Pre Quirúrgicos")
-
-    # --- DESARROLLO DE LA CIRUGÍA ---
-    descripcion_procedimiento = models.TextField(blank=True, null=True, verbose_name="Descripción del Procedimiento Quirúrgico")
-    hallazgos_quirurgicos = models.TextField(blank=True, null=True, verbose_name="Hallazgos Quirúrgicos")
-    accidentes_quirurgicos = models.TextField(blank=True, null=True, verbose_name="Accidentes Quirúrgicos")
-    
-    # --- POST OPERATORIO ---
-    indicaciones_post_quirurgicas = models.TextField(blank=True, null=True, verbose_name="Indicaciones Post-Quirúrgicas")
-    receta = models.TextField(blank=True, null=True, verbose_name="Receta Médica")
-
-    # --- FIRMAS (Digitales - Preparando el terreno) ---
-    # Por ahora los dejamos como booleanos para confirmar si ya firmaron o no en el sistema
-    estudiante_firmo = models.BooleanField(default=False)
-    paciente_firmo = models.BooleanField(default=False)
-    fecha_firma = models.DateTimeField(blank=True, null=True)
-
-    def __str__(self):
-        return f"Protocolo Quirúrgico de {self.paciente}"
-
-    class Meta:
-        verbose_name = "Protocolo Quirúrgico"
-        verbose_name_plural = "Protocolos Quirúrgicos"
-
-class ExamenClinicoFisico(models.Model):
-    paciente = models.OneToOneField('Paciente', on_delete=models.CASCADE, related_name='examen_clinico_fisico')
-
-    # --- SIGNOS VITALES Y ESTADO GENERAL ---
     temperatura_c = models.CharField(max_length=50, blank=True, null=True, verbose_name="Temperatura (°C)")
     presion_arterial = models.CharField(max_length=50, blank=True, null=True)
     pulso = models.CharField(max_length=50, blank=True, null=True)
@@ -541,42 +443,31 @@ class ExamenClinicoFisico(models.Model):
     peso_kg = models.CharField(max_length=50, blank=True, null=True, verbose_name="Peso (kg)")
     talla_m = models.CharField(max_length=50, blank=True, null=True, verbose_name="Talla (metros)")
 
-    # --- EXAMEN FÍSICO CABEZA Y CUELLO ---
-    craneo = models.CharField(max_length=100, blank=True, null=True, help_text="Doliocefalo, mesocefalo, branquiocefalo")
+    craneo = models.CharField(max_length=100, blank=True, null=True)
     cara_simetria = models.BooleanField(default=True, verbose_name="Simetría facial")
-    perfil = models.CharField(max_length=100, blank=True, null=True, help_text="Cóncavo, convexo, recto")
-    
+    perfil = models.CharField(max_length=100, blank=True, null=True)
     ojos = models.CharField(max_length=255, blank=True, null=True)
     nariz = models.CharField(max_length=255, blank=True, null=True)
     oidos = models.CharField(max_length=255, blank=True, null=True)
     cuello = models.CharField(max_length=255, blank=True, null=True)
     ganglios_linfaticos = models.CharField(max_length=255, blank=True, null=True)
 
-    # --- EXAMEN DE LA ATM (Articulación Temporomandibular) ---
     lateralidad = models.BooleanField(default=False)
     lateralidad_obs = models.CharField(max_length=255, blank=True, null=True)
-    
     apertura = models.BooleanField(default=False)
     apertura_obs = models.CharField(max_length=255, blank=True, null=True)
-    
     chasquidos = models.BooleanField(default=False)
     chasquidos_obs = models.CharField(max_length=255, blank=True, null=True)
-    
     crepitacion = models.BooleanField(default=False)
     crepitacion_obs = models.CharField(max_length=255, blank=True, null=True)
-    
     desviacion_apertura_cierre = models.BooleanField(default=False)
     desviacion_apertura_cierre_obs = models.CharField(max_length=255, blank=True, null=True)
-    
     dificultad_abrir_boca = models.BooleanField(default=False)
     dificultad_abrir_boca_obs = models.CharField(max_length=255, blank=True, null=True)
-    
     fatiga_dolor_muscular = models.BooleanField(default=False)
     fatiga_dolor_muscular_obs = models.CharField(max_length=255, blank=True, null=True)
-    
     disminucion_apertura = models.BooleanField(default=False)
     disminucion_apertura_obs = models.CharField(max_length=255, blank=True, null=True)
-    
     dolor_apertura = models.BooleanField(default=False)
     dolor_apertura_obs = models.CharField(max_length=255, blank=True, null=True)
 
@@ -586,3 +477,744 @@ class ExamenClinicoFisico(models.Model):
     class Meta:
         verbose_name = "Examen Clínico y Físico"
         verbose_name_plural = "Exámenes Clínicos y Físicos"
+
+class ExamenPeriodontal(SeguimientoAcademico):
+    paciente = models.ForeignKey('Paciente', on_delete=models.CASCADE, related_name='examenes_periodontales')
+    
+    caracteristica_encia = models.CharField(max_length=255, blank=True, null=True, verbose_name="Característica de la encía")
+    color = models.CharField(max_length=100, blank=True, null=True)
+    textura = models.CharField(max_length=100, blank=True, null=True)
+    consistencia = models.CharField(max_length=100, blank=True, null=True)
+
+    def __str__(self):
+        return f"Examen Periodontal de {self.paciente}"
+
+    class Meta:
+        verbose_name = "Examen Periodontal"
+        verbose_name_plural = "Exámenes Periodontales"
+
+class ProstodonciaRemovible(SeguimientoAcademico):
+    paciente = models.ForeignKey('Paciente', on_delete=models.CASCADE, related_name='prostodoncias_removibles')
+
+    portador_protesis = models.CharField(max_length=50, blank=True, null=True)
+    experiencia_protesica = models.CharField(max_length=50, blank=True, null=True)
+    tiempo_uso_protesis = models.CharField(max_length=100, blank=True, null=True)
+
+    tamano_labio = models.CharField(max_length=50, blank=True, null=True)
+    tamano_lengua = models.CharField(max_length=50, blank=True, null=True)
+    examen_radiografico = models.TextField(blank=True, null=True)
+    diagnostico_removible = models.TextField(blank=True, null=True)
+    pronostico_removible = models.TextField(blank=True, null=True)
+
+    impresiones_iniciales = models.BooleanField(default=False)
+    impresiones_finales = models.BooleanField(default=False)
+    relaciones_intermaxilares = models.BooleanField(default=False)
+    enfilado_y_articulado = models.BooleanField(default=False)
+    terminado = models.BooleanField(default=False)
+    observaciones_procedimiento = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"Prostodoncia Removible de {self.paciente}"
+
+    class Meta:
+        verbose_name = "Prostodoncia Removible"
+        verbose_name_plural = "Prostodoncias Removibles"
+
+class ProstodonciaFija(SeguimientoAcademico):
+    paciente = models.ForeignKey('Paciente', on_delete=models.CASCADE, related_name='prostodoncias_fijas')
+
+    tipo_oclusion = models.CharField(max_length=100, blank=True, null=True)
+    apinamiento_dental = models.CharField(max_length=100, blank=True, null=True)
+    rotacion = models.CharField(max_length=100, blank=True, null=True)
+    sobreerupcion = models.CharField(max_length=100, blank=True, null=True)
+    diastemas = models.CharField(max_length=100, blank=True, null=True)
+    relacion_centrica = models.CharField(max_length=100, blank=True, null=True)
+
+    nivel_hueso_alveolar = models.CharField(max_length=255, blank=True, null=True)
+    proporcion_coronaria = models.CharField(max_length=255, blank=True, null=True)
+    ley_de_ante = models.CharField(max_length=255, blank=True, null=True)
+    
+    raiz_longitud = models.CharField(max_length=100, blank=True, null=True)
+    raiz_configuracion = models.CharField(max_length=100, blank=True, null=True)
+    raiz_direccion = models.CharField(max_length=100, blank=True, null=True)
+    
+    cresta_alveolar_osea = models.CharField(max_length=255, blank=True, null=True)
+    altura_coronaria = models.CharField(max_length=255, blank=True, null=True)
+    
+    trauma_oclusion = models.BooleanField(default=False)
+    espacios_edentulos = models.BooleanField(default=False)
+    
+    pilares = models.CharField(max_length=255, blank=True, null=True)
+    curva_spee = models.CharField(max_length=255, blank=True, null=True)
+    
+    diagnostico_radiologico = models.TextField(blank=True, null=True)
+    diagnostico_clinico = models.TextField(blank=True, null=True)
+    plan_tratamiento = models.TextField(blank=True, null=True)
+
+    toma_impresiones_cementado = models.CharField(max_length=255, blank=True, null=True)
+    pruebas_iniciales = models.BooleanField(default=False)
+    control = models.BooleanField(default=False)
+    prueba_final = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Prostodoncia Fija de {self.paciente}"
+
+    class Meta:
+        verbose_name = "Prostodoncia Fija"
+        verbose_name_plural = "Prostodoncias Fijas"
+
+class ProtocoloQuirurgico(SeguimientoAcademico):
+    paciente = models.ForeignKey('Paciente', on_delete=models.CASCADE, related_name='protocolos_quirurgicos')
+
+    cirujano = models.CharField(max_length=255, blank=True, null=True)
+    anestesiologo = models.CharField(max_length=255, blank=True, null=True)
+    ayudantes = models.CharField(max_length=255, blank=True, null=True)
+    instrumentista = models.CharField(max_length=255, blank=True, null=True)
+    circulantes = models.CharField(max_length=255, blank=True, null=True)
+    # NOTA: Quité el CharField "docente" porque ahora se hereda "docente_supervisor" desde SeguimientoAcademico
+    
+    tecnica_anestesia = models.CharField(max_length=255, blank=True, null=True)
+    duracion_cirugia = models.CharField(max_length=100, blank=True, null=True)
+    
+    diagnostico_pre_operatorio = models.TextField(blank=True, null=True)
+    diagnostico_post_operatorio = models.TextField(blank=True, null=True)
+    observaciones = models.TextField(blank=True, null=True)
+
+    hallazgos_clinicos = models.TextField(blank=True, null=True)
+    hallazgos_radiograficos = models.TextField(blank=True, null=True)
+    hallazgos_laboratoriales = models.TextField(blank=True, null=True)
+    otros_hallazgos_pre = models.TextField(blank=True, null=True)
+
+    descripcion_procedimiento = models.TextField(blank=True, null=True)
+    hallazgos_quirurgicos = models.TextField(blank=True, null=True)
+    accidentes_quirurgicos = models.TextField(blank=True, null=True)
+    
+    indicaciones_post_quirurgicas = models.TextField(blank=True, null=True)
+    receta = models.TextField(blank=True, null=True)
+
+    estudiante_firmo = models.BooleanField(default=False)
+    paciente_firmo = models.BooleanField(default=False)
+    fecha_firma = models.DateTimeField(blank=True, null=True)
+
+    def __str__(self):
+        return f"Protocolo Quirúrgico de {self.paciente}"
+
+    class Meta:
+        verbose_name = "Protocolo Quirúrgico"
+        verbose_name_plural = "Protocolos Quirúrgicos"
+
+        # ==========================================
+# 4. TRATAMIENTOS, AVANCES (SESIONES) Y TRANSFERENCIAS
+# ==========================================
+
+class Tratamiento(models.Model):
+    ESTADOS_TRATAMIENTO = [
+        ('EN_PROGRESO', 'En Progreso'),
+        ('FINALIZADO', 'Finalizado con Éxito'),
+        ('DERIVADO', 'Derivado a otro estudiante'),
+        ('ABANDONADO', 'Abandonado por el paciente'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    paciente = models.ForeignKey('Paciente', on_delete=models.CASCADE, related_name='tratamientos')
+    estudiante = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.RESTRICT, related_name='tratamientos_realizados')
+    
+    nombre_tratamiento = models.CharField(max_length=200, help_text="Ej: Profilaxis, Exodoncia de 3er Molar")
+    diente_pieza = models.CharField(max_length=50, blank=True, null=True, help_text="Ej: 14, 46, Toda la boca")
+    estado = models.CharField(max_length=20, choices=ESTADOS_TRATAMIENTO, default='EN_PROGRESO')
+    
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.nombre_tratamiento} - {self.paciente}"
+
+    class Meta:
+        verbose_name = "Tratamiento"
+        verbose_name_plural = "Tratamientos"
+
+class AvanceClinico(SeguimientoAcademico):
+    """
+    Cada sesión que el estudiante atiende al paciente.
+    Hereda de SeguimientoAcademico (Requiere firma del docente).
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tratamiento = models.ForeignKey(Tratamiento, on_delete=models.CASCADE, related_name='avances')
+    
+    fecha_sesion = models.DateField(default=date.today)
+    descripcion_procedimiento = models.TextField(help_text="¿Qué se le hizo al paciente hoy?")
+    proxima_cita = models.DateField(blank=True, null=True, help_text="Fecha de la siguiente sesión si es necesaria")
+
+    def __str__(self):
+        return f"Avance {self.fecha_sesion} - {self.tratamiento}"
+
+    class Meta:
+        verbose_name = "Avance de Sesión"
+        verbose_name_plural = "Avances de Sesiones"
+        ordering = ['-fecha_sesion']
+
+class Evidencia(models.Model):
+    """Fotos o documentos del avance para que el docente evalúe"""
+    TIPOS_EVIDENCIA = [
+        ('RADIOGRAFIA', 'Radiografía'),
+        ('FOTO_INICIAL', 'Fotografía Clínica Inicial'),
+        ('FOTO_PROCESO', 'Fotografía Clínica en Proceso'),
+        ('FOTO_FINAL', 'Fotografía Clínica Final'),
+        ('DOCUMENTO', 'Documento / Consentimiento'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    avance = models.ForeignKey(AvanceClinico, on_delete=models.CASCADE, related_name='evidencias')
+    
+    tipo_evidencia = models.CharField(max_length=20, choices=TIPOS_EVIDENCIA)
+    archivo = models.FileField(upload_to='evidencias_clinicas/%Y/%m/')
+    descripcion = models.CharField(max_length=255, blank=True, null=True)
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Evidencia: {self.get_tipo_evidencia_display()} - Avance {self.avance.fecha_sesion}"
+
+class Transferencia(models.Model):
+    """Registro histórico de derivación de pacientes entre estudiantes"""
+    ESTADOS_TRANSFERENCIA = [
+        ('PENDIENTE', 'Pendiente de Aprobación Docente'),
+        ('APROBADA', 'Transferencia Aprobada'),
+        ('RECHAZADA', 'Transferencia Rechazada'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    paciente = models.ForeignKey('Paciente', on_delete=models.CASCADE, related_name='historial_transferencias')
+    
+    estudiante_origen = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.RESTRICT, related_name='transferencias_emitidas')
+    estudiante_destino = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.RESTRICT, related_name='transferencias_recibidas')
+    
+    docente_aprobador = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.SET_NULL, 
+        null=True, blank=True, 
+        related_name='transferencias_evaluadas',
+        limit_choices_to={'rol': 'DOCENTE'}
+    )
+    
+    motivo_transferencia = models.TextField(help_text="¿Por qué se deriva al paciente?")
+    estado = models.CharField(max_length=20, choices=ESTADOS_TRANSFERENCIA, default='PENDIENTE')
+    
+    fecha_solicitud = models.DateTimeField(auto_now_add=True)
+    fecha_resolucion = models.DateTimeField(blank=True, null=True, help_text="Cuando el docente aprobó/rechazó")
+
+    def __str__(self):
+        return f"Transferencia de {self.paciente}"
+    
+
+# Asegúrate de tener uuid importado (ya lo tienes)
+# Importar JSONField (en Django 3.1+ viene incluido en models)
+
+# ==========================================
+# 5. PERIODONTOGRAMA
+# ==========================================
+class Periodontograma(SeguimientoAcademico):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    
+    # Usamos ForeignKey y NO OneToOneField, porque un paciente necesitará 
+    # múltiples periodontogramas a lo largo del tiempo (Inicial, Reevaluación, Mantenimiento)
+    paciente = models.ForeignKey(
+        'Paciente', 
+        on_delete=models.CASCADE, 
+        related_name='periodontogramas'
+    )
+    
+    # Aquí guardaremos el estado de React tal cual (dictionaries anidados)
+    # Ejemplo: { "48": { "movilidad": "", "implante": false, "sangrado": [...], ... } }
+    datos_vestibular_superior = models.JSONField(default=dict, blank=True, help_text="Datos de la arcada superior vestibular")
+    datos_palatino_superior = models.JSONField(default=dict, blank=True, help_text="Datos de la arcada superior palatino")
+    datos_vestibular_inferior = models.JSONField(default=dict, blank=True, help_text="Datos de la arcada inferior vestibular")
+    datos_lingual_inferior = models.JSONField(default=dict, blank=True, help_text="Datos de la arcada inferior lingual")
+    
+    # Campos adicionales útiles para el diagnóstico periodontal
+    placa_bacteriana_porcentaje = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, verbose_name="% de Placa (O'Leary)")
+    sangrado_porcentaje = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, verbose_name="% de Sangrado")
+    diagnostico = models.TextField(blank=True, null=True, verbose_name="Diagnóstico Periodontal")
+    pronostico = models.TextField(blank=True, null=True, verbose_name="Pronóstico General y por piezas")
+    
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        # Como heredas de SeguimientoAcademico, asumimos que tienes acceso al estudiante
+        return f"Periodontograma de {self.paciente} - {self.creado_en.strftime('%d/%m/%Y')}"
+
+    class Meta:
+        verbose_name = "Periodontograma"
+        verbose_name_plural = "Periodontogramas"
+        ordering = ['-creado_en'] # Ordenar del más reciente al más antiguo
+
+
+#==========================================
+# 6. SILLONES Y EQUIPOS (Para tu mapa en React)
+#+==========================================
+class Sillon(models.Model): 
+    ESTADOS = [
+        ('operativo', 'Operativo'),
+        ('revision', 'En Revisión'),
+        ('falla', 'Con Falla'),
+    ]
+
+    # Datos básicos
+    nombre = models.CharField(max_length=50, help_text="Ej: Sillón 01")
+    estado = models.CharField(max_length=20, choices=ESTADOS, default='operativo')
+    
+    # Detalles del equipo
+    marca = models.CharField(max_length=100, blank=True, null=True)
+    modelo = models.CharField(max_length=100, blank=True, null=True)
+    numero_serie = models.CharField(max_length=100, blank=True, null=True, unique=True)
+    descripcion = models.TextField(blank=True, null=True, help_text="Características especiales del equipo")
+
+    # Cotas y Mantenimiento
+    ultima_revision = models.DateTimeField(default=timezone.now)
+    dias_frecuencia_mantenimiento = models.IntegerField(default=180, help_text="Cada cuántos días necesita revisión")
+    notas_tecnicas = models.TextField(blank=True, null=True, help_text="Registro de fallas comunes o piezas cambiadas")
+
+    # Coordenadas 3D (Para tu mapa en React)
+    posicion_x = models.FloatField(default=0.0)
+    posicion_y = models.FloatField(default=0.0)
+    posicion_z = models.FloatField(default=0.0)
+
+    def __str__(self):
+        return f"{self.nombre} - {self.estado.upper()}"
+
+# ==========================================
+# 7. CITAS (Agendamiento)
+# ==========================================
+class Cita(models.Model):
+    ESTADOS_CITA = [
+        ('RESERVADA', 'Reservada'),
+        ('CONFIRMADA', 'Confirmada'),
+        ('EN_ESPERA', 'En Espera'),
+        ('ATENDIENDO', 'Atendiendo'),
+        ('NO_ASISTIO', 'No Asistió'),
+        ('CANCELADA', 'Cancelada'),
+    ]
+
+    RAZONES_CANCELACION = [
+        ('PACIENTE', 'Cancelada por Paciente'),
+        ('ESTUDIANTE', 'Cancelada por Estudiante'),
+        ('DOCENTE', 'Cancelada por Docente'),
+        ('MANTENIMIENTO', 'Cancelada por Mantenimiento'),
+        ('OTRA', 'Otra Razón'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    paciente = models.ForeignKey('Paciente', on_delete=models.CASCADE, related_name='citas')
+    estudiante = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.RESTRICT, related_name='citas_estudiante', limit_choices_to={'rol': 'ESTUDIANTE'})
+    docente = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.RESTRICT, related_name='citas_docente', limit_choices_to={'rol': 'DOCENTE'})
+    gabinete = models.ForeignKey('Sillon', on_delete=models.RESTRICT, related_name='citas')
+    motivo = models.ForeignKey('Tratamiento', on_delete=models.CASCADE, related_name='citas')
+    
+    fecha_hora = models.DateTimeField(help_text="Fecha y hora de la cita")
+    estado = models.CharField(max_length=20, choices=ESTADOS_CITA, default='RESERVADA')
+    check_in_time = models.DateTimeField(blank=True, null=True, help_text="Hora de check-in del paciente")
+    duracion_estimada = models.IntegerField(default=30, help_text="Duración estimada en minutos")
+    
+    # Campos de cancelación
+    cancelada_en = models.DateTimeField(blank=True, null=True, help_text="Fecha y hora de cancelación")
+    razon_cancelacion = models.CharField(max_length=20, choices=RAZONES_CANCELACION, blank=True, null=True)
+    motivo_cancelacion = models.TextField(blank=True, null=True, help_text="Descripción del motivo de cancelación")
+    cancelada_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='citas_canceladas')
+    
+    # Cita recurrente
+    cita_recurrente = models.ForeignKey('CitaRecurrente', on_delete=models.SET_NULL, null=True, blank=True, related_name='citas')
+    
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Cita {self.fecha_hora} - {self.paciente} ({self.estado})"
+
+    class Meta:
+        verbose_name = "Cita"
+        verbose_name_plural = "Citas"
+        ordering = ['fecha_hora']
+
+
+@receiver(post_save, sender=Cita)
+def actualizar_inasistencias_y_alerta(sender, instance, **kwargs):
+    paciente = instance.paciente
+    no_asistio_count = Cita.objects.filter(paciente=paciente, estado='NO_ASISTIO').count()
+    paciente.inasistencias = no_asistio_count
+    paciente.alerta_abandono = no_asistio_count >= 3
+    paciente.save(update_fields=['inasistencias', 'alerta_abandono'])
+
+
+# ==========================================
+# CITAS RECURRENTES
+# ==========================================
+class CitaRecurrente(models.Model):
+    FRECUENCIAS = [
+        ('DIARIA', 'Diaria'),
+        ('SEMANAL', 'Semanal'),
+        ('QUINCENAL', 'Quincenal'),
+        ('MENSUAL', 'Mensual'),
+    ]
+
+    DIAS_SEMANA = [
+        ('0', 'Lunes'),
+        ('1', 'Martes'),
+        ('2', 'Miércoles'),
+        ('3', 'Jueves'),
+        ('4', 'Viernes'),
+        ('5', 'Sábado'),
+        ('6', 'Domingo'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    paciente = models.ForeignKey('Paciente', on_delete=models.CASCADE, related_name='citas_recurrentes')
+    estudiante = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.RESTRICT, related_name='citas_recurrentes_estudiante', limit_choices_to={'rol': 'ESTUDIANTE'})
+    docente = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.RESTRICT, related_name='citas_recurrentes_docente', limit_choices_to={'rol': 'DOCENTE'})
+    gabinete = models.ForeignKey('Sillon', on_delete=models.RESTRICT, related_name='citas_recurrentes')
+    motivo = models.ForeignKey('Tratamiento', on_delete=models.CASCADE, related_name='citas_recurrentes')
+
+    # Configuración de recurrencia
+    frecuencia = models.CharField(max_length=20, choices=FRECUENCIAS, default='SEMANAL')
+    hora = models.TimeField(help_text="Hora del día para la cita")
+    dias_semana = models.CharField(max_length=20, blank=True, null=True, help_text="Día(s) de la semana (0-6)")
+    duracion_estimada = models.IntegerField(default=30, help_text="Duración estimada en minutos")
+
+    # Fechas de rango
+    fecha_inicio = models.DateField(help_text="Fecha de inicio de la recurrencia")
+    fecha_fin = models.DateField(blank=True, null=True, help_text="Fecha de fin (si no está rellena, es indefinida)")
+    max_ocurrencias = models.IntegerField(blank=True, null=True, help_text="Número máximo de citas a generar")
+
+    # Control
+    activa = models.BooleanField(default=True)
+    ultima_generacion = models.DateTimeField(auto_now=True)
+
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'citas_recurrentes'
+        ordering = ['fecha_inicio']
+
+    def __str__(self):
+        return f"Cita Recurrente {self.frecuencia} - {self.paciente}"
+
+
+# ==========================================
+# CONFIGURACIÓN DE ALERTAS
+# ==========================================
+class ConfiguracionAlertas(models.Model):
+    """Configuración global de alertas para la clínica"""
+    
+    minutos_espera_alerta = models.IntegerField(default=15, help_text="Minutos de espera antes de generar alerta roja")
+    inasistencias_alerta_abandono = models.IntegerField(default=3, help_text="Número de inasistencias para activar alerta de abandono")
+    dias_notificacion_previa = models.IntegerField(default=1, help_text="Días antes de la cita para enviar notificación")
+    
+    activa = models.BooleanField(default=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'configuracion_alertas'
+        verbose_name = "Configuración de Alertas"
+        verbose_name_plural = "Configuración de Alertas"
+
+    def __str__(self):
+        return "Configuración de Alertas del Sistema"
+
+
+# ==========================================
+# AUDITORÍA DE CITAS
+# ==========================================
+class AuditoriaCita(models.Model):
+    TIPOS_CAMBIO = [
+        ('CREACION', 'Creación'),
+        ('ACTUALIZACION', 'Actualización'),
+        ('CANCELACION', 'Cancelación'),
+        ('CHECK_IN', 'Check-in'),
+        ('CAMBIO_ESTADO', 'Cambio de Estado'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    cita = models.ForeignKey('Cita', on_delete=models.CASCADE, related_name='auditoria')
+    tipo_cambio = models.CharField(max_length=20, choices=TIPOS_CAMBIO)
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
+    
+    # Detalles del cambio
+    campos_modificados = models.JSONField(default=dict, help_text="JSON con los campos que se modificaron")
+    valores_anteriores = models.JSONField(default=dict, help_text="JSON con valores anteriores")
+    valores_nuevos = models.JSONField(default=dict, help_text="JSON con valores nuevos")
+    
+    descripcion = models.TextField(blank=True, null=True)
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'auditoria_citas'
+        ordering = ['-creado_en']
+
+    def __str__(self):
+        return f"Auditoría {self.tipo_cambio} - Cita {self.cita.id}"
+
+
+# ==========================================
+# HISTÓRICO DE ABANDONO DE PACIENTES
+# ==========================================
+class HistoricoAbandonoPaciente(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    paciente = models.ForeignKey('Paciente', on_delete=models.CASCADE, related_name='historico_abandonos')
+    
+    # Información del abandono
+    fecha_abandono = models.DateTimeField(auto_now_add=True)
+    inasistencias_totales = models.IntegerField(help_text="Número de inasistencias que provocaron el abandono")
+    
+    # Notas
+    nota_coordinacion = models.TextField(blank=True, null=True, help_text="Observaciones de coordinación")
+    usuario_que_registro = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='abandonos_registrados')
+    
+    # Reinicio
+    reactivado = models.BooleanField(default=False)
+    fecha_reactivacion = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        db_table = 'historico_abandono_pacientes'
+        ordering = ['-fecha_abandono']
+
+    def __str__(self):
+        return f"Abandono {self.paciente} - {self.fecha_abandono}"
+
+# ==========================================
+# MODULO 5 RADIOGRAFIAS
+# ==========================================
+
+def upload_to_paciente(instance, filename):
+    # Esto guardará los archivos en: evidencias_clinicas/IUP_PACIENTE/CATEGORIA/archivo.jpg
+    paciente_id = str(instance.paciente.id)
+    return os.path.join('evidencias_clinicas', paciente_id, instance.categoria, filename)
+
+class ImagenClinica(models.Model):
+    CATEGORIAS = [
+        ('FACIAL', 'Fotografía Facial'),
+        ('INTRAORAL', 'Fotografía Intraoral'),
+        ('PSP', 'Radiografía Placa de Fósforo'),
+        ('CBCT', 'Captura de Tomografía'),
+        ('PROCESO', 'Seguimiento de Proceso/Laboratorio'),
+        ('FINAL', 'Resultado Final (Post-tratamiento)'),
+    ]
+
+    paciente = models.ForeignKey('Paciente', on_delete=models.CASCADE, related_name='imagenes')
+    estudiante = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    archivo = models.ImageField(upload_to=upload_to_paciente)
+    categoria = models.CharField(max_length=20, choices=CATEGORIAS)
+    pieza_dental = models.IntegerField(null=True, blank=True) # Para radiografías o intraorales
+    descripcion = models.TextField(blank=True)
+    fecha_adquisicion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Imagen Clínica"
+        verbose_name_plural = "Imágenes Clínicas"
+
+
+# ==========================================
+# MÓDULO 6: FORMACIÓN Y SUPERVISIÓN
+# ==========================================
+
+class ConfiguracionCupo(models.Model):
+    """
+    Define los cupos requeridos por asignatura/procedimiento
+    Ej: Endodoncia I requiere 2 procedimientos
+    """
+    PROCEDIMIENTOS = [
+        ('PROFILAXIS', 'Profilaxis'),
+        ('ENDODONCIA', 'Endodoncia'),
+        ('ORTODONCIA', 'Ortodoncia'),
+        ('PERIODONCIA', 'Periodoncia'),
+        ('EXODONCIA', 'Exodoncia'),
+        ('RESTAURACION', 'Restauración'),
+        ('PROTODONCIA_FIJA', 'Prostodoncia Fija'),
+        ('PROTODONCIA_REMOVIBLE', 'Prostodoncia Removible'),
+        ('CIRUGIA', 'Cirugía'),
+        ('ODONTOPEDIATRIA', 'Odontopediatría'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    asignatura = models.CharField(max_length=100, help_text="Ej: Endodoncia I, Periodoncia II")
+    procedimiento = models.CharField(max_length=30, choices=PROCEDIMIENTOS)
+    cupo_minimo = models.IntegerField(default=1, help_text="Número mínimo de procedimientos requeridos")
+    cupo_maximo = models.IntegerField(default=10, help_text="Número máximo recomendado")
+    
+    activo = models.BooleanField(default=True)
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'configuracion_cupo'
+        verbose_name = "Configuración de Cupo"
+        verbose_name_plural = "Configuraciones de Cupo"
+        unique_together = ('asignatura', 'procedimiento')
+
+    def __str__(self):
+        return f"{self.asignatura} - {self.get_procedimiento_display()}: {self.cupo_minimo}-{self.cupo_maximo}"
+
+
+class AsignacionCaso(models.Model):
+    """
+    Vincula un Paciente (caso) con un Estudiante
+    Incluye historial de transferencias y estado del caso
+    """
+    ESTADOS_CASO = [
+        ('ACTIVO', 'Activo'),
+        ('PAUSADO', 'Pausado'),
+        ('TRANSFERIDO', 'Transferido'),
+        ('COMPLETADO', 'Completado'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    paciente = models.ForeignKey(Paciente, on_delete=models.CASCADE, related_name='asignaciones_caso')
+    estudiante = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.RESTRICT, related_name='casos_asignados', limit_choices_to={'rol': 'ESTUDIANTE'})
+    
+    asignatura = models.CharField(max_length=100, help_text="Ej: Endodoncia I, Periodoncia II")
+    procedimiento_principal = models.CharField(max_length=30, choices=ConfiguracionCupo.PROCEDIMIENTOS)
+    
+    estado = models.CharField(max_length=20, choices=ESTADOS_CASO, default='ACTIVO')
+    fecha_asignacion = models.DateTimeField(auto_now_add=True)
+    fecha_completacion = models.DateTimeField(blank=True, null=True)
+    
+    # Para calcular avance
+    procedimientos_aprobados = models.IntegerField(default=0, help_text="Número de procedimientos aprobados por docente")
+    fecha_ultima_actualizacion_avance = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'asignacion_caso'
+        verbose_name = "Asignación de Caso"
+        verbose_name_plural = "Asignaciones de Caso"
+        ordering = ['-fecha_asignacion']
+
+    def __str__(self):
+        return f"{self.paciente} asignado a {self.estudiante} - {self.asignatura}"
+
+    def calcular_porcentaje_avance(self):
+        """Calcula el porcentaje de avance del estudiante en este caso"""
+        try:
+            config = ConfiguracionCupo.objects.get(
+                asignatura=self.asignatura,
+                procedimiento=self.procedimiento_principal
+            )
+            porcentaje = (self.procedimientos_aprobados / config.cupo_minimo) * 100
+            return min(porcentaje, 100)  # Máximo 100%
+        except ConfiguracionCupo.DoesNotExist:
+            return 0
+
+
+class SolicitudSupervision(models.Model):
+    """
+    Solicitudes de supervisión para hitos específicos: Diagnóstico, Inicio, Cierre
+    La firma del docente queda registrada en docente_supervisor + timestamp en fecha_aprobacion
+    """
+    TIPOS_HITO = [
+        ('DIAGNOSTICO', 'Diagnóstico'),
+        ('INICIO', 'Inicio del Procedimiento'),
+        ('CIERRE', 'Cierre del Procedimiento'),
+    ]
+
+    ESTADOS_SOLICITUD = [
+        ('PENDIENTE', 'Pendiente de Revisión'),
+        ('APROBADO', 'Aprobado por Docente'),
+        ('RECHAZADO', 'Rechazado / Con Observaciones'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    asignacion_caso = models.ForeignKey(AsignacionCaso, on_delete=models.CASCADE, related_name='solicitudes_supervision')
+    
+    tipo_hito = models.CharField(max_length=20, choices=TIPOS_HITO, help_text="En qué etapa del procedimiento se requiere supervisión")
+    estado = models.CharField(max_length=20, choices=ESTADOS_SOLICITUD, default='PENDIENTE')
+    
+    # Firma electrónica (docente supervisor)
+    docente_supervisor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='supervisiones_realizadas',
+        limit_choices_to={'rol': 'DOCENTE'}
+    )
+    
+    descripcion_solicitud = models.TextField(help_text="Descripción del procedimiento/diagnóstico a supervisar")
+    observaciones_docente = models.TextField(blank=True, null=True, help_text="Observaciones del docente al rechazar")
+    
+    fecha_solicitud = models.DateTimeField(auto_now_add=True)
+    fecha_aprobacion = models.DateTimeField(blank=True, null=True, help_text="Timestamp de la firma electrónica")
+
+    class Meta:
+        db_table = 'solicitud_supervision'
+        verbose_name = "Solicitud de Supervisión"
+        verbose_name_plural = "Solicitudes de Supervisión"
+        ordering = ['-fecha_solicitud']
+
+    def __str__(self):
+        return f"Supervisión {self.get_tipo_hito_display()} - {self.asignacion_caso.paciente}"
+
+
+class EvaluacionDesempeño(models.Model):
+    """
+    Evaluación de desempeño del estudiante vinculada a la supervisión
+    Incluye alerta temprana de bajo desempeño
+    """
+    CALIFICACIONES = [
+        (5, 'Excelente'),
+        (4, 'Muy Bueno'),
+        (3, 'Bueno'),
+        (2, 'Regular'),
+        (1, 'Insuficiente'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    solicitud_supervision = models.OneToOneField(SolicitudSupervision, on_delete=models.CASCADE, related_name='evaluacion')
+    
+    calificacion = models.IntegerField(choices=CALIFICACIONES, default=3)
+    alerta_temprana = models.BooleanField(default=False, help_text="Marca bajo desempeño detectado")
+    motivo_detalle = models.TextField(blank=True, null=True, help_text="Detalle de la razón de alerta temprana")
+    
+    # Criterios de evaluación
+    manejo_tecnica = models.IntegerField(choices=CALIFICACIONES, default=3)
+    bioseguridad = models.IntegerField(choices=CALIFICACIONES, default=3)
+    comunicacion_paciente = models.IntegerField(choices=CALIFICACIONES, default=3)
+    cumplimiento_tiempo = models.IntegerField(choices=CALIFICACIONES, default=3)
+    documentacion = models.IntegerField(choices=CALIFICACIONES, default=3)
+    
+    fecha_evaluacion = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'evaluacion_desempeño'
+        verbose_name = "Evaluación de Desempeño"
+        verbose_name_plural = "Evaluaciones de Desempeño"
+
+    def __str__(self):
+        return f"Evaluación - {self.solicitud_supervision.asignacion_caso.estudiante} ({self.get_calificacion_display()})"
+
+    @property
+    def promedio_criterios(self):
+        """Calcula el promedio de todos los criterios"""
+        criterios = [
+            self.manejo_tecnica,
+            self.bioseguridad,
+            self.comunicacion_paciente,
+            self.cumplimiento_tiempo,
+            self.documentacion
+        ]
+        return sum(criterios) / len(criterios)
+    
+    
+class AsignacionPaciente(models.Model):
+    paciente = models.ForeignKey('Paciente', on_delete=models.CASCADE, related_name='asignaciones')
+    
+    # CAMBIAMOS EL RELATED_NAME AQUÍ:
+    estudiante = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name='asignaciones_registro' # <-- Nombre único
+    )
+    
+    docente = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        related_name='supervisiones_casos'
+    )
+    # ... resto de campos
