@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { NuevoPaciente } from "@/components/nuevo-paciente"
 import { PapeleraPacientes } from "@/components/papelera-pacientes"
 import { TablaPacientes } from "@/components/tabla-pacientes"
+import { PacientesExport } from "@/components/exporters/pacientes-export"
 
 export default function PacientesPage() {
   const [pacientes, setPacientes] = useState([])
@@ -59,8 +60,12 @@ export default function PacientesPage() {
         </div>
         
         <div className="flex items-center gap-2">
+          {/* Exportación */}
+          <PacientesExport pacientes={pacientes} />
+          
           {/* Módulo de papelera */}
           <PapeleraPacientes />
+          
           {/* Botón de creación */}
           <NuevoPaciente onPacienteCreado={fetchPacientes} />
         </div>

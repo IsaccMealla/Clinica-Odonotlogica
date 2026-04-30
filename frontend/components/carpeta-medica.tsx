@@ -1,11 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { 
   ClipboardList, Activity, Users, Home, Venus, Save, 
-  AlertTriangle, HeartPulse, Droplets, Edit3, Trash2, X 
+  AlertTriangle, HeartPulse, Droplets, Edit3, Trash2, X, Download
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { exportCarpetaMedicaPDF } from "@/lib/exporters/pdf-exporter"
 // 👇 Importamos DialogDescription
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -30,6 +31,36 @@ export function CarpetaMedica({ paciente }: { paciente: any }) {
     no_patologicos: paciente.antecedentes_no_patologicos || {},
     ginecologicos: paciente.antecedentes_ginecologicos || {},
   })
+
+  // Guardar referencia de los datos actuales del paciente (del API)
+  const [pacienteActual, setPacienteActual] = useState(paciente)
+
+  // 👇 NUEVO: Cargar datos cuando el modal se abre
+  useEffect(() => {
+    if (open) {
+      const cargarDatos = async () => {
+        try {
+          const token = localStorage.getItem("access_token")
+          const res = await fetch(`http://localhost:8000/api/pacientes/${paciente.id}/`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          })
+          if (res.ok) {
+            const pacienteActualizado = await res.json()
+            setPacienteActual(pacienteActualizado)
+            setData({
+              familiares: pacienteActualizado.antecedentes_familiares || {},
+              personales: pacienteActualizado.antecedentes_personales || {},
+              no_patologicos: pacienteActualizado.antecedentes_no_patologicos || {},
+              ginecologicos: pacienteActualizado.antecedentes_ginecologicos || {},
+            })
+          }
+        } catch (error) {
+          console.error("Error cargando datos:", error)
+        }
+      }
+      cargarDatos()
+    }
+  }, [open, paciente.id])
 
   const handleCheckChange = (section: string, field: string, value: boolean) => {
     setData((prev) => ({
@@ -108,9 +139,24 @@ export function CarpetaMedica({ paciente }: { paciente: any }) {
                 CI: {paciente.ci} | {paciente.edad} años | {paciente.sexo}
               </p>
             </div>
-            <Button onClick={() => setIsEditing(!isEditing)} variant={isEditing ? "destructive" : "outline"}>
-              {isEditing ? <><X className="mr-2 h-4 w-4"/> Cancelar</> : <><Edit3 className="mr-2 h-4 w-4"/> Editar</>}
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => {
+                  // Pasar el paciente completo del API con todos los antecedentes
+                  exportCarpetaMedicaPDF(pacienteActual)
+                  toast.success("Carpeta médica descargada")
+                }} 
+                variant="outline"
+                className="text-blue-600 hover:bg-blue-50"
+                title="Descargar Carpeta Médica en PDF"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Descargar
+              </Button>
+              <Button onClick={() => setIsEditing(!isEditing)} variant={isEditing ? "destructive" : "outline"}>
+                {isEditing ? <><X className="mr-2 h-4 w-4"/> Cancelar</> : <><Edit3 className="mr-2 h-4 w-4"/> Editar</>}
+              </Button>
+            </div>
           </div>
         </div>
 

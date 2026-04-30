@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, use } from "react"
+import { useState, useEffect, use, useRef } from "react"
 import { ArrowLeft, User, Save, Loader2, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -12,10 +12,12 @@ import { TabEvaluacionGeneral } from "@/components/tabs-expediente/tab-evaluacio
 import { TabOdontopediatria } from "@/components/tabs-expediente/tab-odontopediatria"
 import { TabPeriodoncia } from "@/components/tabs-expediente/tab-periodoncia"
 import { TabPeriodontogramaGrafico } from "@/components/tabs-expediente/tab-periodontograma-grafico"
+import { PeriodontogramaProvider } from "@/context/PeriodontogramaContext"
 
 export default function ExpedienteEstudiantePage({ params }: { params: Promise<{ id: string }> }) {
     const router = useRouter();
     const { id: pacienteId } = use(params);
+    const periodontogramaRef = useRef<any>(null);
 
     const [paciente, setPaciente] = useState<any>(null);
     const [cargando, setCargando] = useState(true);
@@ -64,19 +66,31 @@ export default function ExpedienteEstudiantePage({ params }: { params: Promise<{
         const token = localStorage.getItem("access_token");
         try {
             const response = await fetch(`http://localhost:8000/api/pacientes/${pacienteId}/antecedentes/`, {
-                method: 'POST', // O PUT si tu backend lo soporta
+                method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}` // 👈 SOLUCIÓN AL ERROR DE IMAGEN 1
+                    'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify(formData)
             });
 
-            if (response.ok) {
-                alert("¡Expediente guardado con éxito! 🎉");
-            } else {
-                alert("Error al guardar. Verifica los datos.");
+            if (!response.ok) {
+                alert("Error al guardar los antecedentes.");
+                setGuardando(false);
+                return;
             }
+
+            // Ahora guardar el periodontograma si existe
+            if (periodontogramaRef.current) {
+                const periodontogramaGuardado = await periodontogramaRef.current.guardar();
+                if (!periodontogramaGuardado) {
+                    alert("Antecedentes guardados, pero hubo un error al guardar el periodontograma.");
+                    setGuardando(false);
+                    return;
+                }
+            }
+
+            alert("¡Expediente completo guardado con éxito! 🎉");
         } catch (error) {
             alert("Error de conexión.");
         } finally {
@@ -144,7 +158,9 @@ export default function ExpedienteEstudiantePage({ params }: { params: Promise<{
                 <TabsContent value="periodontograma">
                     <Card>
                         <CardContent className="pt-6">
-                            <TabPeriodontogramaGrafico />
+                            <PeriodontogramaProvider pacienteId={pacienteId}>
+                                <TabPeriodontogramaGrafico ref={periodontogramaRef} pacienteId={pacienteId} />
+                            </PeriodontogramaProvider>
                         </CardContent>
                     </Card>
                 </TabsContent>

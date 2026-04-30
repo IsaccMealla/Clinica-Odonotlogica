@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, use, useEffect } from "react"
+import { useState, use, useEffect, useRef } from "react"
 import { 
     ArrowLeft, User, Stethoscope, Activity, FileText, 
     Save, ClipboardList, ImageIcon, UploadCloud 
@@ -16,6 +16,7 @@ import { TabOdontopediatria } from "@/components/tabs-expediente/tab-odontopedia
 import { TabPeriodoncia } from "@/components/tabs-expediente/tab-periodoncia"
 import { TabPeriodontogramaGrafico } from "@/components/tabs-expediente/tab-periodontograma-grafico"
 import { TabHistorialTratamientos } from "@/components/tabs-expediente/tab-historial-tratamientos"
+import { PeriodontogramaProvider } from "@/context/PeriodontogramaContext"
 
 // MODULO 5: IMÁGENES
 import VisorRadiologico from "@/components/imagenes/VisorRadiologico"
@@ -26,6 +27,7 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
     const router = useRouter();
     const unwrappedParams = use(params);
     const pacienteId = unwrappedParams.id;
+    const periodontogramaRef = useRef<any>(null);
 
     // --- ESTADOS ---
     const [formData, setFormData] = useState({
@@ -119,8 +121,26 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
                 body: JSON.stringify(dataParaEnviar)
             });
 
-            if (response.ok) alert("¡Expediente guardado con éxito! 🎉");
-        } catch (error) { alert("Error de conexión con el servidor."); } 
+            if (!response.ok) {
+                alert("Error al guardar los antecedentes.");
+                setGuardando(false);
+                return;
+            }
+
+            // Ahora guardar el periodontograma si existe
+            if (periodontogramaRef.current) {
+                const periodontogramaGuardado = await periodontogramaRef.current.guardar();
+                if (!periodontogramaGuardado) {
+                    alert("Antecedentes guardados, pero hubo un error al guardar el periodontograma.");
+                    setGuardando(false);
+                    return;
+                }
+            }
+
+            alert("¡Expediente completo guardado con éxito! 🎉");
+        } catch (error) { 
+            alert("Error de conexión con el servidor."); 
+        }
         finally { setGuardando(false); }
     }
 
@@ -216,7 +236,9 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
                             <CardTitle className="text-rose-800">Periodontograma Gráfico</CardTitle>
                         </CardHeader>
                         <CardContent className="p-6">
-                            <TabPeriodontogramaGrafico />
+                            <PeriodontogramaProvider pacienteId={pacienteId}>
+                                <TabPeriodontogramaGrafico ref={periodontogramaRef} pacienteId={pacienteId} />
+                            </PeriodontogramaProvider>
                         </CardContent>
                     </Card>
                 </TabsContent>

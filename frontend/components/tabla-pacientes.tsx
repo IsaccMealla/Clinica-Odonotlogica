@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Search, UserX, Stethoscope } from "lucide-react"
+import { Search, UserX, Stethoscope, Download } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,6 +13,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { exportCarpetaMedicaPDF } from "@/lib/exporters/pdf-exporter"
+import { toast } from "sonner"
 
 // IMPORTACIÓN DE ACCIONES
 import { CarpetaMedica } from "./carpeta-medica"
@@ -39,6 +41,27 @@ export function TablaPacientes({ pacientesIniciales, onRefresh }: TablaPacientes
       (p.apellido_materno && p.apellido_materno.toLowerCase().includes(termino))
     )
   })
+
+  const handleExportPaciente = async (paciente: any) => {
+    try {
+      // Cargar datos completos del paciente desde la API para obtener antecedentes
+      const token = localStorage.getItem("access_token")
+      const res = await fetch(`http://localhost:8000/api/pacientes/${paciente.id}/`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      
+      if (res.ok) {
+        const pacienteCompleto = await res.json()
+        exportCarpetaMedicaPDF(pacienteCompleto)
+        toast.success(`Carpeta de ${paciente.nombres} exportada`)
+      } else {
+        toast.error("Error al cargar los datos del paciente")
+      }
+    } catch (error) {
+      console.error(error)
+      toast.error("Error al exportar")
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -94,11 +117,21 @@ export function TablaPacientes({ pacientesIniciales, onRefresh }: TablaPacientes
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
                       
-                      {/* ACCIÓN 1: CARPETA MÉDICA (Antecedentes Rápidos) */}
+                      {/* ACCIÓN 1: EXPORTAR CARPETA MÉDICA */}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleExportPaciente(paciente)}
+                        className="hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950"
+                        title="Descargar Carpeta Médica (PDF)"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                      
+                      {/* ACCIÓN 2: CARPETA MÉDICA (Antecedentes Rápidos) */}
                       <CarpetaMedica paciente={paciente} />
                       
-                      {/* ACCIÓN 2: EXPEDIENTE COMPLETO (CORREGIDO) */}
-                      {/* Eliminamos /expediente para que coincida con app/pacientes/[id]/page.tsx */}
+                      {/* ACCIÓN 3: EXPEDIENTE COMPLETO */}
                       <Link href={`/pacientes/${paciente.id}`}>
                         <Button 
                           variant="ghost" 
@@ -110,13 +143,13 @@ export function TablaPacientes({ pacientesIniciales, onRefresh }: TablaPacientes
                         </Button>
                       </Link>
                       
-                      {/* ACCIÓN 3: VER PERFIL DETALLADO */}
+                      {/* ACCIÓN 4: VER PERFIL DETALLADO */}
                       <VerPaciente paciente={paciente} />
                       
-                      {/* ACCIÓN 4: EDITAR DATOS */}
+                      {/* ACCIÓN 5: EDITAR DATOS */}
                       <EditarPaciente paciente={paciente} onRefresh={onRefresh} />
                       
-                      {/* ACCIÓN 5: ELIMINAR (BORRADO LÓGICO) */}
+                      {/* ACCIÓN 6: ELIMINAR (BORRADO LÓGICO) */}
                       <EliminarPaciente 
                         id={paciente.id} 
                         nombre={`${paciente.nombres} ${paciente.apellido_paterno}`} 

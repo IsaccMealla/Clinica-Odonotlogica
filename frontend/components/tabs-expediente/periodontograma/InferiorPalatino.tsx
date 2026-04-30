@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react"
+import React from "react"
 import { Input } from "@/components/ui/input"
+import { usePeriodontograma } from "@/context/PeriodontogramaContext"
 
 type DienteData = {
   movilidad: string;
@@ -82,17 +83,29 @@ const getMovilidadEstilo = (grado: string) => {
 };
 
 export function InferiorPalatino() {
-  const [datos, setDatos] = useState(estadoInicial);
+  const { datos, setDatos } = usePeriodontograma();
+  
+  const datosLingual = datos.datos_lingual_inferior as Record<number, DienteData>;
 
   const updateDiente = (pieza: number, campo: keyof DienteData, valor: any) => {
-    setDatos(prev => ({ ...prev, [pieza]: { ...prev[pieza], [campo]: valor } }));
+    setDatos({
+      ...datos,
+      datos_lingual_inferior: {
+        ...datosLingual,
+        [pieza]: { ...datosLingual[pieza], [campo]: valor }
+      }
+    });
   };
 
   const updateArray = (pieza: number, campo: 'sangrado' | 'supuracion' | 'margen' | 'sondaje', index: number, valor: any) => {
-    setDatos(prev => {
-      const nuevoArray = [...prev[pieza][campo]] as any;
-      nuevoArray[index] = valor;
-      return { ...prev, [pieza]: { ...prev[pieza], [campo]: nuevoArray } };
+    const nuevoArray = [...datosLingual[pieza][campo]] as any;
+    nuevoArray[index] = campo === 'margen' || campo === 'sondaje' ? Number(valor) : valor;
+    setDatos({
+      ...datos,
+      datos_lingual_inferior: {
+        ...datosLingual,
+        [pieza]: { ...datosLingual[pieza], [campo]: nuevoArray }
+      }
     });
   };
 
@@ -108,7 +121,7 @@ export function InferiorPalatino() {
   const ptsSondajeArr: string[] = [];
 
   dientesInferiores.forEach((pieza) => {
-    const d = datos[pieza];
+    const d = datosLingual[pieza];
     const xs = coordenadasX[pieza];
     
     xs.forEach((x, index) => {
@@ -159,7 +172,7 @@ export function InferiorPalatino() {
             {/* TABLA DE INPUTS */}
             <div className="flex w-full">
               {dientesInferiores.map((pieza) => {
-                const d = datos[pieza];
+                const d = datosLingual[pieza];
                 const nic = [
                   (Number(d.margen[0]) || 0) + (Number(d.sondaje[0]) || 0),
                   (Number(d.margen[1]) || 0) + (Number(d.sondaje[1]) || 0),
@@ -247,7 +260,7 @@ export function InferiorPalatino() {
 
                 {/* 2. RENDERIZADO DE IMPLANTES */}
                 {dientesInferiores.map((pieza) => {
-                  if (!datos[pieza].implante) return null;
+                  if (!datosLingual[pieza].implante) return null;
                   
                   const ancho = anchosDientes[pieza];
                   const centroX = coordenadasX[pieza][1];
@@ -280,7 +293,7 @@ export function InferiorPalatino() {
                 
                 {/* 5. PUNTOS Y MARCADORES (Sangrado, supuración) */}
                 {dientesInferiores.map((pieza) => {
-                  const d = datos[pieza];
+                  const d = datosLingual[pieza];
                   const xs = coordenadasX[pieza];
                   
                   return xs.map((x, index) => {

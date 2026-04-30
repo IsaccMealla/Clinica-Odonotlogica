@@ -3,10 +3,12 @@
 import { useEffect, useState } from "react"
 import { TablaAsignacion } from "@/components/docente/tabla-asignacion"
 import { Loader2, ClipboardList, ShieldCheck } from "lucide-react"
+import { AsignacionesExport } from "@/components/exporters/asignaciones-export"
 
 export default function AsignacionesPage() {
   const [token, setToken] = useState<string | null>(null)
   const [rol, setRol] = useState<string | null>(null)
+  const [asignaciones, setAsignaciones] = useState([])
 
   useEffect(() => {
     // Recuperamos credenciales del localStorage
@@ -61,11 +63,12 @@ export default function AsignacionesPage() {
             Vincula estudiantes con pacientes para el seguimiento de historias clínicas.
           </p>
         </div>
+        <AsignacionesExport asignaciones={asignaciones} />
       </div>
       
       {/* Contenedor de la Tabla CRUD */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-        <TablaAsignacion token={token} />
+        <TablaAsignacion token={token} onDataChange={setAsignaciones} />
       </div>
     </div>
   )

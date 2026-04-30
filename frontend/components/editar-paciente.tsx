@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -33,6 +33,27 @@ export function EditarPaciente({ paciente, onRefresh }: EditarPacienteProps) {
   const [cargando, setCargando] = useState(false)
 
   const [formData, setFormData] = useState({ ...paciente })
+
+  // 👇 NUEVO: Recargar datos cuando el modal se abre
+  useEffect(() => {
+    if (abierto) {
+      const cargarPacienteActualizado = async () => {
+        try {
+          const token = localStorage.getItem("access_token")
+          const res = await fetch(`http://localhost:8000/api/pacientes/${paciente.id}/`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          })
+          if (res.ok) {
+            const pacienteActualizado = await res.json()
+            setFormData(pacienteActualizado)
+          }
+        } catch (error) {
+          console.error("Error cargando paciente:", error)
+        }
+      }
+      cargarPacienteActualizado()
+    }
+  }, [abierto, paciente.id])
 
   const hoy = new Date().toISOString().split("T")[0];
 

@@ -21,7 +21,8 @@ from .models import (
     Transferencia,
     Sillon,  # <-- NUEVO MODELO IMPORTADO AQUÍ
     Cita , # <-- NUEVO MODELO IMPORTADO AQUÍ
-    ImagenClinica
+    ImagenClinica,
+    Periodontograma  # <-- PERIODONTOGRAMA IMPORTADO
 )
 
 User = get_user_model()
@@ -93,6 +94,14 @@ class ExamenPeriodontalSerializer(serializers.ModelSerializer):
     class Meta:
         model = ExamenPeriodontal
         exclude = ('paciente',)
+
+class PeriodontogramaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Periodontograma
+        fields = ['id', 'paciente', 'datos_vestibular_superior', 'datos_palatino_superior', 
+                  'datos_vestibular_inferior', 'datos_lingual_inferior', 'diagnostico', 'pronostico',
+                  'estudiante', 'estado_academico']
+        read_only_fields = ['id', 'creado_en', 'actualizado_en', 'estudiante']
 
 class HistoriaOdontopediatricaSerializer(serializers.ModelSerializer):
     class Meta:

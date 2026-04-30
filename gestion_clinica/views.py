@@ -316,6 +316,50 @@ class ExamenPeriodontalViewSet(viewsets.ModelViewSet):
     queryset = ExamenPeriodontal.objects.all()
     serializer_class = ExamenPeriodontalSerializer
 
+class PeriodontogramaViewSet(viewsets.ModelViewSet):
+    queryset = Periodontograma.objects.all()
+    serializer_class = PeriodontogramaSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        """Filtrar por paciente si se proporciona en la query"""
+        queryset = Periodontograma.objects.all()
+        paciente_id = self.request.query_params.get('paciente', None)
+        if paciente_id:
+            queryset = queryset.filter(paciente_id=paciente_id)
+        return queryset
+    
+    def create(self, request, *args, **kwargs):
+        """Crear periodontograma con mejor manejo de errores"""
+        try:
+            return super().create(request, *args, **kwargs)
+        except Exception as e:
+            import traceback
+            print("Error al crear periodontograma:", str(e))
+            print(traceback.format_exc())
+            raise
+    
+    def update(self, request, *args, **kwargs):
+        """Actualizar periodontograma con mejor manejo de errores"""
+        try:
+            return super().update(request, *args, **kwargs)
+        except Exception as e:
+            import traceback
+            print("Error al actualizar periodontograma:", str(e))
+            print(traceback.format_exc())
+            raise
+    
+    def perform_create(self, serializer):
+        """Al crear, asegurarse de que estudiante es el usuario actual y estado es BORRADOR"""
+        serializer.save(
+            estudiante=self.request.user,
+            estado_academico='BORRADOR'
+        )
+    
+    def perform_update(self, serializer):
+        """Al actualizar, mantener el estudiante actual"""
+        serializer.save(estudiante=self.request.user)
+
 class HistoriaOdontopediatricaViewSet(viewsets.ModelViewSet):
     queryset = HistoriaOdontopediatrica.objects.all()
     serializer_class = HistoriaOdontopediatricaSerializer

@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react"
+import React from "react"
 import { Input } from "@/components/ui/input"
+import { usePeriodontograma } from "@/context/PeriodontogramaContext"
 
 type DienteData = {
   movilidad: string;
@@ -82,17 +83,29 @@ const getMovilidadEstilo = (grado: string) => {
 };
 
 export function InferiorVestibular() {
-  const [datos, setDatos] = useState(estadoInicial);
+  const { datos, setDatos } = usePeriodontograma();
+
+  const datosVestibularInf = datos.datos_vestibular_inferior as Record<number, DienteData>;
 
   const updateDiente = (pieza: number, campo: keyof DienteData, valor: any) => {
-    setDatos(prev => ({ ...prev, [pieza]: { ...prev[pieza], [campo]: valor } }));
+    setDatos({
+      ...datos,
+      datos_vestibular_inferior: {
+        ...datosVestibularInf,
+        [pieza]: { ...datosVestibularInf[pieza], [campo]: valor }
+      }
+    });
   };
 
   const updateArray = (pieza: number, campo: 'sangrado' | 'supuracion' | 'margen' | 'sondaje', index: number, valor: any) => {
-    setDatos(prev => {
-      const nuevoArray = [...prev[pieza][campo]] as any;
-      nuevoArray[index] = valor;
-      return { ...prev, [pieza]: { ...prev[pieza], [campo]: nuevoArray } };
+    const nuevoArray = [...datosVestibularInf[pieza][campo]] as any;
+    nuevoArray[index] = campo === 'margen' || campo === 'sondaje' ? Number(valor) : valor;
+    setDatos({
+      ...datos,
+      datos_vestibular_inferior: {
+        ...datosVestibularInf,
+        [pieza]: { ...datosVestibularInf[pieza], [campo]: nuevoArray }
+      }
     });
   };
 
@@ -108,7 +121,7 @@ export function InferiorVestibular() {
   const ptsSondajeArr: string[] = [];
 
   dientesInferiores.forEach((pieza) => {
-    const d = datos[pieza];
+    const d = datosVestibularInf[pieza];
     const xs = coordenadasX[pieza];
     
     xs.forEach((x, index) => {
@@ -159,7 +172,7 @@ export function InferiorVestibular() {
             {/* TABLA DE INPUTS */}
             <div className="flex w-full">
               {dientesInferiores.map((pieza) => {
-                const d = datos[pieza];
+                const d = datosVestibularInf[pieza];
                 const nic = [
                   (Number(d.margen[0]) || 0) + (Number(d.sondaje[0]) || 0),
                   (Number(d.margen[1]) || 0) + (Number(d.sondaje[1]) || 0),
@@ -246,7 +259,7 @@ export function InferiorVestibular() {
 
                 {/* 2. RENDERIZADO DE IMPLANTES */}
                 {dientesInferiores.map((pieza) => {
-                  if (!datos[pieza].implante) return null;
+                  if (!datosVestibularInf[pieza].implante) return null;
                   
                   const ancho = anchosDientes[pieza];
                   const centroX = coordenadasX[pieza][1];
@@ -279,7 +292,7 @@ export function InferiorVestibular() {
                 
                 {/* 5. PUNTOS Y MARCADORES (Sangrado, supuración) */}
                 {dientesInferiores.map((pieza) => {
-                  const d = datos[pieza];
+                  const d = datosVestibularInf[pieza];
                   const xs = coordenadasX[pieza];
                   
                   return xs.map((x, index) => {

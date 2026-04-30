@@ -13,6 +13,7 @@ from .views import (
     HabitosViewSet,
     AntecedentesPeriodontalesViewSet,
     ExamenPeriodontalViewSet,
+    PeriodontogramaViewSet,
     HistoriaOdontopediatricaViewSet,
     ProstodonciaRemovibleViewSet,
     ProstodonciaFijaViewSet,
@@ -57,6 +58,7 @@ router.register(r'antecedentes-ginecologicos', AntecedenteGinecologicoViewSet)
 router.register(r'habitos', HabitosViewSet)
 router.register(r'antecedentes-periodontales', AntecedentesPeriodontalesViewSet)
 router.register(r'examen-periodontal', ExamenPeriodontalViewSet)
+router.register(r'periodontogramas', PeriodontogramaViewSet)
 router.register(r'historia-odontopediatrica', HistoriaOdontopediatricaViewSet)
 router.register(r'prostodoncia-removible', ProstodonciaRemovibleViewSet)
 router.register(r'prostodoncia-fija', ProstodonciaFijaViewSet)
