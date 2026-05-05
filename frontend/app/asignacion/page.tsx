@@ -68,7 +68,7 @@ export default function AsignacionesPage() {
       
       {/* Contenedor de la Tabla CRUD */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-        <TablaAsignacion token={token} onDataChange={setAsignaciones} />
+        <TablaAsignacion token={token} />
       </div>
     </div>
   )

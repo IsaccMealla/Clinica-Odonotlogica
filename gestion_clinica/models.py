@@ -791,6 +791,8 @@ class Cita(models.Model):
         ('CONFIRMADA', 'Confirmada'),
         ('EN_ESPERA', 'En Espera'),
         ('ATENDIENDO', 'Atendiendo'),
+        ('FINALIZADO', 'Finalizado'),
+        ('REPROGRAMADA', 'Reprogramada'),
         ('NO_ASISTIO', 'No Asistió'),
         ('CANCELADA', 'Cancelada'),
     ]
@@ -1217,4 +1219,4 @@ class AsignacionPaciente(models.Model):
         null=True, 
         related_name='supervisiones_casos'
     )
-    # ... resto de campos
+    

@@ -9,7 +9,8 @@ import {
   Calendar as CalendarIcon, 
   Box, 
   TrendingUp, 
-  AlertCircle 
+  AlertCircle,
+  ListChecks
 } from "lucide-react"
 
 // Componentes del Módulo
@@ -18,6 +19,7 @@ import ListaEsperaCard from "@/components/citas/ListaEsperaCard"
 import { FormularioCita } from "@/components/citas/FormularioCita"
 import Gabinetes3D from "@/components/citas/Gabinetes3D"
 import ReporteProductividad from "@/components/citas/ReporteProductividad"
+import { GestorCitasProgramadas } from "@/components/citas/GestorCitasProgramadas"
 import { Cita } from "@/types/cita"
 
 export default function CitasPage() {
@@ -77,9 +79,12 @@ export default function CitasPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 lg:w-[600px] mb-8">
+        <TabsList className="grid w-full grid-cols-5 lg:w-[900px] mb-8">
           <TabsTrigger value="asignar" className="gap-2">
             <LayoutDashboard className="w-4 h-4" /> Asignar
+          </TabsTrigger>
+          <TabsTrigger value="gestionar" className="gap-2">
+            <ListChecks className="w-4 h-4" /> Gestionar
           </TabsTrigger>
           <TabsTrigger value="monitor-3d" className="gap-2">
             <Box className="w-4 h-4" /> Monitor 3D
@@ -111,25 +116,30 @@ export default function CitasPage() {
           </div>
         </TabsContent>
 
+        {/* PESTAÑA 2: GESTIONAR CITAS */}
+        <TabsContent value="gestionar" className="space-y-6 animate-in fade-in-50">
+          <GestorCitasProgramadas citas={citas} onCitasActualizadas={fetchCitas} />
+        </TabsContent>
+
         {/* PESTAÑA 2: MONITOR 3D (GABINETES) */}
-       <TabsContent value="monitor-3d">
-  <Card className="min-h-[600px]">
-    <CardHeader className="flex flex-row items-center justify-between">
-      <div>
-        <CardTitle>Estado de Unidades Dentales</CardTitle>
-        <p className="text-sm text-muted-foreground mt-1">Mapa en tiempo real de la clínica</p>
-      </div>
-      <div className="flex gap-4 text-xs">
-        <span className="flex items-center gap-1">🟢 Libre</span>
-        <span className="flex items-center gap-1">🟠 Espera</span>
-        <span className="flex items-center gap-1">🔴 Atendiendo</span>
-      </div>
-    </CardHeader>
-    <CardContent>
-      <Gabinetes3D citasHoy={citasHoy} onCitaUpdate={fetchCitas} />
-    </CardContent>
-  </Card>
-</TabsContent>
+        <TabsContent value="monitor-3d">
+          <Card className="min-h-[600px]">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Estado de Unidades Dentales</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">Mapa en tiempo real de la clínica</p>
+              </div>
+              <div className="flex gap-4 text-xs">
+                <span className="flex items-center gap-1">🟢 Libre</span>
+                <span className="flex items-center gap-1">🟠 Espera</span>
+                <span className="flex items-center gap-1">🔴 Atendiendo</span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Gabinetes3D />
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         {/* PESTAÑA 3: CALENDARIO COMPLETO */}
         <TabsContent value="calendario">

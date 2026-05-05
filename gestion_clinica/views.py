@@ -716,11 +716,116 @@ class ConfiguracionAlertasViewSet(viewsets.ModelViewSet):
 # =========================================================================
 # VIEWSET DE AUDITORÍA DE CITAS
 # =========================================================================
-class AuditoriaCitaViewSet(viewsets.ReadOnlyModelViewSet):
+class AuditoriaCitaViewSet(viewsets.ModelViewSet):
     queryset = AuditoriaCita.objects.all()
     serializer_class = AuditoriaCitaSerializer
     permission_classes = [IsAuthenticated]
     filterset_fields = ['cita', 'tipo_cambio', 'usuario']
+
+    def perform_create(self, serializer):
+        """Registra automáticamente el usuario que realiza el cambio"""
+        serializer.save(usuario=self.request.user)
+
+
+# =========================================================================
+# VIEWSET: HISTORIAL DE CAMBIOS DE ESTADO CON FILTROS AVANZADOS
+# =========================================================================
+class HistorialCitasViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet para ver el historial de cambios de estado de citas con filtros.
+    Permite filtrar por:
+    - estudiante: Estudiante asignado a la cita
+    - paciente: Paciente de la cita
+    - estado: Estado actual de la cita
+    - fecha_desde: Fecha inicial (YYYY-MM-DD)
+    - fecha_hasta: Fecha final (YYYY-MM-DD)
+    """
+    serializer_class = AuditoriaCitaSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        queryset = AuditoriaCita.objects.all().select_related(
+            'cita__paciente', 'cita__estudiante', 'cita__docente', 'cita__gabinete', 'cita__motivo', 'usuario'
+        ).order_by('-creado_en')
+        
+        # Filtros
+        estudiante_id = self.request.query_params.get('estudiante')
+        paciente_id = self.request.query_params.get('paciente')
+        estado = self.request.query_params.get('estado')
+        fecha_desde = self.request.query_params.get('fecha_desde')
+        fecha_hasta = self.request.query_params.get('fecha_hasta')
+        
+        if estudiante_id:
+            queryset = queryset.filter(cita__estudiante_id=estudiante_id)
+        
+        if paciente_id:
+            queryset = queryset.filter(cita__paciente_id=paciente_id)
+        
+        if estado:
+            queryset = queryset.filter(cita__estado=estado)
+        
+        if fecha_desde:
+            queryset = queryset.filter(cita__fecha_hora__gte=fecha_desde)
+        
+        if fecha_hasta:
+            queryset = queryset.filter(cita__fecha_hora__lte=fecha_hasta)
+        
+        return queryset
+    
+    @action(detail=False, methods=['get'])
+    def por_paciente(self, request):
+        """Endpoint que agrupa el historial por paciente"""
+        paciente_id = request.query_params.get('paciente_id')
+        
+        if not paciente_id:
+            return Response(
+                {'error': 'Se requiere paciente_id'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        auditorias = AuditoriaCita.objects.filter(cita__paciente_id=paciente_id).select_related(
+            'cita__paciente', 'cita__estudiante', 'cita__docente', 'cita__gabinete', 'usuario'
+        ).order_by('-creado_en')
+        
+        serializer = AuditoriaCitaSerializer(auditorias, many=True)
+        return Response({
+            'paciente_id': paciente_id,
+            'total_cambios': auditorias.count(),
+            'cambios': serializer.data
+        })
+    
+    @action(detail=False, methods=['get'])
+    def resumen_estadisticas(self, request):
+        """Endpoint que devuelve estadísticas del historial"""
+        estudiante_id = request.query_params.get('estudiante_id')
+        
+        from django.db.models import Count, Q
+        from datetime import timedelta
+        from django.utils import timezone
+        
+        querybase = AuditoriaCita.objects.all()
+        
+        if estudiante_id:
+            querybase = querybase.filter(cita__estudiante_id=estudiante_id)
+        
+        # Estadísticas
+        hoy = timezone.now().date()
+        hace_7_dias = hoy - timedelta(days=7)
+        hace_30_dias = hoy - timedelta(days=30)
+        
+        stats = {
+            'total_cambios': querybase.count(),
+            'cambios_hoy': querybase.filter(creado_en__date=hoy).count(),
+            'cambios_ultimos_7_dias': querybase.filter(creado_en__date__gte=hace_7_dias).count(),
+            'cambios_ultimos_30_dias': querybase.filter(creado_en__date__gte=hace_30_dias).count(),
+            'por_tipo_cambio': dict(querybase.values('tipo_cambio').annotate(count=Count('id')).values_list('tipo_cambio', 'count')),
+            'cambios_finalizados': querybase.filter(cita__estado='FINALIZADO').count(),
+            'cambios_en_espera': querybase.filter(cita__estado='EN_ESPERA').count(),
+            'cambios_no_asistio': querybase.filter(cita__estado='NO_ASISTIO').count(),
+            'cambios_canceladas': querybase.filter(cita__estado='CANCELADA').count(),
+        }
+        
+        return Response(stats)
 
 
 # =========================================================================

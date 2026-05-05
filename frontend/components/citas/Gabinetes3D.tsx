@@ -5,15 +5,44 @@ import { Environment, OrbitControls, PresentationControls, Text, Box, Cylinder }
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import * as THREE from 'three'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
+import { AlertTriangle, AlertCircle } from "lucide-react"
+import { useSoundPlayer } from "@/hooks/useSoundPlayer"
 
 interface Sillon {
-  id: string
+  id: string | number
   nombre: string
   estado: 'DISPONIBLE' | 'OCUPADO' | 'MANTENIMIENTO'
+  posicion_x: number
+  posicion_y: number
+  posicion_z: number
+  ultima_revision?: string
+  dias_frecuencia_mantenimiento?: number
+}
+
+interface Paciente {
+  id: string
+  ci: string
+  nombres: string
+  apellido_paterno: string
+}
+
+interface Usuario {
+  id: number
+  first_name: string
+  last_name: string
+  rol: string
 }
 
 interface Gabinetes3DProps {
   onGabineteSelect?: (sillon: Sillon) => void
+  onCitaCreated?: () => void
 }
 
 // Componente individual de sillón dental en 3D
@@ -118,15 +147,23 @@ function GabineteCanvas({ sillones, onSelect }: {
   sillones: Sillon[]
   onSelect: (sillon: Sillon) => void
 }) {
-  // Disposición en grilla de sillones (3x2)
-  const posiciones: [number, number, number][] = [
-    [-2, 0, 0],
-    [0, 0, 0],
-    [2, 0, 0],
-    [-2, 0, -3],
-    [0, 0, -3],
-    [2, 0, -3],
-  ]
+  // Usar posiciones personalizadas si existen, si no usar una grilla predeterminada
+  const getPosicion = (idx: number, sillon: Sillon): [number, number, number] => {
+    if (sillon.posicion_x !== undefined && sillon.posicion_y !== undefined && sillon.posicion_z !== undefined) {
+      return [sillon.posicion_x * 3, sillon.posicion_y, sillon.posicion_z * 3]
+    }
+    
+    // Grilla de 3x2 por defecto
+    const posiciones: [number, number, number][] = [
+      [-2, 0, 0],
+      [0, 0, 0],
+      [2, 0, 0],
+      [-2, 0, -3],
+      [0, 0, -3],
+      [2, 0, -3],
+    ]
+    return posiciones[idx] || [0, 0, 0]
+  }
 
   return (
     <Canvas
@@ -154,7 +191,7 @@ function GabineteCanvas({ sillones, onSelect }: {
       {sillones.map((sillon, idx) => (
         <SillonDental
           key={sillon.id}
-          position={posiciones[idx] || [0, 0, 0]}
+          position={getPosicion(idx, sillon)}
           nombre={sillon.nombre}
           estado={sillon.estado}
           onSelect={() => onSelect(sillon)}
@@ -173,11 +210,250 @@ function GabineteCanvas({ sillones, onSelect }: {
   )
 }
 
+// Diálogo para asignar cita rápidamente
+function DialogoAsignarCita({ 
+  sillon, 
+  onClose, 
+  onCitaCreada 
+}: { 
+  sillon: Sillon | null
+  onClose: () => void
+  onCitaCreada: () => void
+}) {
+  const { playSound } = useSoundPlayer()
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [pacientes, setPacientes] = useState<Paciente[]>([])
+  const [estudiantes, setEstudiantes] = useState<Usuario[]>([])
+  const [docentes, setDocentes] = useState<Usuario[]>([])
+  const [tratamientos, setTratamientos] = useState<any[]>([])
+  
+  const [formData, setFormData] = useState({
+    paciente: '',
+    estudiante: '',
+    docente: '',
+    motivo: '',
+    fecha_hora: '',
+    duracion_estimada: 30
+  })
+
+  useEffect(() => {
+    if (sillon) {
+      fetchData()
+    }
+  }, [sillon])
+
+  const fetchData = async () => {
+    try {
+      const token = localStorage.getItem('access_token')
+      const headers: HeadersInit = { 'Content-Type': 'application/json' }
+      if (token) headers.Authorization = `Bearer ${token}`
+
+      const [pacRes, estRes, docRes, tratRes] = await Promise.all([
+        fetch('http://127.0.0.1:8000/api/pacientes/', { headers }),
+        fetch('http://127.0.0.1:8000/api/usuarios/?rol=ESTUDIANTE', { headers }),
+        fetch('http://127.0.0.1:8000/api/usuarios/?rol=DOCENTE', { headers }),
+        fetch('http://127.0.0.1:8000/api/tratamientos/', { headers })
+      ])
+
+      const normalizeList = (data: any) => {
+        if (Array.isArray(data)) return data
+        if (data && Array.isArray(data.results)) return data.results
+        return []
+      }
+
+      setPacientes(normalizeList(await pacRes.json()))
+      setEstudiantes(normalizeList(await estRes.json()))
+      setDocentes(normalizeList(await docRes.json()).filter((u: Usuario) => u.rol === 'DOCENTE'))
+      setTratamientos(normalizeList(await tratRes.json()))
+    } catch (error) {
+      console.error('Error fetching data:', error)
+      setError('Error al cargar los datos')
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!formData.paciente || !formData.estudiante || !formData.fecha_hora) {
+      setError('Faltan campos obligatorios')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+
+    try {
+      const response = await fetch('http://127.0.0.1:8000/api/citas/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+        },
+        body: JSON.stringify({
+          ...formData,
+          gabinete: sillon?.id.toString()
+        })
+      })
+
+      if (response.ok) {
+        playSound('exito')
+        setError('')
+        setFormData({
+          paciente: '',
+          estudiante: '',
+          docente: '',
+          motivo: '',
+          fecha_hora: '',
+          duracion_estimada: 30
+        })
+        onCitaCreada()
+        onClose()
+      } else {
+        const errorData = await response.json()
+        setError(`Error: ${JSON.stringify(errorData)}`)
+      }
+    } catch (error) {
+      console.error('Error:', error)
+      setError('Error al crear la cita')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (!sillon) return null
+
+  return (
+    <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogHeader>
+        <DialogTitle>Asignar Cita - {sillon.nombre}</DialogTitle>
+      </DialogHeader>
+
+      {error && (
+        <Alert className="border-red-500 bg-red-50">
+          <AlertTriangle className="h-4 w-4 text-red-600" />
+          <AlertDescription className="text-red-800 ml-2">{error}</AlertDescription>
+        </Alert>
+      )}
+
+      <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+        <p className="text-sm text-blue-900">
+          <strong>Gabinete:</strong> {sillon.nombre} <br />
+          <strong>Estado:</strong> <Badge className="ml-1">{sillon.estado}</Badge>
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* PACIENTE */}
+        <div className="space-y-1">
+          <Label>Paciente <span className="text-red-500">*</span></Label>
+          <Select value={formData.paciente} onValueChange={(value) => setFormData({...formData, paciente: value})}>
+            <SelectTrigger>
+              <SelectValue placeholder="Seleccionar paciente" />
+            </SelectTrigger>
+            <SelectContent>
+              {pacientes.map(p => (
+                <SelectItem key={p.id} value={p.id.toString()}>
+                  {p.apellido_paterno} {p.nombres}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* ESTUDIANTE */}
+        <div className="space-y-1">
+          <Label>Estudiante <span className="text-red-500">*</span></Label>
+          <Select value={formData.estudiante} onValueChange={(value) => setFormData({...formData, estudiante: value})}>
+            <SelectTrigger>
+              <SelectValue placeholder="Seleccionar estudiante" />
+            </SelectTrigger>
+            <SelectContent>
+              {estudiantes.map(est => (
+                <SelectItem key={est.id} value={est.id.toString()}>
+                  {est.first_name} {est.last_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* DOCENTE */}
+        <div className="space-y-1">
+          <Label>Docente</Label>
+          <Select value={formData.docente} onValueChange={(value) => setFormData({...formData, docente: value})}>
+            <SelectTrigger>
+              <SelectValue placeholder="Seleccionar docente" />
+            </SelectTrigger>
+            <SelectContent>
+              {docentes.map(doc => (
+                <SelectItem key={doc.id} value={doc.id.toString()}>
+                  {doc.first_name} {doc.last_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* MOTIVO */}
+        <div className="space-y-1">
+          <Label>Tratamiento</Label>
+          <Select value={formData.motivo} onValueChange={(value) => setFormData({...formData, motivo: value})}>
+            <SelectTrigger>
+              <SelectValue placeholder="Seleccionar tratamiento" />
+            </SelectTrigger>
+            <SelectContent>
+              {tratamientos.map(trat => (
+                <SelectItem key={trat.id} value={trat.id.toString()}>
+                  {trat.nombre_tratamiento}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* FECHA Y HORA */}
+        <div className="space-y-1">
+          <Label>Fecha y Hora <span className="text-red-500">*</span></Label>
+          <Input
+            type="datetime-local"
+            value={formData.fecha_hora}
+            onChange={(e) => setFormData({...formData, fecha_hora: e.target.value})}
+            required
+          />
+        </div>
+
+        {/* DURACIÓN */}
+        <div className="space-y-1">
+          <Label>Duración (min)</Label>
+          <Input
+            type="number"
+            value={formData.duracion_estimada}
+            onChange={(e) => setFormData({...formData, duracion_estimada: parseInt(e.target.value) || 30})}
+            min="15"
+            max="180"
+          />
+        </div>
+
+        <div className="flex gap-2 pt-4 border-t">
+          <Button type="button" variant="outline" onClick={onClose} disabled={loading} className="flex-1">
+            Cancelar
+          </Button>
+          <Button type="submit" disabled={loading} className="flex-1 bg-green-600 hover:bg-green-700">
+            {loading ? '⏳ Guardando...' : '✓ Crear Cita'}
+          </Button>
+        </div>
+      </form>
+    </DialogContent>
+  )
+}
+
 // Componente principal
-export default function Gabinetes3D({ onGabineteSelect }: Gabinetes3DProps) {
+export default function Gabinetes3D({ onGabineteSelect, onCitaCreated }: Gabinetes3DProps) {
   const [sillones, setSillones] = useState<Sillon[]>([])
   const [selectedSillon, setSelectedSillon] = useState<Sillon | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showDialogoAsignar, setShowDialogoAsignar] = useState(false)
 
   useEffect(() => {
     fetchSillones()
@@ -204,6 +480,12 @@ export default function Gabinetes3D({ onGabineteSelect }: Gabinetes3DProps) {
   const handleSelectSillon = (sillon: Sillon) => {
     setSelectedSillon(sillon)
     onGabineteSelect?.(sillon)
+  }
+
+  const handleCitaCreada = () => {
+    fetchSillones()
+    onCitaCreated?.()
+    setShowDialogoAsignar(false)
   }
 
   if (loading) {
@@ -235,55 +517,73 @@ export default function Gabinetes3D({ onGabineteSelect }: Gabinetes3DProps) {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Resumen de estado */}
         <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
-          <h3 className="text-sm font-semibold text-slate-300 mb-3">Estados</h3>
+          <h3 className="text-sm font-semibold text-slate-300 mb-3">📊 Estados</h3>
           <div className="space-y-2 text-sm">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-              <span>Disponible: {sillones.filter(s => s.estado === 'DISPONIBLE').length}</span>
+              <span>Disponible: <strong>{sillones.filter(s => s.estado === 'DISPONIBLE').length}</strong></span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-              <span>Ocupado: {sillones.filter(s => s.estado === 'OCUPADO').length}</span>
+              <span>Ocupado: <strong>{sillones.filter(s => s.estado === 'OCUPADO').length}</strong></span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
-              <span>Mantenimiento: {sillones.filter(s => s.estado === 'MANTENIMIENTO').length}</span>
+              <span>Mantenimiento: <strong>{sillones.filter(s => s.estado === 'MANTENIMIENTO').length}</strong></span>
             </div>
           </div>
         </div>
 
         {/* Gabinete seleccionado */}
-        <motion.div
-          key={selectedSillon?.id}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-br from-cyan-900/40 to-slate-900/50 p-4 rounded-lg border border-cyan-500/30 md:col-span-2"
-        >
-          {selectedSillon ? (
-            <div>
-              <h3 className="text-sm font-semibold text-cyan-400 mb-2">Gabinete Seleccionado</h3>
-              <p className="text-lg font-bold text-white mb-3">{selectedSillon.nombre}</p>
-              <div className="flex items-center gap-2 mb-3">
-                <div 
-                  className="w-4 h-4 rounded-full"
-                  style={{
-                    backgroundColor: selectedSillon.estado === 'DISPONIBLE' ? '#10b981' 
-                      : selectedSillon.estado === 'OCUPADO' ? '#ef4444' 
-                      : '#f97316'
-                  }}
-                />
-                <span className="text-sm text-slate-300">{selectedSillon.estado}</span>
+        <Dialog open={showDialogoAsignar} onOpenChange={setShowDialogoAsignar}>
+          <motion.div
+            key={selectedSillon?.id}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-gradient-to-br from-cyan-900/40 to-slate-900/50 p-4 rounded-lg border border-cyan-500/30 md:col-span-2"
+          >
+            {selectedSillon ? (
+              <div>
+                <h3 className="text-sm font-semibold text-cyan-400 mb-2">🎯 Gabinete Seleccionado</h3>
+                <p className="text-lg font-bold text-white mb-3">{selectedSillon.nombre}</p>
+                <div className="flex items-center gap-2 mb-3">
+                  <div 
+                    className="w-4 h-4 rounded-full"
+                    style={{
+                      backgroundColor: selectedSillon.estado === 'DISPONIBLE' ? '#10b981' 
+                        : selectedSillon.estado === 'OCUPADO' ? '#ef4444' 
+                        : '#f97316'
+                    }}
+                  />
+                  <span className="text-sm text-slate-300">{selectedSillon.estado}</span>
+                </div>
+                {selectedSillon.ultima_revision && (
+                  <p className="text-xs text-slate-400 mb-3">
+                    Última revisión: {new Date(selectedSillon.ultima_revision).toLocaleDateString('es-ES')}
+                  </p>
+                )}
+                <DialogTrigger asChild>
+                  <Button 
+                    className="w-full bg-cyan-600 hover:bg-cyan-700 text-white"
+                    onClick={() => setShowDialogoAsignar(true)}
+                  >
+                    ➕ Asignar Cita
+                  </Button>
+                </DialogTrigger>
               </div>
-              <button className="w-full bg-cyan-600 hover:bg-cyan-700 text-white py-2 rounded-lg text-sm font-semibold transition">
-                Asignar a Cita
-              </button>
-            </div>
-          ) : (
-            <div className="text-slate-400 text-sm">
-              Selecciona un gabinete en la vista 3D para ver detalles y asignarlo
-            </div>
-          )}
-        </motion.div>
+            ) : (
+              <div className="text-slate-400 text-sm">
+                👆 Selecciona un gabinete en la vista 3D para ver detalles y asignarlo
+              </div>
+            )}
+          </motion.div>
+
+          <DialogoAsignarCita 
+            sillon={selectedSillon}
+            onClose={() => setShowDialogoAsignar(false)}
+            onCitaCreada={handleCitaCreada}
+          />
+        </Dialog>
       </div>
     </div>
   )

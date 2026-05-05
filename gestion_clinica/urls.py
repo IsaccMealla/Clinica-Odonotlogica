@@ -32,6 +32,7 @@ from .views import (
     CitaRecurrenteViewSet,
     ConfiguracionAlertasViewSet,
     AuditoriaCitaViewSet,
+    HistorialCitasViewSet,
     # --- AGREGADO: VIEWSET PARA HISTÓRICO DE ABANDONO DE PACIENTES ---
     HistoricoAbandonoPacienteViewSet,
     # --- MÓDULO 6: FORMACIÓN Y SUPERVISIÓN ---
@@ -81,6 +82,7 @@ router.register(r'citas', CitaViewSet, basename='cita')
 router.register(r'citas-recurrentes', CitaRecurrenteViewSet, basename='cita-recurrente')
 router.register(r'configuracion-alertas', ConfiguracionAlertasViewSet, basename='configuracion-alertas')
 router.register(r'auditoria-citas', AuditoriaCitaViewSet, basename='auditoria-cita')
+router.register(r'historial-citas', HistorialCitasViewSet, basename='historial-citas')
 router.register(r'historico-abandono', HistoricoAbandonoPacienteViewSet, basename='historico-abandono')
 
 # ----- AGREGADO: RUTA PARA IMÁGENES CLÍNICAS -----
@@ -103,5 +105,6 @@ urlpatterns = [
     path('reportes/estadisticas/', views.estadisticas_3d_view, name='estadisticas_3d'),
     
     # Ruta personalizada para recuperación de contraseña
+   path('api/notificaciones/', include('notificaciones.urls')),
     path('recuperar-password/', views.enviar_correo_recuperacion, name='recuperar_password'),
 ]

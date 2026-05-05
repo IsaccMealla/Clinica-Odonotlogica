@@ -11,11 +11,22 @@ export interface Cita {
   motivo: string
   motivo_nombre: string
   fecha_hora: string
-  estado: 'RESERVADA' | 'CONFIRMADA' | 'EN_ESPERA' | 'ATENDIENDO' | 'NO_ASISTIO'
+  estado: 'RESERVADA' | 'CONFIRMADA' | 'EN_ESPERA' | 'ATENDIENDO' | 'FINALIZADO' | 'NO_ASISTIO' | 'CANCELADA' | 'REPROGRAMADA'
   check_in_time: string | null
   duracion_estimada: number
   creado_en: string
   actualizado_en: string
+}
+
+export interface RegistroAuditoria {
+  id: string
+  cita: string
+  estado_anterior: string
+  estado_nuevo: string
+  usuario: string
+  usuario_nombre: string
+  timestamp: string
+  comentario?: string
 }
 
 export interface Paciente {

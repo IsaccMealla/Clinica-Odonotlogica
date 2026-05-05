@@ -3,7 +3,7 @@
 import { useState, use, useEffect, useRef } from "react"
 import { 
     ArrowLeft, User, Stethoscope, Activity, FileText, 
-    Save, ClipboardList, ImageIcon, UploadCloud 
+    Save, ClipboardList, ImageIcon, UploadCloud, History
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -17,6 +17,7 @@ import { TabPeriodoncia } from "@/components/tabs-expediente/tab-periodoncia"
 import { TabPeriodontogramaGrafico } from "@/components/tabs-expediente/tab-periodontograma-grafico"
 import { TabHistorialTratamientos } from "@/components/tabs-expediente/tab-historial-tratamientos"
 import { PeriodontogramaProvider } from "@/context/PeriodontogramaContext"
+import { HistorialCitasPorPaciente } from "@/components/citas/HistorialCitasPorPaciente"
 
 // MODULO 5: IMÁGENES
 import VisorRadiologico from "@/components/imagenes/VisorRadiologico"
@@ -174,10 +175,10 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
                 </Button>
             </div>
 
-            {/* --- TABS PRINCIPALES (AHORA 5 COLUMNAS) --- */}
+            {/* --- TABS PRINCIPALES (AHORA 6 COLUMNAS) --- */}
             <Tabs defaultValue="historia" className="w-full flex-1 flex flex-col">
 
-                <TabsList className="grid w-full grid-cols-5 h-14 bg-white border shadow-sm rounded-xl p-1">
+                <TabsList className="grid w-full grid-cols-6 h-14 bg-white border shadow-sm rounded-xl p-1">
                     <TabsTrigger value="historia" className="text-md data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700">
                         <FileText className="h-4 w-4 mr-2" /> Historia Clínica
                     </TabsTrigger>
@@ -192,6 +193,9 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
                     </TabsTrigger>
                     <TabsTrigger value="imagenes" className="text-md data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700">
                         <ImageIcon className="h-4 w-4 mr-2" /> Imágenes/RX
+                    </TabsTrigger>
+                    <TabsTrigger value="historial-citas" className="text-md data-[state=active]:bg-cyan-50 data-[state=active]:text-cyan-700">
+                        <History className="h-4 w-4 mr-2" /> Historial Citas
                     </TabsTrigger>
                 </TabsList>
 
@@ -283,6 +287,24 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
                             <VisorRadiologico imagenes={imagenes} />
                         </div>
                     </div>
+                </TabsContent>
+
+                {/* --- NUEVO CONTENIDO: HISTORIAL DE CITAS --- */}
+                <TabsContent value="historial-citas" className="mt-6 flex-1">
+                    <Card className="border-cyan-100 shadow-sm">
+                        <CardHeader className="bg-cyan-50/50 border-b">
+                            <CardTitle className="text-cyan-800">Historial de Cambios de Citas</CardTitle>
+                            <CardDescription>
+                                Visualiza todos los cambios de estado realizados en las citas de este paciente
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="p-6">
+                            <HistorialCitasPorPaciente 
+                                pacienteId={pacienteId} 
+                                pacienteNombre={`${paciente.apellido_paterno} ${paciente.nombres}`}
+                            />
+                        </CardContent>
+                    </Card>
                 </TabsContent>
 
             </Tabs>

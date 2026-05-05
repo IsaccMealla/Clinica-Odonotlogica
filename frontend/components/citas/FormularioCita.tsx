@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Plus, AlertTriangle } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Plus, AlertTriangle, AlertCircle } from "lucide-react"
 import { useSoundPlayer } from "@/hooks/useSoundPlayer"
 import { Paciente, Usuario, Tratamiento, Sillon, Cita } from "@/types/cita"
 
@@ -22,6 +23,7 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [conflicto, setConflicto] = useState<string>('')
+  const [advertencias, setAdvertencias] = useState<string[]>([])
   const [formData, setFormData] = useState({
     paciente: '',
     estudiante: '',
@@ -37,10 +39,18 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
   const [docentes, setDocentes] = useState<Usuario[]>([])
   const [tratamientos, setTratamientos] = useState<Tratamiento[]>([])
   const [sillones, setSillones] = useState<Sillon[]>([])
+  
+  // Estados para detectar duplicados
+  const [pacientesConCitas, setPacientesConCitas] = useState<Set<string>>(new Set())
+  const [estudiantesConCitas, setEstudiantesConCitas] = useState<Set<string>>(new Set())
+  const [docentesConCitas, setDocentesConCitas] = useState<Set<string>>(new Set())
+  const [sillonesOcupados, setSillonesOcupados] = useState<Set<string>>(new Set())
+  const [fechasOcupadas, setFechasOcupadas] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (open) {
       fetchData()
+      analizarCitasExistentes()
       if (citaEditar) {
         setFormData({
           paciente: citaEditar.paciente?.toString() || '',
@@ -54,6 +64,63 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
       }
     }
   }, [open, citaEditar])
+
+  // Analizar citas existentes para detectar duplicados
+  const analizarCitasExistentes = () => {
+    const pacientes = new Set<string>()
+    const estudiantes = new Set<string>()
+    const docentes = new Set<string>()
+    const sillones = new Set<string>()
+    const fechas = new Set<string>()
+
+    citasExistentes.forEach(cita => {
+      if (cita.estado !== 'CANCELADA' && cita.estado !== 'NO_ASISTIO' && cita.estado !== 'FINALIZADO') {
+        pacientes.add(cita.paciente?.toString() || '')
+        estudiantes.add(cita.estudiante?.toString() || '')
+        if (cita.docente) docentes.add(cita.docente?.toString() || '')
+        sillones.add(cita.gabinete?.toString() || '')
+        // Extraer solo la fecha sin la hora
+        const fecha = cita.fecha_hora.split('T')[0]
+        fechas.add(fecha)
+      }
+    })
+
+    setPacientesConCitas(pacientes)
+    setEstudiantesConCitas(estudiantes)
+    setDocentesConCitas(docentes)
+    setSillonesOcupados(sillones)
+    setFechasOcupadas(fechas)
+  }
+
+  // Detectar advertencias en tiempo real
+  useEffect(() => {
+    const nuevasAdvertencias: string[] = []
+
+    if (formData.paciente && pacientesConCitas.has(formData.paciente)) {
+      nuevasAdvertencias.push('⚠️ Este paciente ya tiene citas programadas')
+    }
+
+    if (formData.estudiante && estudiantesConCitas.has(formData.estudiante)) {
+      nuevasAdvertencias.push('⚠️ Este estudiante ya tiene citas programadas')
+    }
+
+    if (formData.docente && docentesConCitas.has(formData.docente)) {
+      nuevasAdvertencias.push('⚠️ Este docente ya tiene citas programadas')
+    }
+
+    if (formData.gabinete && sillonesOcupados.has(formData.gabinete)) {
+      nuevasAdvertencias.push('⚠️ Este gabinete ya tiene citas programadas')
+    }
+
+    if (formData.fecha_hora) {
+      const fecha = formData.fecha_hora.split('T')[0]
+      if (fechasOcupadas.has(fecha)) {
+        nuevasAdvertencias.push('⚠️ Ya hay citas programadas para esta fecha')
+      }
+    }
+
+    setAdvertencias(nuevasAdvertencias)
+  }, [formData, pacientesConCitas, estudiantesConCitas, docentesConCitas, sillonesOcupados, fechasOcupadas])
 
   const normalizeList = (value: any) => {
     if (Array.isArray(value)) return value
@@ -99,6 +166,7 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
 
     const citaPaciente = citasParaValidar.find(cita => {
       if (citaEditar && cita.id === citaEditar.id) return false
+      if (cita.estado === 'CANCELADA' || cita.estado === 'FINALIZADO' || cita.estado === 'NO_ASISTIO') return false
       const citaStart = new Date(cita.fecha_hora).getTime()
       const citaEnd = citaStart + ((cita.duracion_estimada || 30) * 60000)
       const nuevaStart = new Date(formData.fecha_hora).getTime()
@@ -109,6 +177,7 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
 
     const citaEstudiante = citasParaValidar.find(cita => {
       if (citaEditar && cita.id === citaEditar.id) return false
+      if (cita.estado === 'CANCELADA' || cita.estado === 'FINALIZADO' || cita.estado === 'NO_ASISTIO') return false
       const citaStart = new Date(cita.fecha_hora).getTime()
       const citaEnd = citaStart + ((cita.duracion_estimada || 30) * 60000)
       const nuevaStart = new Date(formData.fecha_hora).getTime()
@@ -117,13 +186,29 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
       return cita.estudiante?.toString() === formData.estudiante && !(nuevaEnd <= citaStart || nuevaStart >= citaEnd)
     })
 
+    const citaGabinete = formData.gabinete ? citasParaValidar.find(cita => {
+      if (citaEditar && cita.id === citaEditar.id) return false
+      if (cita.estado === 'CANCELADA' || cita.estado === 'FINALIZADO' || cita.estado === 'NO_ASISTIO') return false
+      const citaStart = new Date(cita.fecha_hora).getTime()
+      const citaEnd = citaStart + ((cita.duracion_estimada || 30) * 60000)
+      const nuevaStart = new Date(formData.fecha_hora).getTime()
+      const nuevaEnd = nuevaStart + (formData.duracion_estimada * 60000)
+      
+      return cita.gabinete?.toString() === formData.gabinete && !(nuevaEnd <= citaStart || nuevaStart >= citaEnd)
+    }) : null
+
     if (citaPaciente) {
-      setConflicto(`⚠️ El paciente ya tiene una cita en ese horario (${new Date(citaPaciente.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`)
+      setConflicto(`🚫 El paciente ya tiene una cita en ese horario (${new Date(citaPaciente.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`)
       return false
     }
 
     if (citaEstudiante) {
-      setConflicto(`⚠️ El estudiante ya tiene una cita en ese horario (${new Date(citaEstudiante.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`)
+      setConflicto(`🚫 El estudiante ya tiene una cita en ese horario (${new Date(citaEstudiante.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`)
+      return false
+    }
+
+    if (citaGabinete) {
+      setConflicto(`🚫 El gabinete ya está ocupado en ese horario (${new Date(citaGabinete.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`)
       return false
     }
 
@@ -137,7 +222,6 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
 
     setLoading(true)
     
-    // Debug para ver qué se envía exactamente al backend
     console.log("Payload enviado:", formData)
 
     try {
@@ -167,6 +251,7 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
           duracion_estimada: 30
         })
         setConflicto('')
+        setAdvertencias([])
         onCitaCreated()
       } else {
         const errorData = await response.json()
@@ -179,6 +264,27 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
     } finally {
       setLoading(false)
     }
+  }
+
+  // Helper para mostrar badges de estado en los select items
+  const getPacienteLabel = (paciente: Paciente) => {
+    const esDuplicado = pacientesConCitas.has(paciente.id.toString())
+    return `${paciente.apellido_paterno} ${paciente.nombres}${esDuplicado ? ' 🔴 (con citas)' : ''}`
+  }
+
+  const getEstudianteLabel = (estudiante: Usuario) => {
+    const esDuplicado = estudiantesConCitas.has(estudiante.id.toString())
+    return `${estudiante.first_name} ${estudiante.last_name}${esDuplicado ? ' 🔴 (con citas)' : ''}`
+  }
+
+  const getDocenteLabel = (docente: Usuario) => {
+    const esDuplicado = docentesConCitas.has(docente.id.toString())
+    return `${docente.first_name} ${docente.last_name}${esDuplicado ? ' 🔴 (con citas)' : ''}`
+  }
+
+  const getSillonLabel = (sillon: Sillon) => {
+    const esDuplicado = sillonesOcupados.has(sillon.id.toString())
+    return `${sillon.nombre || `Gabinete ${sillon.id}`}${esDuplicado ? ' 🔴 (ocupado)' : ''} (${sillon.estado})`
   }
 
   return (
@@ -194,6 +300,7 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
           <DialogTitle>{citaEditar ? 'Editar Cita Clínica' : 'Programar Nueva Cita'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* ERRORES CRÍTICOS */}
           {conflicto && (
             <Alert className="border-red-500 bg-red-50">
               <AlertTriangle className="h-4 w-4 text-red-600" />
@@ -203,10 +310,27 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
             </Alert>
           )}
 
+          {/* ADVERTENCIAS */}
+          {advertencias.length > 0 && (
+            <Alert className="border-yellow-500 bg-yellow-50">
+              <AlertCircle className="h-4 w-4 text-yellow-600" />
+              <AlertDescription className="text-yellow-800 ml-2">
+                <ul className="list-disc list-inside space-y-1">
+                  {advertencias.map((adv, idx) => <li key={idx}>{adv}</li>)}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* PACIENTE */}
             <div className="space-y-1">
-              <Label htmlFor="paciente">Paciente <span className="text-red-500">*</span></Label>
+              <Label htmlFor="paciente" className="flex items-center gap-2">
+                Paciente <span className="text-red-500">*</span>
+                {formData.paciente && pacientesConCitas.has(formData.paciente) && (
+                  <Badge variant="destructive" className="text-xs">Duplicado</Badge>
+                )}
+              </Label>
               <Select value={formData.paciente} onValueChange={(value) => setFormData({...formData, paciente: value})}>
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar paciente" />
@@ -214,7 +338,7 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
                 <SelectContent>
                   {pacientes.map(p => (
                     <SelectItem key={p.id} value={p.id.toString()}>
-                      {p.apellido_paterno} {p.nombres}
+                      {getPacienteLabel(p)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -223,7 +347,12 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
 
             {/* ESTUDIANTE */}
             <div className="space-y-1">
-              <Label htmlFor="estudiante">Estudiante Asignado <span className="text-red-500">*</span></Label>
+              <Label htmlFor="estudiante" className="flex items-center gap-2">
+                Estudiante Asignado <span className="text-red-500">*</span>
+                {formData.estudiante && estudiantesConCitas.has(formData.estudiante) && (
+                  <Badge variant="destructive" className="text-xs">Duplicado</Badge>
+                )}
+              </Label>
               <Select value={formData.estudiante} onValueChange={(value) => setFormData({...formData, estudiante: value})}>
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar estudiante" />
@@ -231,7 +360,7 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
                 <SelectContent>
                   {estudiantes.map(est => (
                     <SelectItem key={est.id} value={est.id.toString()}>
-                      {est.first_name} {est.last_name}
+                      {getEstudianteLabel(est)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -240,7 +369,12 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
 
             {/* DOCENTE */}
             <div className="space-y-1">
-              <Label htmlFor="docente">Docente Supervisor</Label>
+              <Label htmlFor="docente" className="flex items-center gap-2">
+                Docente Supervisor
+                {formData.docente && docentesConCitas.has(formData.docente) && (
+                  <Badge variant="destructive" className="text-xs">Ocupado</Badge>
+                )}
+              </Label>
               <Select value={formData.docente} onValueChange={(value) => setFormData({...formData, docente: value})}>
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar docente" />
@@ -248,7 +382,7 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
                 <SelectContent>
                   {docentes.map(doc => (
                     <SelectItem key={doc.id} value={doc.id.toString()}>
-                      {doc.first_name} {doc.last_name}
+                      {getDocenteLabel(doc)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -257,15 +391,20 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
 
             {/* GABINETE / SILLÓN */}
             <div className="space-y-1">
-              <Label htmlFor="gabinete">Gabinete / Sillón</Label>
+              <Label htmlFor="gabinete" className="flex items-center gap-2">
+                Gabinete / Sillón
+                {formData.gabinete && sillonesOcupados.has(formData.gabinete) && (
+                  <Badge variant="destructive" className="text-xs">Ocupado</Badge>
+                )}
+              </Label>
               <Select value={formData.gabinete} onValueChange={(value) => setFormData({...formData, gabinete: value})}>
                 <SelectTrigger>
-                  <SelectValue placeholder={sillones.length > 0 ? "Seleccionar gabinete" : "Sin gabinetes en la base de datos"} />
+                  <SelectValue placeholder={sillones.length > 0 ? "Seleccionar gabinete" : "Sin gabinetes"} />
                 </SelectTrigger>
                 <SelectContent>
                   {sillones.map(sillon => (
                     <SelectItem key={sillon.id} value={sillon.id.toString()}>
-                      {sillon.nombre || `Gabinete ${sillon.numero}`} {sillon.estado ? `(${sillon.estado})` : ''}
+                      {getSillonLabel(sillon)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -291,7 +430,12 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
 
             {/* FECHA Y HORA */}
             <div className="space-y-1">
-              <Label htmlFor="fecha_hora">Fecha y Hora <span className="text-red-500">*</span></Label>
+              <Label htmlFor="fecha_hora" className="flex items-center gap-2">
+                Fecha y Hora <span className="text-red-500">*</span>
+                {formData.fecha_hora && fechasOcupadas.has(formData.fecha_hora.split('T')[0]) && (
+                  <Badge variant="destructive" className="text-xs">Fecha Ocupada</Badge>
+                )}
+              </Label>
               <Input
                 id="fecha_hora"
                 type="datetime-local"
