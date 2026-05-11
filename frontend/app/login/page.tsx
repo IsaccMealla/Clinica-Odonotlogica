@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
+import { jwtDecode } from 'jwt-decode'
 import { 
   Lock, User, Activity, Stethoscope, HeartPulse, Plus, 
   Loader2, CheckCircle2, AlertCircle, Eye, EyeOff, Smile, ShieldAlert
@@ -167,6 +168,19 @@ export default function LoginPage() {
         // Guardamos los tokens
         localStorage.setItem("access_token", data.access)
         localStorage.setItem("refresh_token", data.refresh)
+        
+        // Decodificamos el JWT para extraer el rol
+        try {
+          const decoded = jwtDecode(data.access) as any
+          const rol = decoded.rol || 'ESTUDIANTE'
+          localStorage.setItem("user_role", rol)
+          localStorage.setItem("username", decoded.username || formData.username)
+          console.log("Token decodificado. Rol guardado:", rol)
+        } catch (error) {
+          console.error("Error decodificando JWT:", error)
+          // Fallback: guardar con rol por defecto
+          localStorage.setItem("user_role", "ESTUDIANTE")
+        }
         
         playSound("login")
         setStatus("success")

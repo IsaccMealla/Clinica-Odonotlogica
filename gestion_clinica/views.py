@@ -21,12 +21,39 @@ from django.utils.encoding import force_bytes
 from django.core.mail import send_mail
 from django.conf import settings
 
+# --- IMPORTACIONES DE JWT PERSONALIZADO ---
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.views import TokenObtainPairView
+
 # --- IMPORTACIONES DE MODELOS Y SERIALIZADORES ---
 from .models import *
 from .serializers import *
 
 # Obtenemos el modelo de usuario activo (sea el por defecto o uno personalizado)
 User = get_user_model()
+
+
+# =========================================================================
+# SERIALIZADOR Y VISTA DE LOGIN PERSONALIZADO (CON ROL EN JWT)
+# =========================================================================
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """
+    Serializador personalizado que incluye el rol en el token JWT
+    """
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        # Agregamos el rol al payload del token
+        token['rol'] = getattr(user, 'rol', 'ESTUDIANTE')
+        token['username'] = user.username
+        return token
+
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    """
+    Vista personalizada que usa el serializador con rol en JWT
+    """
+    serializer_class = CustomTokenObtainPairSerializer
 
 # =========================================================================
 # VIEWSET DE USUARIOS 

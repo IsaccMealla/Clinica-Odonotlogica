@@ -10,6 +10,13 @@ Usuario: admin
 Contraseña: Admin123!
 Rol: ADMIN
 ```
+
+### 🏥 **Administrador 2**
+```
+Usuario: admin2
+Contraseña: Admin456!
+Rol: ADMIN
+```
 **Acceso:** http://localhost:3000/login
 
 ---
