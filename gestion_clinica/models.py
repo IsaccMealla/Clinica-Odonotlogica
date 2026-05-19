@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 import uuid
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
@@ -1110,3 +1111,30 @@ class TeacherApproval(models.Model):
 # Agregar campos de no-show al paciente (conservamos histórico)
 Paciente.add_to_class('no_show_count', models.PositiveSmallIntegerField(default=0))
 Paciente.add_to_class('no_show_status', models.CharField(max_length=20, default='none', choices=[('none', 'None'), ('warning', 'Warning'), ('flagged', 'Flagged')]))
+=======
+"""
+Modelos de la aplicación gestion_clinica.
+
+NOTA: Esta aplicación ha sido refactorizada a una estructura modular.
+Los modelos están organizados en la carpeta models/ con módulos específicos:
+
+- models/base.py: Clases abstractas y base
+- models/usuario.py: Usuario personalizado
+- models/paciente.py: Paciente y antecedentes
+- models/examen.py: Exámenes clínicos
+- models/prostodoncia.py: Prótesis dentales
+- models/cirugia.py: Procedimientos quirúrgicos
+- models/tratamiento.py: Tratamientos y avances
+- models/cita.py: Citas y agenda
+- models/radiografia.py: Imágenes y periodontogramas
+- models/mantenimiento.py: Equipos
+- models/formacion.py: Supervisión y evaluación (Módulo 6)
+
+Para mantener compatibilidad hacia atrás, todos los modelos se importan aquí.
+Django sigue viendo estos modelos como si estuvieran en models.py
+"""
+
+# Importar todos los modelos de los submódulos
+# Esto mantiene la compatibilidad con el resto del proyecto
+from .models import *  # noqa: F401, F403
+>>>>>>> Stashed changes

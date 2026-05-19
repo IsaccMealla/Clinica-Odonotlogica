@@ -934,6 +934,7 @@ def no_show_statistics_by_patient(request):
     """
     from gestion_clinica.tasks import get_no_shows_by_patient
     
+<<<<<<< Updated upstream
     try:
         stats = get_no_shows_by_patient()
         return Response({
@@ -1001,3 +1002,161 @@ def trigger_no_show_check(request):
             {'error': f'Error triggering no-show check: {str(e)}'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+=======
+
+from rest_framework import viewsets, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+
+# Asegúrate de importar los modelos y serializadores nuevos que creamos:
+# from .models import AutorizacionImagen, ImagenClinica, HistorialEntregable
+# from .serializers import AutorizacionImagenSerializer, HistorialEntregableSerializer
+
+# =========================================================================
+# NUEVO: MOTOR DE AUTORIZACIÓN Y AUDITORÍA DE IMÁGENES (M5 + M6)
+# =========================================================================
+
+class AutorizacionImagenViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet para que los Docentes autoricen a los Estudiantes a subir imágenes
+    con un límite de horas, y para que los Estudiantes vean sus autorizaciones.
+    """
+    queryset = AutorizacionImagen.objects.all()
+    serializer_class = AutorizacionImagenSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        
+        # Docente: ve las autorizaciones que él emitió
+        if getattr(user, 'rol', '') == 'DOCENTE':
+            return self.queryset.filter(docente=user).order_by('-fecha_emision')
+            
+        # Estudiante: ve las autorizaciones que le dieron a él
+        if getattr(user, 'rol', '') == 'ESTUDIANTE':
+            return self.queryset.filter(estudiante=user).order_by('-fecha_emision')
+            
+        # Coordinador/Admin: ve todas
+        if user.is_superuser or getattr(user, 'rol', '') in ['ADMIN', 'ADMINISTRADOR']:
+            return self.queryset.all().order_by('-fecha_emision')
+            
+        return self.queryset.none()
+
+    def perform_create(self, serializer):
+        """Solo los Docentes pueden crear autorizaciones"""
+        if getattr(self.request.user, 'rol', '') != 'DOCENTE':
+            raise PermissionError('Solo los docentes pueden emitir autorizaciones de imágenes.')
+        
+        # Guarda asignando al docente logueado
+        autorizacion = serializer.save(docente=self.request.user, estado='PENDIENTE')
+        
+        # REGISTRO DE AUDITORÍA: El docente dio el permiso
+        HistorialEntregable.objects.create(
+            autorizacion=autorizacion,
+            actor=self.request.user,
+            accion='AUTORIZACION_CREADA',
+            detalles=f"El docente fijó un plazo de {autorizacion.plazo_horas} horas para subir una imagen categoría {autorizacion.categoria_esperada}."
+        )
+
+    @action(detail=True, methods=['get'])
+    def historial(self, request, pk=None):
+        """Endpoint para ver la línea de tiempo/auditoría de una autorización específica"""
+        autorizacion = self.get_object()
+        historial = HistorialEntregable.objects.filter(autorizacion=autorizacion)
+        
+        # Nota: Asume que creaste el HistorialEntregableSerializer
+        serializer = HistorialEntregableSerializer(historial, many=True)
+        return Response(serializer.data)
+
+
+# =========================================================================
+# ACTUALIZACIÓN: SUBIDA DE IMÁGENES RESTRINGIDA POR TIEMPO
+# =========================================================================
+# NOTA: Debes REEMPLAZAR tu actual `ImagenClinicaViewSet` por este.
+
+class ImagenClinicaViewSet(viewsets.ModelViewSet):
+    queryset = ImagenClinica.objects.all()
+    serializer_class = ImagenClinicaSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # Permite filtrar en el frontend usando: /api/imagenes/?paciente=ID
+        paciente_id = self.request.query_params.get('paciente')
+        if paciente_id:
+            return self.queryset.filter(paciente_id=paciente_id)
+        return self.queryset
+
+    def create(self, request, *args, **kwargs):
+        """
+        Sobrescribimos el método create() en lugar de perform_create() 
+        para poder abortar la petición y devolver un Error HTTP si expiró el tiempo.
+        """
+        # Obtenemos los datos del request
+        autorizacion_id = request.data.get('autorizacion')
+        
+        if not autorizacion_id:
+            return Response(
+                {"error": "Es obligatorio contar con una autorización del docente para subir imágenes."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            # Buscamos la autorización y verificamos que pertenezca al estudiante logueado
+            autorizacion = AutorizacionImagen.objects.get(id=autorizacion_id, estudiante=request.user)
+        except AutorizacionImagen.DoesNotExist:
+            return Response(
+                {"error": "Autorización no válida o no pertenece a este estudiante."}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # ---------------------------------------------------------
+        # LÓGICA DE NEGOCIO: VALIDAR EL RELOJ (VENTANA DE TIEMPO)
+        # ---------------------------------------------------------
+        if not autorizacion.esta_vigente():
+            # Si el tiempo pasó, la "quemamos"
+            if autorizacion.estado == 'PENDIENTE':
+                autorizacion.estado = 'EXPIRADA'
+                autorizacion.save()
+                
+                # Auditoría del fallo
+                HistorialEntregable.objects.create(
+                    autorizacion=autorizacion, actor=request.user, 
+                    accion='PLAZO_EXPIRADO', 
+                    detalles="Intento bloqueado: El estudiante superó el límite de horas."
+                )
+            return Response(
+                {"error": f"El plazo de {autorizacion.plazo_horas} horas asignado por el docente ha expirado."}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Si el tiempo es válido, permitimos que el serializador haga su trabajo normal
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        # Guardamos la imagen
+        nueva_imagen = serializer.save(estudiante=request.user, autorizacion=autorizacion)
+
+        # ---------------------------------------------------------
+        # LÓGICA POST-GUARDADO: ACTUALIZAR ESTADOS Y AUDITORÍA
+        # ---------------------------------------------------------
+        autorizacion.estado = 'COMPLETADA'
+        autorizacion.save()
+
+        HistorialEntregable.objects.create(
+            autorizacion=autorizacion, actor=request.user, 
+            accion='IMAGEN_SUBIDA', 
+            detalles=f"Imagen {nueva_imagen.categoria} cargada exitosamente a tiempo."
+        )
+
+        # [AQUÍ ENTRARÍA CELERY EN EL FUTURO]
+        if nueva_imagen.categoria == 'DICOM':
+            # procesar_radiografia_ia.delay(nueva_imagen.id)
+            HistorialEntregable.objects.create(
+                autorizacion=autorizacion, actor=None, # Sistema automático
+                accion='IA_INICIADA', detalles="Radiografía enviada al motor de Inteligencia Artificial."
+            )
+
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+>>>>>>> Stashed changes

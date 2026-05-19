@@ -356,5 +356,261 @@ class PacienteSerializer(serializers.ModelSerializer):
         el frontend reciba un objeto vacío o null de forma limpia.
         """
         ret = super().to_representation(instance)
+<<<<<<< Updated upstream
         # Opcional: Podrías forzar valores por defecto aquí si fuera necesario
         return ret
+=======
+        return ret
+
+# ==========================================
+# SERIALIZADORES DEL FLUJO CLÍNICO
+# ==========================================
+
+class TratamientoSerializer(serializers.ModelSerializer):
+    # Agregamos un campo virtual de solo lectura
+    paciente_nombre_completo = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Tratamiento
+        fields = '__all__' # Esto enviará todos los campos normales + el nuevo campo
+
+    # Esta función le dice a Django cómo llenar 'paciente_nombre_completo'
+    def get_paciente_nombre_completo(self, obj):
+        # Verificamos que tenga paciente asignado
+        if obj.paciente:
+            # Une nombre y apellidos, y usa strip() por si algún apellido está vacío
+            return f"{obj.paciente.nombres} {obj.paciente.apellido_paterno} {obj.paciente.apellido_materno}".strip()
+        return "Desconocido"
+
+class EvidenciaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Evidencia
+        fields = '__all__'
+
+class AvanceClinicoSerializer(serializers.ModelSerializer):
+    # Anidamos las evidencias para que al pedir un avance, vengan sus fotos de una vez
+    evidencias = EvidenciaSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = AvanceClinico
+        fields = '__all__'
+
+class TransferenciaSerializer(serializers.ModelSerializer):
+    # Campos de solo lectura para ver el nombre de los estudiantes y no solo su ID
+    estudiante_origen_nombre = serializers.CharField(source='estudiante_origen.username', read_only=True)
+    estudiante_destino_nombre = serializers.CharField(source='estudiante_destino.username', read_only=True)
+    
+    class Meta:
+        model = Transferencia
+        fields = '__all__'
+
+# ==========================================
+# SERIALIZADORES DE MANTENIMIENTO (SILLONES)
+# ==========================================
+
+class SillonSerializer(serializers.ModelSerializer):
+    # Creamos un campo virtual llamado 'posicion' para el 3D (Solo lectura)
+    posicion = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Sillon
+        # 🟢 SOLUCIÓN: Agregamos las posiciones individuales a la lista
+        fields = [
+            'id', 'nombre', 'estado', 'posicion', 
+            'posicion_x', 'posicion_y', 'posicion_z',  # <- ¡AQUÍ ESTÁ LA MAGIA!
+            'marca', 'modelo', 'numero_serie', 'descripcion', 
+            'ultima_revision', 'dias_frecuencia_mantenimiento', 'notas_tecnicas'
+        ]
+        
+        # 🟢 EXTRA: Las ocultamos en las respuestas GET para mantener el JSON limpio
+        extra_kwargs = {
+            'posicion_x': {'write_only': True},
+            'posicion_y': {'write_only': True},
+            'posicion_z': {'write_only': True},
+        }
+
+    # Esta función empaqueta [x, y, z] para que React Fiber lo lea correctamente
+    def get_posicion(self, obj):
+        return [obj.posicion_x, obj.posicion_y, obj.posicion_z]
+
+# =========================================================================
+# 7. Serializer de Citas
+# =========================================================================
+class CitaSerializer(serializers.ModelSerializer):
+    paciente_nombre = serializers.CharField(source='paciente.__str__', read_only=True)
+    estudiante_nombre = serializers.CharField(source='estudiante.get_full_name', read_only=True)
+    docente_nombre = serializers.CharField(source='docente.get_full_name', read_only=True)
+    gabinete_nombre = serializers.CharField(source='gabinete.nombre', read_only=True)
+    motivo_nombre = serializers.CharField(source='motivo.nombre_tratamiento', read_only=True)
+    cancelada_por_nombre = serializers.CharField(source='cancelada_por.get_full_name', read_only=True)
+
+    class Meta:
+        model = Cita
+        fields = [
+            'id', 'paciente', 'paciente_nombre', 'estudiante', 'estudiante_nombre', 
+            'docente', 'docente_nombre', 'gabinete', 'gabinete_nombre', 
+            'motivo', 'motivo_nombre', 'fecha_hora', 'estado', 'check_in_time', 
+            'duracion_estimada', 'cita_recurrente',
+            'cancelada_en', 'razon_cancelacion', 'motivo_cancelacion', 'cancelada_por', 'cancelada_por_nombre',
+            'creado_en', 'actualizado_en'
+        ]
+
+
+from rest_framework import serializers
+from .models import CitaRecurrente, ConfiguracionAlertas, AuditoriaCita, HistoricoAbandonoPaciente
+
+
+# =========================================================================
+# SERIALIZERS PARA CITAS RECURRENTES
+# =========================================================================
+class CitaRecurrenteSerializer(serializers.ModelSerializer):
+    paciente_nombre = serializers.CharField(source='paciente.__str__', read_only=True)
+    estudiante_nombre = serializers.CharField(source='estudiante.get_full_name', read_only=True)
+    docente_nombre = serializers.CharField(source='docente.get_full_name', read_only=True)
+    gabinete_nombre = serializers.CharField(source='gabinete.nombre', read_only=True)
+    motivo_nombre = serializers.CharField(source='motivo.nombre_tratamiento', read_only=True)
+    citas_generadas = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CitaRecurrente
+        fields = [
+            'id', 'paciente', 'paciente_nombre', 'estudiante', 'estudiante_nombre',
+            'docente', 'docente_nombre', 'gabinete', 'gabinete_nombre',
+            'motivo', 'motivo_nombre', 'frecuencia', 'hora', 'dias_semana',
+            'duracion_estimada', 'fecha_inicio', 'fecha_fin', 'max_ocurrencias',
+            'activa', 'citas_generadas', 'ultima_generacion', 'creado_en'
+        ]
+
+    def get_citas_generadas(self, obj):
+        return obj.citas.count()
+
+
+# =========================================================================
+# SERIALIZERS PARA CONFIGURACI� N DE ALERTAS
+# =========================================================================
+class ConfiguracionAlertasSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ConfiguracionAlertas
+        fields = [
+            'id', 'minutos_espera_alerta', 'inasistencias_alerta_abandono',
+            'dias_notificacion_previa', 'activa', 'actualizado_en'
+        ]
+
+
+# =========================================================================
+# SERIALIZERS PARA AUDITORÍA DE CITAS
+# =========================================================================
+class AuditoriaCitaSerializer(serializers.ModelSerializer):
+    usuario_nombre = serializers.CharField(source='usuario.get_full_name', read_only=True)
+
+    class Meta:
+        model = AuditoriaCita
+        fields = [
+            'id', 'cita', 'tipo_cambio', 'usuario', 'usuario_nombre',
+            'campos_modificados', 'valores_anteriores', 'valores_nuevos',
+            'descripcion', 'creado_en'
+        ]
+
+
+# =========================================================================
+# SERIALIZERS PARA HISTRICO DE ABANDONO
+# =========================================================================
+class HistoricoAbandonoPacienteSerializer(serializers.ModelSerializer):
+    paciente_nombre = serializers.CharField(source='paciente.__str__', read_only=True)
+    usuario_nombre = serializers.CharField(source='usuario_que_registro.get_full_name', read_only=True)
+
+    class Meta:
+        model = HistoricoAbandonoPaciente
+        fields = [
+            'id', 'paciente', 'paciente_nombre', 'fecha_abandono',
+            'inasistencias_totales', 'nota_coordinacion', 'usuario_que_registro',
+            'usuario_nombre', 'reactivado', 'fecha_reactivacion'
+        ]
+
+# =========================================================================
+# SERIALIZERS RADIOGRAFIAS
+# =========================================================================
+
+class ImagenClinicaSerializer(serializers.ModelSerializer):
+    # Aseguramos que el paciente se reciba como el ID (UUID)
+    paciente = serializers.PrimaryKeyRelatedField(queryset=Paciente.objects.all())
+
+    class Meta:
+        model = ImagenClinica
+        fields = [
+            'id', 'paciente', 'archivo', 'categoria', 
+            'pieza_dental', 'descripcion', 'fecha_adquisicion'
+           ]
+        # ESTO ES LO MÁS IMPORTANTE:
+        # Quitamos 'estudiante' de los campos requeridos en el POST
+        read_only_fields = ['id', 'estudiante', 'fecha_adquisicion']
+
+
+# =========================================================================
+# SERIALIZERS MÓDULO 6: FORMACIÓN Y SUPERVISIÓN
+# =========================================================================
+
+
+
+
+class ConfiguracionCupoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ConfiguracionCupo
+        fields = [
+            'id', 'asignatura', 'procedimiento', 'cupo_minimo', 'cupo_maximo',
+            'activo', 'creado_en', 'actualizado_en'
+        ]
+
+
+class AsignacionCasoSerializer(serializers.ModelSerializer):
+    paciente_nombre = serializers.CharField(source='paciente.__str__', read_only=True)
+    estudiante_nombre = serializers.CharField(source='estudiante.get_full_name', read_only=True)
+    porcentaje_avance = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AsignacionCaso
+        fields = [
+            'id', 'paciente', 'paciente_nombre', 'estudiante', 'estudiante_nombre',
+            'asignatura', 'procedimiento_principal', 'estado', 'fecha_asignacion',
+            'fecha_completacion', 'procedimientos_aprobados', 'porcentaje_avance',
+            'fecha_ultima_actualizacion_avance'
+        ]
+
+    def get_porcentaje_avance(self, obj):
+        return obj.calcular_porcentaje_avance()
+
+
+class SolicitudSupervisionSerializer(serializers.ModelSerializer):
+    asignacion_caso_paciente = serializers.CharField(source='asignacion_caso.paciente.__str__', read_only=True)
+    asignacion_caso_estudiante = serializers.CharField(source='asignacion_caso.estudiante.get_full_name', read_only=True)
+    docente_nombre = serializers.CharField(source='docente_supervisor.get_full_name', read_only=True)
+
+    class Meta:
+        model = SolicitudSupervision
+        fields = [
+            'id', 'asignacion_caso', 'asignacion_caso_paciente', 'asignacion_caso_estudiante',
+            'tipo_hito', 'estado', 'docente_supervisor', 'docente_nombre',
+            'descripcion_solicitud', 'observaciones_docente',
+            'fecha_solicitud', 'fecha_aprobacion'
+        ]
+
+
+class EvaluacionDesempeñoSerializer(serializers.ModelSerializer):
+    solicitud_supervision_hito = serializers.CharField(source='solicitud_supervision.get_tipo_hito_display', read_only=True)
+    estudiante_nombre = serializers.CharField(source='solicitud_supervision.asignacion_caso.estudiante.get_full_name', read_only=True)
+    promedio_criterios = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EvaluacionDesempeño
+        fields = [
+            'id', 'solicitud_supervision', 'solicitud_supervision_hito', 'estudiante_nombre',
+            'calificacion', 'alerta_temprana', 'motivo_detalle',
+            'manejo_tecnica', 'bioseguridad', 'comunicacion_paciente',
+            'cumplimiento_tiempo', 'documentacion', 'promedio_criterios',
+            'fecha_evaluacion', 'actualizado_en'
+        ]
+
+    def get_promedio_criterios(self, obj):
+        return obj.promedio_criterios
+    
+>>>>>>> Stashed changes
