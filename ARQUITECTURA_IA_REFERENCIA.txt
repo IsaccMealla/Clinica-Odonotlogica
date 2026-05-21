@@ -1,0 +1,72 @@
+ARQUITECTURA DE PROCESAMIENTO IA - REFERENCIA TÉCNICA
+
+FLUJO COMPLETO:
+
+1. FRONTEND -> POST /api/imagenes/ + archivo
+   - Envía radiografía en multipart/form-data
+   - ViewSet valida autorización de carga
+
+2. VISTA (perform_create):
+   - Lee bytes del archivo
+   - Ejecuta DICOM Processor (validate_biosafety)
+   - Si falla: BiosafetyFilterError -> 403 PermissionDenied
+   - Si OK: Guarda imagen con estado 'Pendiente'
+   - Marca autorización como 'USADO'
+   - Registra auditoría
+
+3. CELERY TASK (procesar_inferencia_ia_task):
+   - Se dispara: procesar_inferencia_ia_task.delay(imagen_id)
+   - Lee ruta del archivo guardado
+   - Ejecuta CNNInferenceService.infer(image_path)
+   - Obtiene diccionario con 'detecciones', 'diagnostico_general'
+   - Guarda en hallazgos_ia (JSONField)
+   - Actualiza estado a 'Procesado'
+   - Registra auditoría con resultado
+
+4. DIAGNÓSTICO MANUAL (POST /api/imagenes/{id}/diagnostico_manual/):
+   - Recibe hallazgos_manuales: [{etiqueta, bounding_box, observaciones}]
+   - Valida estructura
+   - Dibuja cuadros rojos en imagen original
+   - Guarda imagen_anotada
+   - Merge con hallazgos_ia si existen
+   - Registra auditoría
+
+5. ESTADO (GET /api/imagenes/{id}/estado_procesamiento/):
+   - Verifica estado actual
+   - Consulta tarea Celery
+   - Retorna hallazgos, estado, si tiene imagen anotada
+
+REQUISITOS DEL SISTEMA:
+
+Redis (localhost:6379):
+  redis-server
+
+Celery Worker:
+  celery -A backend worker -l info
+
+Django Server:
+  python manage.py runserver
+
+Base de Datos:
+  PostgreSQL con migrations aplicadas
+
+ESTRUCTURA AUDITORÍA:
+
+HistorialAuditoriaImagen registra:
+- SUBIDA_REALIZADA: cuando se sube archivo
+- IA_INFERENCIA_INICIADA: cuando se dispara Celery
+- IA_INFERENCIA_COMPLETADA: cuando termina procesamiento
+- DIAGNOSTICO_MANUAL_REGISTRADO: cuando se guardan hallazgos manuales
+
+CAMPOS JSONField:
+
+hallazgos_ia: {
+  'detecciones': [
+    {'etiqueta': 'Caries', 'confianza': 0.92, 'bounding_box': [x1, y1, x2, y2]}
+  ],
+  'diagnostico_general': 'Texto descriptivo'
+}
+
+hallazgos_manuales: [
+  {'etiqueta': 'Caries', 'bounding_box': [x1, y1, x2, y2], 'observaciones': 'Texto'}
+]

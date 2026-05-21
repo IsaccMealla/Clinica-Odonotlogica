@@ -1,6 +1,7 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
+<<<<<<< Updated upstream
 from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated, BasePermission
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
@@ -49,6 +50,18 @@ from reportlab.lib.pagesizes import letter
 import openpyxl
 
 # --- IMPORTACIONES PARA RECUPERAR CONTRASEÑA ---
+=======
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from .models import Sillon 
+from .serializers import SillonSerializer
+from .models import ImagenClinica
+from .serializers import ImagenClinicaSerializer
+from django.utils import timezone
+from datetime import timedelta
+
+>>>>>>> Stashed changes
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode
@@ -56,12 +69,78 @@ from django.utils.encoding import force_bytes
 from django.core.mail import send_mail
 from django.conf import settings
 
+<<<<<<< Updated upstream
 User = get_user_model()
+=======
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.views import TokenObtainPairView
+>>>>>>> Stashed changes
 
-# --- IMPORTACIONES DE MODELOS Y SERIALIZADORES ---
 from .models import *
 from .serializers import *
+from .serializers_modulos_4_8 import (
+    ControlAcademicoSerializer, PagoFacturaSerializer,
+    DespachoAlmacenSerializer, InventarioSerializer, TratamientoFlowSerializer
+)
+from .models import AutorizacionCargaImage, HistorialAuditoriaImagen
+from .utils.dicom_processor import DICOMProcessor, BiosafetyFilterError
+from .utils.diagnostico_manual import DiagnosticoManualService
+from .tasks import procesar_inferencia_ia_task, registrar_auditoria_imagen
+from django.db import models, transaction
 
+<<<<<<< Updated upstream
+=======
+User = get_user_model()
+
+
+# =========================================================================
+# SERIALIZADOR Y VISTA DE LOGIN PERSONALIZADO (CON ROL EN JWT)
+# =========================================================================
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """
+    Serializador personalizado que incluye el rol en el token JWT
+    """
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        # Agregamos el rol al payload del token
+        token['rol'] = getattr(user, 'rol', 'ESTUDIANTE')
+        token['username'] = user.username
+        return token
+
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    """
+    Vista personalizada que usa el serializador con rol en JWT
+    """
+    serializer_class = CustomTokenObtainPairSerializer
+
+# =========================================================================
+# VIEWSET DE USUARIOS 
+# =========================================================================
+class UsuarioViewSet(viewsets.ModelViewSet):
+    queryset = User.objects.all().order_by('-date_joined')
+    serializer_class = UsuarioSerializer
+    permission_classes = [IsAuthenticated]
+
+    # --- NUEVA ACCIÓN: Obtener solo estudiantes para poder asignarlos ---
+    @action(detail=False, methods=['get'])
+    def estudiantes(self, request):
+        estudiantes = User.objects.filter(rol='ESTUDIANTE').order_by('first_name', 'last_name')
+        serializer = self.get_serializer(estudiantes, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def docentes(self, request):
+        docentes = User.objects.filter(rol='DOCENTE').order_by('first_name', 'last_name')
+        serializer = self.get_serializer(docentes, many=True)
+        return Response(serializer.data)
+
+
+# =========================================================================
+# VIEWSET DE PACIENTES Y ANTECEDENTES
+# =========================================================================
+>>>>>>> Stashed changes
 class PacienteViewSet(viewsets.ModelViewSet):
     queryset = Paciente.objects.all()
     serializer_class = PacienteSerializer
@@ -73,6 +152,19 @@ class PacienteViewSet(viewsets.ModelViewSet):
         if self.action == 'papelera':
             return Paciente.objects.filter(activo=False)
         return Paciente.objects.filter(activo=True)
+
+    @action(detail=False, methods=['get'])
+    def mis_asignaciones_docente(self, request):
+        """
+        Retorna solo los pacientes que el docente tiene asignados.
+        URL: /api/pacientes/mis_asignaciones_docente/
+        """
+        if getattr(request.user, 'rol', None) != 'DOCENTE':
+            return Response({'error': 'Solo docentes pueden acceder'}, status=status.HTTP_403_FORBIDDEN)
+
+        pacientes = self.get_queryset().filter(docente_asignado=request.user)
+        serializer = self.get_serializer(pacientes, many=True)
+        return Response(serializer.data)
 
     # --- ACCIONES DE PAPELERA Y BORRADO ---
 
@@ -1079,15 +1171,344 @@ class ImagenClinicaViewSet(viewsets.ModelViewSet):
     queryset = ImagenClinica.objects.all()
     serializer_class = ImagenClinicaSerializer
     permission_classes = [IsAuthenticated]
+<<<<<<< Updated upstream
 
+=======
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
+    
+>>>>>>> Stashed changes
     def get_queryset(self):
-        # Permite filtrar en el frontend usando: /api/imagenes/?paciente=ID
         paciente_id = self.request.query_params.get('paciente')
         if paciente_id:
             return self.queryset.filter(paciente_id=paciente_id)
         return self.queryset
 
+<<<<<<< Updated upstream
     def create(self, request, *args, **kwargs):
+=======
+    def perform_create(self, serializer):
+        estudiante = self.request.user
+        paciente = serializer.validated_data.get('paciente')
+        archivo = serializer.validated_data.get('archivo')
+        
+        if paciente is None:
+            raise PermissionDenied('Paciente requerido')
+
+        ahora = timezone.now()
+        autorizacion = AutorizacionCargaImage.objects.filter(
+            estudiante=estudiante,
+            paciente=paciente,
+            estado='APROBADO'
+        ).order_by('-fecha_aprobacion').first()
+
+        if not autorizacion or (autorizacion.expiracion and ahora > autorizacion.expiracion):
+            # Registrar intento fallido de carga
+            HistorialAuditoriaImagen.objects.create(
+                accion='INTENTO_CARGA_SIN_PERMISO',
+                estudiante=estudiante,
+                paciente=paciente,
+                detalles={
+                    'razon': 'Sin autorización válida o expirada',
+                    'tiene_autorizacion': autorizacion is not None,
+                    'autorizacion_expirada': autorizacion is not None and autorizacion.expiracion and ahora > autorizacion.expiracion
+                }
+            )
+            raise PermissionDenied('No tiene autorización válida para cargar esta imagen')
+
+        try:
+            archivo_bytes = archivo.read()
+            db_patient_full_name = f"{paciente.apellido_paterno} {paciente.nombres}"
+            DICOMProcessor.validate_biosafety(archivo_bytes, db_patient_full_name)
+        except BiosafetyFilterError as e:
+            HistorialAuditoriaImagen.objects.create(
+                accion='CARGA_RECHAZADA_BIOSEGURIDAD',
+                estudiante=estudiante,
+                paciente=paciente,
+                detalles={'razon': str(e)}
+            )
+            raise PermissionDenied(str(e))
+
+        instancia = serializer.save(
+            estudiante=estudiante,
+            estado_procesamiento='Pendiente'
+        )
+        
+        autorizacion.estado = 'USADO'
+        autorizacion.fecha_intento_envio = ahora
+        autorizacion.save()
+
+        HistorialAuditoriaImagen.objects.create(
+            accion='SUBIDA_REALIZADA',
+            estudiante=estudiante,
+            docente=autorizacion.docente,
+            paciente=paciente,
+            detalles={
+                'imagen_id': str(instancia.id),
+                'autorizacion_id': str(autorizacion.id),
+                'categoria': instancia.categoria,
+                'tiempo_permitido_minutos': autorizacion.tiempo_permitido_minutos
+            }
+        )
+
+    @action(detail=True, methods=['post'])
+    def procesar_ia(self, request, pk=None):
+        imagen = self.get_object()
+        
+        if imagen.estado_procesamiento == 'Procesando':
+            return Response(
+                {'error': 'La imagen ya está siendo procesada'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        imagen.estado_procesamiento = 'Procesando'
+        imagen.save()
+        
+        tarea = procesar_inferencia_ia_task.delay(str(imagen.id))
+        
+        imagen.tarea_celery_id = tarea.id
+        imagen.save()
+        
+        # Registrar en historial de análisis
+        if not imagen.historial_analisis:
+            imagen.historial_analisis = []
+        
+        entrada_historial = {
+            'timestamp': timezone.now().isoformat(),
+            'tipo': 'IA_INFERENCIA',
+            'estado': 'en_proceso',
+            'usuario_id': str(request.user.id),
+            'usuario_nombre': str(request.user),
+            'tarea_id': tarea.id,
+            'resultados': None
+        }
+        
+        imagen.historial_analisis.append(entrada_historial)
+        imagen.save()
+        
+        HistorialAuditoriaImagen.objects.create(
+            accion='IA_INFERENCIA_INICIADA',
+            estudiante=request.user,
+            paciente=imagen.paciente,
+            detalles={'imagen_id': str(imagen.id), 'tarea_id': tarea.id}
+        )
+        
+        return Response(
+            {'message': 'Procesamiento IA iniciado', 'tarea_id': tarea.id},
+            status=status.HTTP_202_ACCEPTED
+        )
+    
+    @action(detail=True, methods=['post'])
+    def diagnostico_manual(self, request, pk=None):
+        imagen = self.get_object()
+        hallazgos = request.data.get('hallazgos', [])
+        
+        try:
+            DiagnosticoManualService.validar_hallazgos(hallazgos)
+        except ValueError as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        imagen.hallazgos_manuales = hallazgos
+        
+        if imagen.hallazgos_ia:
+            imagen.hallazgos_ia = DiagnosticoManualService.merge_hallazgos(
+                imagen.hallazgos_ia,
+                hallazgos
+            )
+        
+        imagen_anotada = DiagnosticoManualService.crear_anotacion(
+            imagen.archivo.path,
+            hallazgos
+        )
+        
+        from django.core.files.base import ContentFile
+        from datetime import datetime
+        imagen.imagen_anotada.save(
+            f"anotada_{datetime.now().timestamp()}.png",
+            ContentFile(imagen_anotada.getvalue()),
+            save=False
+        )
+        
+        imagen.save()
+        
+        HistorialAuditoriaImagen.objects.create(
+            accion='DIAGNOSTICO_MANUAL_REGISTRADO',
+            estudiante=request.user,
+            paciente=imagen.paciente,
+            detalles={
+                'imagen_id': str(imagen.id),
+                'hallazgos': hallazgos,
+                'total_hallazgos': len(hallazgos)
+            }
+        )
+        
+        serializer = self.get_serializer(imagen)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    @action(detail=True, methods=['get'])
+    def estado_procesamiento(self, request, pk=None):
+        imagen = self.get_object()
+        
+        if imagen.tarea_celery_id:
+            from celery.result import AsyncResult
+            resultado = AsyncResult(imagen.tarea_celery_id)
+            estado_tarea = resultado.state
+        else:
+            estado_tarea = 'NO_INICIADA'
+        
+        return Response({
+            'imagen_id': str(imagen.id),
+            'imagen_url': request.build_absolute_uri(imagen.archivo.url),
+            'imagen_anotada_url': request.build_absolute_uri(imagen.imagen_anotada.url) if imagen.imagen_anotada else None,
+            'estado': imagen.estado_procesamiento,
+            'estado_tarea': estado_tarea,
+            'hallazgos_ia': imagen.hallazgos_ia,
+            'hallazgos_manuales': imagen.hallazgos_manuales,
+            'tiene_imagen_anotada': bool(imagen.imagen_anotada)
+        })
+    
+    @action(detail=True, methods=['get'])
+    def descargar_imagen_anotada(self, request, pk=None):
+        imagen = self.get_object()
+        
+        if not imagen.imagen_anotada:
+            return Response(
+                {'error': 'No hay imagen anotada disponible'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        return Response({
+            'url': imagen.imagen_anotada.url,
+            'nombre': imagen.imagen_anotada.name
+        })
+    
+    @action(detail=False, methods=['get'])
+    def listar_para_analizar(self, request):
+        """Lista imágenes disponibles para que el estudiante seleccione una para analizar"""
+        paciente_id = request.query_params.get('paciente')
+        if not paciente_id:
+            return Response(
+                {'error': 'paciente requerido'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        imagenes = ImagenClinica.objects.filter(
+            paciente_id=paciente_id,
+            estudiante=request.user
+        ).values('id', 'archivo', 'categoria', 'pieza_dental', 'fecha_adquisicion', 'estado_procesamiento')
+        
+        return Response(list(imagenes))
+    
+    @action(detail=True, methods=['get'])
+    def historial_analisis(self, request, pk=None):
+        """Retorna la línea de tiempo de análisis de una imagen"""
+        imagen = self.get_object()
+        historial = imagen.historial_analisis or []
+        
+        # Ordenar por timestamp descendente
+        historial_ordenado = sorted(
+            historial,
+            key=lambda x: x.get('timestamp', ''),
+            reverse=True
+        )
+        
+        return Response({
+            'imagen_id': str(imagen.id),
+            'categoria': imagen.categoria,
+            'historial': historial_ordenado,
+            'total_analisis': len(historial)
+        })
+
+
+# =========================================================================
+# MÓDULO 6: VIEWSETS DE FORMACIÓN Y SUPERVISIÓN
+# =========================================================================
+
+from rest_framework.permissions import BasePermission
+
+
+class IsCoordinador(BasePermission):
+    """Permiso: Solo Coordinador puede acceder"""
+    def has_permission(self, request, view):
+        return request.user and (request.user.is_superuser or getattr(request.user, 'rol', '') in ['ADMIN', 'ADMINISTRADOR', 'DOCENTE'])
+
+
+class IsDocente(BasePermission):
+    """Permiso: Solo Docente puede acceder"""
+    def has_permission(self, request, view):
+        return request.user and (request.user.is_superuser or getattr(request.user, 'rol', '') == 'DOCENTE')
+
+
+class IsEstudiante(BasePermission):
+    """Permiso: Solo Estudiante puede acceder"""
+    def has_permission(self, request, view):
+        return request.user and (request.user.is_superuser or getattr(request.user, 'rol', '') == 'ESTUDIANTE')
+
+
+class ConfiguracionCupoViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet para gestionar configuraciones de cupo por asignatura
+    Acceso: Coordinador/Docente
+    """
+    queryset = ConfiguracionCupo.objects.all()
+    serializer_class = ConfiguracionCupoSerializer
+    permission_classes = [IsAuthenticated, IsCoordinador]
+
+    def get_queryset(self):
+        # Filtrar solo activos
+        activo = self.request.query_params.get('activo')
+        qs = ConfiguracionCupo.objects.all()
+        if activo is not None:
+            qs = qs.filter(activo=activo.lower() == 'true')
+        return qs
+
+
+class AsignacionCasoViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet para gestionar asignaciones de casos
+    Acceso: Coordinador (crea/actualiza), Estudiante (lee sus propios casos)
+    """
+    serializer_class = AsignacionCasoSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        
+        # Superusuario o Coordinador ven todos
+        if user.is_superuser or getattr(user, 'rol', '') in ['ADMIN', 'ADMINISTRADOR']:
+            return AsignacionCaso.objects.all().order_by('-fecha_asignacion')
+        
+        # Estudiante solo ve sus propias asignaciones
+        if getattr(user, 'rol', '') == 'ESTUDIANTE':
+            return AsignacionCaso.objects.filter(estudiante=user).order_by('-fecha_asignacion')
+        
+        # Docente ve todos (para supervisar)
+        if getattr(user, 'rol', '') == 'DOCENTE':
+            return AsignacionCaso.objects.all().order_by('-fecha_asignacion')
+        
+        return AsignacionCaso.objects.none()
+
+    def perform_create(self, serializer):
+        """Solo Coordinador puede crear asignaciones"""
+        if not (self.request.user.is_superuser or getattr(self.request.user, 'rol', '') in ['ADMIN', 'ADMINISTRADOR']):
+            raise PermissionError('Solo el coordinador puede asignar casos')
+        serializer.save()
+
+    @action(detail=False, methods=['get'])
+    def mis_asignaciones(self, request):
+        """Endpoint para que el estudiante vea sus casos asignados"""
+        if getattr(request.user, 'rol', '') != 'ESTUDIANTE':
+            return Response({'error': 'Solo estudiantes pueden acceder'}, status=status.HTTP_403_FORBIDDEN)
+        
+        asignaciones = AsignacionCaso.objects.filter(estudiante=request.user, estado='ACTIVO')
+        serializer = self.get_serializer(asignaciones, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def alumnos_retrasados(self, request):
+>>>>>>> Stashed changes
         """
         Sobrescribimos el método create() en lugar de perform_create() 
         para poder abortar la petición y devolver un Error HTTP si expiró el tiempo.
@@ -1095,7 +1516,261 @@ class ImagenClinicaViewSet(viewsets.ModelViewSet):
         # Obtenemos los datos del request
         autorizacion_id = request.data.get('autorizacion')
         
+<<<<<<< Updated upstream
         if not autorizacion_id:
+=======
+        retrasados = []
+        asignaciones = AsignacionCaso.objects.filter(estado='ACTIVO')
+        
+        for asignacion in asignaciones:
+            porcentaje = asignacion.calcular_porcentaje_avance()
+            # Consideramos retrasado si tiene menos del 50% del cupo
+            if porcentaje < 50:
+                retrasados.append({
+                    'id': str(asignacion.id),
+                    'estudiante': asignacion.estudiante.get_full_name(),
+                    'paciente': str(asignacion.paciente),
+                    'asignatura': asignacion.asignatura,
+                    'porcentaje_avance': round(porcentaje, 2),
+                    'procedimientos_aprobados': asignacion.procedimientos_aprobados,
+                    'dias_activo': (timezone.now() - asignacion.fecha_asignacion).days
+                })
+        
+        return Response(retrasados)
+
+
+class SolicitudSupervisionViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet para solicitudes de supervisión
+    Hitos: Diagnóstico, Inicio, Cierre
+    """
+    serializer_class = SolicitudSupervisionSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        
+        # Estudiante: ve sus propias solicitudes
+        if getattr(user, 'rol', '') == 'ESTUDIANTE':
+            return SolicitudSupervision.objects.filter(
+                asignacion_caso__estudiante=user
+            ).order_by('-fecha_solicitud')
+        
+        # Docente: ve solicitudes pendientes de su supervisión
+        if getattr(user, 'rol', '') == 'DOCENTE':
+            return SolicitudSupervision.objects.filter(
+                estado='PENDIENTE'
+            ).order_by('-fecha_solicitud')
+        
+        # Admin/Coordinador: ven todas
+        if user.is_superuser or getattr(user, 'rol', '') in ['ADMIN', 'ADMINISTRADOR']:
+            return SolicitudSupervision.objects.all().order_by('-fecha_solicitud')
+        
+        return SolicitudSupervision.objects.none()
+
+    def perform_create(self, serializer):
+        """Estudiante crea la solicitud"""
+        asignacion = serializer.validated_data['asignacion_caso']
+        if asignacion.estudiante != self.request.user:
+            raise PermissionError('Solo el estudiante asignado puede solicitar supervisión')
+        serializer.save()
+
+
+# =========================================================================
+# NUEVOS VIEWSETS: FLUJO CLÍNICO-ACADÉMICO (MÓDULOS 4-8)
+# =========================================================================
+
+class ControlAcademicoViewSet(viewsets.ModelViewSet):
+    """
+    Control académico: Aprobación y evaluación de tratamientos.
+    Solo Docentes pueden crear y actualizar.
+    """
+    queryset = ControlAcademico.objects.all()
+    serializer_class = ControlAcademicoSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        
+        # Docentes ven todos los controles académicos
+        if getattr(user, 'rol', '') == 'DOCENTE':
+            return ControlAcademico.objects.all().order_by('-creado_en')
+        
+        # Estudiantes ven solo los de sus tratamientos
+        if getattr(user, 'rol', '') == 'ESTUDIANTE':
+            return ControlAcademico.objects.filter(
+                tratamiento__estudiante=user
+            ).order_by('-creado_en')
+        
+        # Admin ve todos
+        if user.is_superuser:
+            return ControlAcademico.objects.all().order_by('-creado_en')
+        
+        return ControlAcademico.objects.none()
+
+    def validar_estado_control(self, tratamiento, tipo_control):
+        if tipo_control == 'Inicial_Plan' and tratamiento.estado != 'Pendiente_Aprobacion':
+            raise PermissionDenied('El tratamiento debe estar en "Pendiente Aprobación" para crear el control inicial')
+        if tipo_control == 'Final_Ejecucion' and tratamiento.estado != 'Finalizado_Pendiente_Nota':
+            raise PermissionDenied('El tratamiento debe estar en "Finalizado Pendiente Nota" para crear el control final')
+
+    def perform_create(self, serializer):
+        """Solo docentes pueden crear controles académicos"""
+        if getattr(self.request.user, 'rol', '') != 'DOCENTE':
+            raise PermissionDenied('Solo docentes pueden crear controles académicos')
+        
+        tratamiento = serializer.validated_data['tratamiento']
+        tipo_control = serializer.validated_data['tipo_control']
+        self.validar_estado_control(tratamiento, tipo_control)
+        serializer.save(docente=self.request.user)
+
+    def perform_update(self, serializer):
+        """Solo docentes pueden actualizar controles académicos respetando el estado del tratamiento"""
+        if getattr(self.request.user, 'rol', '') != 'DOCENTE':
+            raise PermissionDenied('Solo docentes pueden actualizar controles académicos')
+
+        tratamiento = serializer.instance.tratamiento
+        tipo_control = serializer.validated_data.get('tipo_control', serializer.instance.tipo_control)
+        self.validar_estado_control(tratamiento, tipo_control)
+        serializer.save()
+
+
+class PagoFacturaViewSet(viewsets.ModelViewSet):
+    """
+    Gestión de pagos: Caja procesa pagos y emite facturas.
+    Solo Recepcionistas/Cajeros pueden crear pagos.
+    """
+    queryset = PagoFactura.objects.all()
+    serializer_class = PagoFacturaSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        
+        # Recepcionistas/Cajeros ven todos los pagos
+        if getattr(user, 'rol', '') in ['RECEPCIONISTA', 'CAJERO']:
+            return PagoFactura.objects.all().order_by('-creado_en')
+        
+        # Estudiantes ven solo los de sus tratamientos
+        if getattr(user, 'rol', '') == 'ESTUDIANTE':
+            return PagoFactura.objects.filter(
+                tratamiento__estudiante=user
+            ).order_by('-creado_en')
+        
+        # Admin ve todos
+        if user.is_superuser:
+            return PagoFactura.objects.all().order_by('-creado_en')
+        
+        return PagoFactura.objects.none()
+
+    def perform_create(self, serializer):
+        """Solo Recepcionista/Cajero puede procesar pagos"""
+        if getattr(self.request.user, 'rol', '') not in ['RECEPCIONISTA', 'CAJERO', 'ADMIN']:
+            if not self.request.user.is_superuser:
+                raise PermissionDenied('Solo recepcionistas/cajeros pueden procesar pagos')
+        
+        tratamiento = serializer.validated_data['tratamiento']
+        
+        # Validación de negocio: solo puede pagar si está aprobado
+        if tratamiento.estado != 'Aprobado_Por_Pagar':
+            raise PermissionDenied(f'El tratamiento debe estar "Aprobado Por Pagar". Estado actual: {tratamiento.estado}')
+        
+        # Validación: monto pagado debe coincidir con precio
+        monto_pagado = serializer.validated_data['monto_pagado']
+        if monto_pagado != tratamiento.precio:
+            raise PermissionDenied(f'El monto pagado (Bs {monto_pagado}) no coincide con el precio del tratamiento (Bs {tratamiento.precio})')
+
+        if serializer.validated_data.get('estado_pago') != 'Emitido':
+            raise PermissionDenied('El pago debe ser creado en estado Emitido')
+        
+        serializer.save()
+
+
+class DespachoAlmacenViewSet(viewsets.ModelViewSet):
+    """
+    Despacho de insumos desde almacén.
+    Solo Almaceneros pueden despachar.
+    Descuenta automáticamente del inventario.
+    """
+    queryset = DespachoAlmacen.objects.all()
+    serializer_class = DespachoAlmacenSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        
+        # Almaceneros ven todos los despachos
+        if getattr(user, 'rol', '') == 'ALMACENERO':
+            return DespachoAlmacen.objects.all().order_by('-creado_en')
+        
+        # Estudiantes ven solo los de sus tratamientos
+        if getattr(user, 'rol', '') == 'ESTUDIANTE':
+            return DespachoAlmacen.objects.filter(
+                tratamiento__estudiante=user
+            ).order_by('-creado_en')
+        
+        # Admin ve todos
+        if user.is_superuser:
+            return DespachoAlmacen.objects.all().order_by('-creado_en')
+        
+        return DespachoAlmacen.objects.none()
+
+    def perform_create(self, serializer):
+        """Solo Almacenero puede despachar"""
+        if getattr(self.request.user, 'rol', '') not in ['ALMACENERO', 'ADMIN']:
+            if not self.request.user.is_superuser:
+                raise PermissionDenied('Solo almaceneros pueden despachar insumos')
+        
+        tratamiento = serializer.validated_data['tratamiento']
+        inventario = serializer.validated_data['inventario']
+        cantidad = serializer.validated_data['cantidad_despachada']
+        
+        # Validación de negocio: solo puede despachar si está pagado
+        if tratamiento.estado != 'Pagado_Autorizado':
+            raise PermissionDenied(f'El tratamiento debe estar "Pagado y Autorizado". Estado actual: {tratamiento.estado}')
+
+        with transaction.atomic():
+            inventario = Inventario.objects.select_for_update().get(pk=inventario.pk)
+            if inventario.stock_actual < cantidad:
+                raise PermissionDenied(f'Stock insuficiente. Disponible: {inventario.stock_actual}, Solicitado: {cantidad}')
+            serializer.save()
+
+
+class InventarioViewSet(viewsets.ModelViewSet):
+    """
+    Control de inventario: Gestión de materiales y insumos.
+    """
+    queryset = Inventario.objects.all()
+    serializer_class = InventarioSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # Todos autenticados pueden ver inventario
+        return Inventario.objects.all().order_by('material_nombre')
+    
+    @action(detail=False, methods=['get'])
+    def bajo_stock(self, request):
+        """
+        Endpoint para obtener materiales con stock bajo.
+        URL: /api/inventario/bajo_stock/
+        """
+        materials_bajo_stock = Inventario.objects.filter(
+            stock_actual__lte=models.F('stock_minimo')
+        ).order_by('stock_actual')
+        
+        serializer = self.get_serializer(materials_bajo_stock, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def aprobar(self, request, pk=None):
+        """Docente aprueba la solicitud (firma electrónica)"""
+        if getattr(request.user, 'rol', '') != 'DOCENTE':
+            return Response({'error': 'Solo docentes pueden aprobar'}, status=status.HTTP_403_FORBIDDEN)
+        
+        solicitud = self.get_object()
+        
+        if solicitud.estado != 'PENDIENTE':
+>>>>>>> Stashed changes
             return Response(
                 {"error": "Es obligatorio contar con una autorización del docente para subir imágenes."}, 
                 status=status.HTTP_400_BAD_REQUEST

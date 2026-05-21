@@ -17,6 +17,7 @@ from .views import (
     ProstodonciaFijaViewSet,
     ProtocoloQuirurgicoViewSet,
     ExamenClinicoFisicoViewSet,
+<<<<<<< Updated upstream
     UserViewSet,
     RolePermissionViewSet,
     AuditLogViewSet,
@@ -27,6 +28,39 @@ from .views import (
     reset_password,
     ResourceViewSet,
     disponibilidad,
+=======
+    # --- NUEVOS VIEWSETS (TRATAMIENTOS Y CLÍNICA) ---
+    TratamientoViewSet,
+    AvanceClinicoViewSet,
+    EvidenciaViewSet,
+    TransferenciaViewSet,
+    # --- AGREGADO: VIEWSET DE SILLONES ---
+    SillonViewSet,
+    # --- AGREGADO: VIEWSET DE CITAS ---
+    CitaViewSet,
+    # --- NUEVOS VIEWSETS (AGENDAMIENTO AVANZADO) ---
+    CitaRecurrenteViewSet,
+    ConfiguracionAlertasViewSet,
+    AuditoriaCitaViewSet,
+    HistorialCitasViewSet,
+    # --- AGREGADO: VIEWSET PARA HISTÓRICO DE ABANDONO DE PACIENTES ---
+    HistoricoAbandonoPacienteViewSet,
+    # --- MÓDULO 6: FORMACIÓN Y SUPERVISIÓN ---
+    ConfiguracionCupoViewSet,
+    AsignacionCasoViewSet,
+    SolicitudSupervisionViewSet,
+    EvaluacionDesempeñoViewSet,
+    # --- MÓDULOS 4-8: FLUJO CLÍNICO-ACADÉMICO ---
+    ControlAcademicoViewSet,
+    PagoFacturaViewSet,
+    DespachoAlmacenViewSet,
+    InventarioViewSet,
+)
+from .autorizacion_views import (
+    EstudianteAutorizacionViewSet,
+    DocenteAutorizacionViewSet,
+    HistorialAuditoriaImagenViewSet,
+>>>>>>> Stashed changes
 )
 
 # Creamos el router automático
@@ -48,6 +82,7 @@ router.register(r'prostodoncia-removible', ProstodonciaRemovibleViewSet)
 router.register(r'prostodoncia-fija', ProstodonciaFijaViewSet)
 router.register(r'protocolo-quirurgico', ProtocoloQuirurgicoViewSet)
 router.register(r'examen-clinico', ExamenClinicoFisicoViewSet)
+<<<<<<< Updated upstream
 router.register(r'chairs', views.DentalChairViewSet)
 router.register(r'dentists', views.DentistViewSet)
 router.register(r'students', views.StudentViewSet)
@@ -64,6 +99,46 @@ router.register(r'users', views.UserViewSet, basename='users')
 router.register(r'role-permissions', views.RolePermissionViewSet, basename='role-permissions')
 router.register(r'audit-logs', views.AuditLogViewSet, basename='audit-logs')
 router.register(r'user-sessions', views.UserSessionViewSet, basename='user-sessions')
+=======
+
+# --- NUEVAS RUTAS: TRATAMIENTOS, AVANCES Y TRANSFERENCIAS ---
+router.register(r'tratamientos', TratamientoViewSet, basename='tratamientos')
+router.register(r'avances-clinicos', AvanceClinicoViewSet, basename='avances-clinicos')
+router.register(r'evidencias', EvidenciaViewSet, basename='evidencias')
+router.register(r'transferencias', TransferenciaViewSet, basename='transferencias')
+
+# --- AGREGADO: RUTA PARA SILLONES ---
+router.register(r'sillones', SillonViewSet, basename='sillon')
+
+# --- AGREGADO: RUTA PARA CITAS ---
+router.register(r'citas', CitaViewSet, basename='cita')
+
+# --- NUEVAS RUTAS: AGENDAMIENTO AVANZADO ---
+router.register(r'citas-recurrentes', CitaRecurrenteViewSet, basename='cita-recurrente')
+router.register(r'configuracion-alertas', ConfiguracionAlertasViewSet, basename='configuracion-alertas')
+router.register(r'auditoria-citas', AuditoriaCitaViewSet, basename='auditoria-cita')
+router.register(r'historial-citas', HistorialCitasViewSet, basename='historial-citas')
+router.register(r'historico-abandono', HistoricoAbandonoPacienteViewSet, basename='historico-abandono')
+
+# ----- AGREGADO: RUTA PARA IMÁGENES CLÍNICAS -----
+router.register(r'imagenes', views.ImagenClinicaViewSet, basename='imagenes')
+router.register(r'autorizaciones', EstudianteAutorizacionViewSet, basename='autorizaciones')
+router.register(r'autorizaciones-docente', DocenteAutorizacionViewSet, basename='autorizaciones-docente')
+router.register(r'auditoria-imagenes', HistorialAuditoriaImagenViewSet, basename='auditoria-imagenes')
+
+# ========== MÓDULO 6: FORMACIÓN Y SUPERVISIÓN ==========
+router.register(r'configuracion-cupo', ConfiguracionCupoViewSet, basename='configuracion-cupo')
+router.register(r'asignacion-caso', AsignacionCasoViewSet, basename='asignacion-caso')
+router.register(r'solicitud-supervision', SolicitudSupervisionViewSet, basename='solicitud-supervision')
+router.register(r'evaluacion-desempeño', EvaluacionDesempeñoViewSet, basename='evaluacion-desempeño')
+
+# ========== MÓDULOS 4-8: FLUJO CLÍNICO-ACADÉMICO ==========
+router.register(r'controles-academicos', ControlAcademicoViewSet, basename='control-academico')
+router.register(r'pagos-facturas', PagoFacturaViewSet, basename='pago-factura')
+router.register(r'despachos-almacen', DespachoAlmacenViewSet, basename='despacho-almacen')
+router.register(r'inventario', InventarioViewSet, basename='inventario')
+
+>>>>>>> Stashed changes
 
 urlpatterns = [
     # Las rutas automáticas (CRUD completo para pacientes y todas sus tablas)

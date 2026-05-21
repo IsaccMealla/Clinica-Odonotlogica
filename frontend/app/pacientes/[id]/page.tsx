@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, use, useEffect, useRef } from "react"
+// 1. Agregamos 'use' a las importaciones de React
+import { useState, useEffect, useRef, useCallback, use } from "react"
 import { 
     ArrowLeft, User, Stethoscope, Activity, FileText, 
     Save, ClipboardList, ImageIcon, UploadCloud, History
@@ -8,7 +9,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { useRouter } from "next/navigation"
+import { useRouter } from 'next/navigation';
 
 // IMPORTAMOS LOS COMPONENTES DE LAS PESTAÑAS
 import { TabEvaluacionGeneral } from "@/components/tabs-expediente/tab-evaluacion-general"
@@ -22,14 +23,20 @@ import { AutorizacionImagen } from "@/types/radiografias"
 // MODULO 5: IMÁGENES
 import VisorRadiologico from "@/components/imagenes/VisorRadiologico"
 import ImageUpload from "@/components/imagenes/ImageUpload"
-import ExploradorImagenes from "@/components/imagenes/ExploradorImagenes"       
+import SolicitudPermisoForm from "@/components/imagenes/SolicitudPermisoForm"
+import PanelAutorizacionesDocente from "@/components/imagenes/PanelAutorizacionesDocente"
 
 export default function ExpedientePacientePage({ params }: { params: Promise<{ id: string }> }) {
     const router = useRouter();
     const unwrappedParams = use(params);
     const pacienteId = unwrappedParams.id;
+<<<<<<< Updated upstream
     const periodontogramaRef = useRef<any>(null);
 const [autorizacionPendiente, setAutorizacionPendiente] = useState<AutorizacionImagen | null>(null);
+=======
+    const periodontogramaRef = useRef<{ guardar: () => Promise<boolean> } | null>(null);
+
+>>>>>>> Stashed changes
     // --- ESTADOS ---
     const [formData, setFormData] = useState({
         familiares: {}, personales: {}, no_patologicos: {}, ginecologicos: {},
@@ -37,10 +44,27 @@ const [autorizacionPendiente, setAutorizacionPendiente] = useState<AutorizacionI
         historia_odontopediatrica: {}, prostodoncia_removible: {},
         prostodoncia_fija: {}, protocolo_quirurgico: {}, examen_clinico_fisico: {}
     });
-    const [paciente, setPaciente] = useState<any>(null);
-    const [imagenes, setImagenes] = useState([]);
+    type ImagenData = {
+        id: string
+        archivo: string
+        categoria: string
+        fecha_adquisicion: string
+        paciente_nombre?: string
+    }
+
+    type PacienteData = {
+        nombres: string
+        apellido_paterno: string
+        ci: string
+        edad: number
+    }
+
+    const [paciente, setPaciente] = useState<PacienteData | null>(null);
+    const [imagenes, setImagenes] = useState<ImagenData[]>([]);
     const [guardando, setGuardando] = useState(false);
     const [cargando, setCargando] = useState(true);
+    const [rolUsuario, setRolUsuario] = useState('');
+    const pacienteOptions = paciente ? [{ id: pacienteId, nombre: `${paciente.nombres} ${paciente.apellido_paterno}` }] : []
 
     // --- CARGA DE DATOS (PACIENTE, ANTECEDENTES E IMÁGENES) ---
     const cargarPaciente = async (id: string) => {
@@ -58,7 +82,7 @@ const [autorizacionPendiente, setAutorizacionPendiente] = useState<AutorizacionI
         }
     };
 
-    const cargarImagenes = async () => {
+    const cargarImagenes = useCallback(async () => {
         try {
             const token = localStorage.getItem('access_token');
             const res = await fetch(`http://localhost:8000/api/imagenes/?paciente=${pacienteId}`, {
@@ -69,7 +93,12 @@ const [autorizacionPendiente, setAutorizacionPendiente] = useState<AutorizacionI
                 setImagenes(Array.isArray(data) ? data : (data.results || []));
             }
         } catch (error) { console.error("Error cargando imágenes:", error); }
-    };
+    }, [pacienteId]);
+
+    useEffect(() => {
+        const storedRol = String(localStorage.getItem('user_role') || '').toUpperCase().trim()
+        setRolUsuario(storedRol)
+    }, [])
 
     useEffect(() => {
         const cargarExpediente = async () => {
@@ -79,7 +108,7 @@ const [autorizacionPendiente, setAutorizacionPendiente] = useState<AutorizacionI
                     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
                 });
                 if (response.ok) {
-                    const datosGuardados = await response.json();
+                    const datosGuardados = (await response.json()) as Record<string, unknown>;
                     setFormData(prev => ({ ...prev, ...datosGuardados }));
                 }
             } catch (error) { console.error("Error cargando expediente:", error); }
@@ -93,10 +122,10 @@ const [autorizacionPendiente, setAutorizacionPendiente] = useState<AutorizacionI
                 cargarImagenes()
             ]).finally(() => setCargando(false));
         }
-    }, [pacienteId]);
+    }, [pacienteId, cargarImagenes]);
 
     // --- FUNCIONES DE ACCIÓN ---
-    const handleInputChange = (seccion: string, campo: string, valor: any) => {
+    const handleInputChange = (seccion: string, campo: string, valor: unknown) => {
         setFormData((prev) => ({
             ...prev,
             [seccion]: { ...prev[seccion as keyof typeof prev], [campo]: valor }
@@ -140,6 +169,7 @@ const [autorizacionPendiente, setAutorizacionPendiente] = useState<AutorizacionI
 
             alert("¡Expediente completo guardado con éxito! 🎉");
         } catch (error) { 
+            console.error(error)
             alert("Error de conexión con el servidor."); 
         }
         finally { setGuardando(false); }
@@ -262,7 +292,7 @@ const [autorizacionPendiente, setAutorizacionPendiente] = useState<AutorizacionI
                 {/* --- NUEVO CONTENIDO: MÓDULO 5 IMÁGENES Y RAYOS X --- */}
                 <TabsContent value="imagenes" className="mt-6 flex-1">
                     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-full">
-                        {/* Columna Izquierda: Panel de Carga */}
+                        {/* Columna Izquierda: Panel de Carga y Solicitud */}
                         <div className="lg:col-span-1 space-y-4">
                             <Card className="border-blue-100 shadow-sm">
                                 <CardHeader className="bg-blue-50/50 border-b">
@@ -270,23 +300,32 @@ const [autorizacionPendiente, setAutorizacionPendiente] = useState<AutorizacionI
                                         <UploadCloud className="w-4 h-4" /> Adquisición de Imagen
                                     </CardTitle>
                                 </CardHeader>
-                                <CardContent className="pt-4">
+                                <CardContent className="pt-4 space-y-4">
                                     <ImageUpload pacienteId={pacienteId} onUploadSuccess={cargarImagenes} />
+                                    <div className="border-t pt-4">
+                                        <SolicitudPermisoForm pacientes={pacienteOptions} onSuccess={cargarImagenes} />
+                                    </div>
                                 </CardContent>
                             </Card>
-                            
+
                             <Card className="p-4 bg-blue-50 border-blue-100">
                                 <p className="text-xs text-blue-800 font-medium italic">
-                                    "Recuerde etiquetar correctamente la pieza dental y el plano de corte para capturas CBCT."
+                                    Recuerde etiquetar correctamente la pieza dental y el plano de corte para capturas CBCT.
                                 </p>
                             </Card>
                         </div>
                         
                         {/* Columna Derecha: Visor Avanzado */}
-                        <div className="lg:col-span-3">
-                            <VisorRadiologico imagenes={imagenes} />
+                        <div className="lg:col-span-3 space-y-4">
+                            <VisorRadiologico imagenes={imagenes} pacienteId={pacienteId} />
                         </div>
                     </div>
+
+                    {(rolUsuario === 'ESTUDIANTE' || rolUsuario === 'DOCENTE' || rolUsuario === 'ADMIN') && (
+                      <div className="mt-6">
+                        <PanelAutorizacionesDocente />
+                      </div>
+                    )}
                 </TabsContent>
 
                 {/* --- NUEVO CONTENIDO: HISTORIAL DE CITAS --- */}

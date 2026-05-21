@@ -14,6 +14,7 @@ from .models import (
     ProstodonciaFija,
     ProtocoloQuirurgico,
     ExamenClinicoFisico,
+<<<<<<< Updated upstream
     Gabinete,
     DentalChair,
     Dentist,
@@ -30,6 +31,20 @@ from .models import (
     RolePermission,
     AuditLog,
     UserSession,
+=======
+    Tratamiento, 
+    AvanceClinico, 
+    Evidencia, 
+    Transferencia,
+    Sillon,  # <-- NUEVO MODELO IMPORTADO AQUÍ
+    Cita , # <-- NUEVO MODELO IMPORTADO AQUÍ
+    ImagenClinica,
+    Periodontograma,  # <-- PERIODONTOGRAMA IMPORTADO
+    ControlAcademico,
+    PagoFactura,
+    DespachoAlmacen,
+    Inventario,
+>>>>>>> Stashed changes
 )
 
 User = get_user_model()
@@ -324,6 +339,7 @@ class PacienteSerializer(serializers.ModelSerializer):
     
     # Campo calculado en el modelo (recuerda tener el método @property edad en tu modelo)
     edad = serializers.ReadOnlyField()
+    docente_asignado_nombre = serializers.SerializerMethodField()
 
     class Meta:
         model = Paciente
@@ -334,6 +350,12 @@ class PacienteSerializer(serializers.ModelSerializer):
             'contacto_emergencia', 'telefono_emergencia', 
             'fecha_ultima_consulta', 'motivo_ultima_consulta', 
             'activo', 'edad',
+<<<<<<< Updated upstream
+=======
+            'estudiante_asignado',
+            'docente_asignado',
+            'docente_asignado_nombre',
+>>>>>>> Stashed changes
             
             # Relaciones anidadas
             'antecedentes_familiares', 
@@ -349,6 +371,13 @@ class PacienteSerializer(serializers.ModelSerializer):
             'protocolo_quirurgico',
             'examen_clinico_fisico'
         ]
+
+    def get_docente_asignado_nombre(self, obj):
+        if obj.docente_asignado:
+            first = obj.docente_asignado.first_name or ''
+            last = obj.docente_asignado.last_name or ''
+            return f"{first} {last}".strip() or obj.docente_asignado.username
+        return None
 
     def to_representation(self, instance):
         """
@@ -532,19 +561,20 @@ class HistoricoAbandonoPacienteSerializer(serializers.ModelSerializer):
 # =========================================================================
 
 class ImagenClinicaSerializer(serializers.ModelSerializer):
-    # Aseguramos que el paciente se reciba como el ID (UUID)
     paciente = serializers.PrimaryKeyRelatedField(queryset=Paciente.objects.all())
+    # Campos calculados
+    estudiante_nombre = serializers.CharField(source='estudiante.get_full_name', read_only=True)
+    historial_analisis = serializers.JSONField(read_only=True)
 
     class Meta:
         model = ImagenClinica
         fields = [
-            'id', 'paciente', 'archivo', 'categoria', 
-            'pieza_dental', 'descripcion', 'fecha_adquisicion'
-           ]
-        # ESTO ES LO MÁS IMPORTANTE:
-        # Quitamos 'estudiante' de los campos requeridos en el POST
-        read_only_fields = ['id', 'estudiante', 'fecha_adquisicion']
-
+            'id', 'paciente', 'estudiante', 'estudiante_nombre', 'archivo', 'categoria', 
+            'pieza_dental', 'descripcion', 'fecha_adquisicion',
+            'estado_procesamiento', 'hallazgos_ia', 'hallazgos_manuales',
+            'imagen_anotada', 'tarea_celery_id', 'historial_analisis'
+        ]
+        read_only_fields = ['id', 'estudiante', 'fecha_adquisicion', 'hallazgos_ia', 'imagen_anotada', 'tarea_celery_id', 'historial_analisis', 'estudiante_nombre']
 
 # =========================================================================
 # SERIALIZERS MÓDULO 6: FORMACIÓN Y SUPERVISIÓN

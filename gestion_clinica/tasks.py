@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 try:
     from celery import shared_task
 except ImportError:
@@ -185,3 +186,87 @@ def get_weekly_no_show_summary():
         'week_end': week_end.isoformat(),
         'total_no_shows': stats
     }
+=======
+from celery import shared_task
+from django.core.files.base import ContentFile
+from .models import ImagenClinica, HistorialAuditoriaImagen
+from .utils.ia_inference import CNNInferenceService
+import json
+import os
+from django.utils import timezone
+
+
+@shared_task(bind=True, max_retries=3)
+def procesar_inferencia_ia_task(self, radiografia_id):
+    try:
+        imagen = ImagenClinica.objects.get(id=radiografia_id)
+        
+        inference_service = CNNInferenceService()
+        hallazgos = inference_service.infer(imagen.archivo.path)
+        
+        imagen.hallazgos_ia = hallazgos
+        imagen.estado_procesamiento = 'Procesado'
+        
+        # Actualizar historial de análisis con los resultados
+        if not imagen.historial_analisis:
+            imagen.historial_analisis = []
+        
+        # Buscar la entrada en proceso y actualizarla
+        for entrada in imagen.historial_analisis:
+            if entrada.get('tarea_id') == self.request.id:
+                entrada['estado'] = 'completado'
+                entrada['resultados'] = hallazgos
+                entrada['timestamp_finalizacion'] = timezone.now().isoformat()
+                break
+        
+        imagen.save()
+        
+        HistorialAuditoriaImagen.objects.create(
+            accion='IA_INFERENCIA_COMPLETADA',
+            estudiante=imagen.estudiante,
+            paciente=imagen.paciente,
+            detalles={
+                'radiografia_id': str(radiografia_id),
+                'modelo_usado': hallazgos.get('modelo_usado', 'DESCONOCIDO'),
+                'confianza_promedio': hallazgos.get('confianza_promedio'),
+                'num_detecciones': len(hallazgos.get('detecciones', []))
+            }
+        )
+        
+        return {'status': 'success', 'radiografia_id': str(radiografia_id)}
+    
+    except ImagenClinica.DoesNotExist:
+        return {'status': 'error', 'message': 'Image not found'}
+    except Exception as exc:
+        # Registrar error en historial
+        try:
+            imagen = ImagenClinica.objects.get(id=radiografia_id)
+            if not imagen.historial_analisis:
+                imagen.historial_analisis = []
+            
+            for entrada in imagen.historial_analisis:
+                if entrada.get('tarea_id') == self.request.id:
+                    entrada['estado'] = 'error'
+                    entrada['error'] = str(exc)
+                    break
+            
+            imagen.estado_procesamiento = 'Error'
+            imagen.save()
+        except:
+            pass
+        
+        if self.request.retries < self.max_retries:
+            self.retry(exc=exc, countdown=60)
+        return {'status': 'error', 'message': str(exc)}
+
+
+@shared_task
+def registrar_auditoria_imagen(accion, estudiante_id, paciente_id, detalles=None):
+    HistorialAuditoriaImagen.objects.create(
+        accion=accion,
+        estudiante_id=estudiante_id,
+        paciente_id=paciente_id,
+        detalles=detalles or {}
+    )
+    return {'status': 'logged'}
+>>>>>>> Stashed changes

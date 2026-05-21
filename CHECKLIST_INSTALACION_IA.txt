@@ -1,0 +1,211 @@
+CHECKLIST DE INSTALACIÓN - IA RADIOGRAFÍAS
+
+═════════════════════════════════════════════════════════════════
+
+PRE-REQUISITOS:
+
+☐ Python 3.9+
+☐ PostgreSQL 12+
+☐ Redis
+☐ Git
+
+═════════════════════════════════════════════════════════════════
+
+PASO 1: CLONAR Y CONFIGURAR
+
+☐ cd d:\Clinica-Odonotlogica
+☐ python -m venv venv (o tu gestor de venv preferido)
+☐ source venv/Scripts/activate (Windows: venv\Scripts\activate)
+
+═════════════════════════════════════════════════════════════════
+
+PASO 2: INSTALAR DEPENDENCIAS
+
+☐ pip install --upgrade pip
+☐ pip install -r requirements.txt
+
+   Si tienes problemas con PyTorch/TensorFlow, instalar por separado:
+   ☐ pip install torch (o tu versión específica)
+   ☐ pip install tensorflow (opcional)
+   ☐ pip install onnxruntime
+
+═════════════════════════════════════════════════════════════════
+
+PASO 3: CONFIGURAR REDIS
+
+Opción A - Nativo:
+☐ Descargar Redis de https://redis.io/download
+☐ redis-server (en terminal separada)
+
+Opción B - Docker:
+☐ docker-compose up -d redis
+☐ docker ps (verificar que está corriendo)
+
+Verificar conexión:
+☐ redis-cli ping (debe retornar PONG)
+
+═════════════════════════════════════════════════════════════════
+
+PASO 4: MIGRACIONES DE BASE DE DATOS
+
+☐ python manage.py makemigrations
+
+   Verificar que se crean migraciones para ImagenClinica con:
+   ✓ hallazgos_ia
+   ✓ hallazgos_manuales
+   ✓ estado_procesamiento
+   ✓ imagen_anotada
+   ✓ tarea_celery_id
+
+☐ python manage.py migrate
+
+   Verificar que no hay errores
+
+═════════════════════════════════════════════════════════════════
+
+PASO 5: VERIFICACIÓN COMPLETA
+
+En terminal 1:
+☐ python verificar_arquitectura_ia.py
+
+Debe mostrar:
+✓ Archivos
+✓ Campos del modelo
+✓ Configuración Celery
+✓ Imports
+✓ ViewSet actions
+✓ Dependencias
+
+═════════════════════════════════════════════════════════════════
+
+PASO 6: EJECUTAR SERVICIOS
+
+Terminal 1 - Redis (si no usas Docker):
+☐ redis-server
+
+Terminal 2 - Celery Worker:
+☐ celery -A backend worker -l info
+
+   Debe mostrar:
+   [tasks]
+   ✓ gestion_clinica.tasks.procesar_inferencia_ia_task
+   ✓ gestion_clinica.tasks.registrar_auditoria_imagen
+
+Terminal 3 - Django Server:
+☐ python manage.py runserver
+
+   Acceder a: http://localhost:8000/admin
+
+═════════════════════════════════════════════════════════════════
+
+PASO 7: PRUEBAS
+
+En terminal 4:
+☐ python test_arquitectura_ia.py
+
+Debe mostrar:
+✓ PASS: Inferencia IA
+✓ PASS: Diagnóstico Manual
+✓ PASS: Auditoría
+✓ PASS: Celery + Redis
+
+═════════════════════════════════════════════════════════════════
+
+PASO 8: VERIFICAR ENDPOINTS
+
+Usando curl o Postman:
+
+Test 1 - Listar imágenes:
+☐ GET http://localhost:8000/api/imagenes/
+
+   Retorna: []
+
+Test 2 - Ver task de ejemplo:
+☐ Acceder a /admin
+☐ Verificar que ImagenClinica aparece con nuevos campos
+
+═════════════════════════════════════════════════════════════════
+
+PASO 9: VALIDAR FRONTEND
+
+Si está corriendo frontend:
+☐ npm install (en frontend/)
+☐ Verificar que radiografia-api.ts se importa sin errores
+☐ Verificar componente VisorRadiografiaConAnotaciones
+
+═════════════════════════════════════════════════════════════════
+
+TROUBLESHOOTING:
+
+Problema: "No module named pydicom"
+Solución: pip install pydicom
+
+Problema: "Connection refused (Redis)"
+Solución: 
+  - Verificar que redis-server está ejecutándose
+  - O ejecutar: docker-compose up redis
+
+Problema: "Celery worker no inicia"
+Solución:
+  - Verificar Redis está corriendo
+  - Verificar CELERY_BROKER_URL en settings.py
+
+Problema: "Migration conflicts"
+Solución:
+  - python manage.py showmigrations
+  - python manage.py migrate gestion_clinica
+
+Problema: "ImagenClinica model error"
+Solución:
+  - Verificar que models.py tiene los nuevos campos
+  - Ejecutar: python manage.py makemigrations --name add_ia_fields
+  - python manage.py migrate
+
+═════════════════════════════════════════════════════════════════
+
+ESTADO FINAL:
+
+Cuando todo esté corriendo correctamente verás:
+
+Terminal 1 (Redis):
+  Ready to accept connections
+
+Terminal 2 (Celery):
+  Connected to redis://localhost:6379/0
+  [*] Ready to accept tasks
+
+Terminal 3 (Django):
+  Starting development server at http://127.0.0.1:8000/
+
+Terminal 4 (Tests):
+  Total: 4/4 pruebas exitosas
+  ✓ Sistema listo para producción
+
+═════════════════════════════════════════════════════════════════
+
+COMANDOS ÚTILES:
+
+Ver logs Celery en tiempo real:
+$ celery -A backend worker -l debug
+
+Monitorear tareas Celery:
+$ celery -A backend events
+$ celery -A backend inspect active
+
+Acceder a Redis CLI:
+$ redis-cli
+> KEYS *
+> FLUSHALL (limpiar todo)
+
+Resetear base de datos (CUIDADO - destruye datos):
+$ python manage.py migrate gestion_clinica zero
+$ python manage.py migrate gestion_clinica
+
+═════════════════════════════════════════════════════════════════
+
+Documentación:
+- ARQUITECTURA_IA.md - Guía completa
+- RESUMEN_IMPLEMENTACION.txt - Resumen de archivos
+- ARQUITECTURA_IA_REFERENCIA.txt - Referencia rápida
+
+═════════════════════════════════════════════════════════════════

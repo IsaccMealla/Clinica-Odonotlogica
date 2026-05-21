@@ -28,8 +28,14 @@ INSTALLED_APPS = [
     'django.contrib.postgres',
     'rest_framework',         # Para crear la API
     'corsheaders',            # Para que React pueda conectarse
+<<<<<<< Updated upstream
     'gestion_clinica',        # Tu app de la clínica
     
+=======
+    'channels',               # WebSockets en tiempo real
+    'gestion_clinica',
+    'notificaciones',        
+>>>>>>> Stashed changes
 ]
 
 # Custom user model
@@ -158,4 +164,31 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'isacc.mealla.psn@gmail.com'  
 EMAIL_HOST_PASSWORD = 'kmmp rcny urga htqa'
 
+<<<<<<< Updated upstream
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+=======
+# ==========================================
+# CONFIGURACIÓN DE CANALES Y CELERY + REDIS
+# ==========================================
+ASGI_APPLICATION = 'backend.asgi.application'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            'hosts': [('127.0.0.1', 6379)],
+        },
+    },
+}
+
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+
+>>>>>>> Stashed changes

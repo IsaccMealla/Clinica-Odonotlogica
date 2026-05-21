@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: clinica_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - clinica_network
+
+  db:
+    image: postgres:15
+    container_name: clinica_postgres
+    environment:
+      POSTGRES_DB: gestion_clinica
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - clinica_network
+
+volumes:
+  redis_data:
+  postgres_data:
+
+networks:
+  clinica_network:
+    driver: bridge
