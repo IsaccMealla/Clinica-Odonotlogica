@@ -41,10 +41,75 @@ interface TabOdontoProps {
 }
 
 export function TabOdontopediatria({ formData, onChange }: TabOdontoProps) {
-  // Extraemos la sección del estado global, si no existe usamos un objeto vacío
   const odonto = formData.historia_odontopediatrica || {};
   const seccion = 'historia_odontopediatrica';
 
+  // ==========================================
+  // CÁLCULO DE EDAD Y VALIDACIÓN DE ACCESO
+  // ==========================================
+  // NOTA: Ajusta la ruta de 'fecha_nacimiento' según la estructura exacta de tu JSON
+  const fechaNacimiento = formData?.datos_personales?.fecha_nacimiento || formData?.fecha_nacimiento;
+  const EDAD_LIMITE_PEDIATRIA = 14; // Cambia este número si tu clínica considera niños hasta otra edad (ej. 12 o 15)
+
+  const calcularEdad = (fecha: string) => {
+    if (!fecha) return null;
+    const hoy = new Date();
+    const cumpleanos = new Date(fecha);
+    let edad = hoy.getFullYear() - cumpleanos.getFullYear();
+    const m = hoy.getMonth() - cumpleanos.getMonth();
+    if (m < 0 || (m === 0 && hoy.getDate() < cumpleanos.getDate())) {
+      edad--;
+    }
+    return edad;
+  };
+
+  const edadPaciente = calcularEdad(fechaNacimiento);
+
+  // ==========================================
+  // FUNCIONES DE VALIDACIÓN
+  // ==========================================
+  const handleTextChange = (seccionObj: string, campo: string, value: string) => {
+    if (/^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s\.,\-]*$/.test(value)) {
+      onChange(seccionObj, campo, value);
+    }
+  };
+
+  const handlePAChange = (value: string) => {
+    if (/^\d{0,3}(\/\d{0,3})?$/.test(value)) {
+      onChange(seccion, 'presion_arterial', value);
+    }
+  };
+
+  const preventInvalidNumberChars = (e: React.KeyboardEvent<HTMLInputElement>, allowDecimal: boolean = true) => {
+    const invalidChars = ['e', 'E', '+', '-'];
+    if (!allowDecimal) invalidChars.push('.', ',');
+    if (invalidChars.includes(e.key)) {
+      e.preventDefault();
+    }
+  };
+
+  // ==========================================
+  // RENDER CONDICIONAL SI ES MAYOR DE EDAD
+  // ==========================================
+  if (edadPaciente !== null && edadPaciente > EDAD_LIMITE_PEDIATRIA) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 bg-white border rounded-xl shadow-sm space-y-4">
+        <div className="bg-slate-100 p-4 rounded-full">
+          {/* Un ícono simple de bloqueo o información */}
+          <svg className="w-12 h-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        </div>
+        <h3 className="text-xl font-bold text-slate-700">Sección no aplicable</h3>
+        <p className="text-slate-500 text-center max-w-md">
+          El paciente tiene <span className="font-bold text-slate-700">{edadPaciente} años</span>. 
+          La historia clínica de odontopediatría está restringida para pacientes de hasta {EDAD_LIMITE_PEDIATRIA} años de edad.
+        </p>
+      </div>
+    );
+  }
+
+  // ==========================================
+  // RENDER DEL COMPONENTE NORMAL
+  // ==========================================
   return (
     <Tabs defaultValue="datos" className="w-full">
       <TabsList className="grid w-full grid-cols-4 mb-6 bg-slate-100 p-1 rounded-xl">
@@ -62,23 +127,24 @@ export function TabOdontopediatria({ formData, onChange }: TabOdontoProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           <div className="space-y-2">
             <Label>Apodo (¿Cómo lo llaman?)</Label>
-            <Input value={odonto.apodo || ''} onChange={(e) => onChange(seccion, 'apodo', e.target.value)} />
+            <Input value={odonto.apodo || ''} onChange={(e) => handleTextChange(seccion, 'apodo', e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label>Hobbie</Label>
-            <Input value={odonto.hobbie || ''} onChange={(e) => onChange(seccion, 'hobbie', e.target.value)} />
+            <Input value={odonto.hobbie || ''} onChange={(e) => handleTextChange(seccion, 'hobbie', e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label>Nombre Padres/Madre</Label>
-            <Input value={odonto.nombre_padres || ''} onChange={(e) => onChange(seccion, 'nombre_padres', e.target.value)} />
+            <Input value={odonto.nombre_padres || ''} onChange={(e) => handleTextChange(seccion, 'nombre_padres', e.target.value)} />
           </div>
           <div className="space-y-2">
+            {/* Teléfono libre (para permitir signos + o espacios) */}
             <Label>Teléfono Padres</Label>
             <Input value={odonto.telefono_padres || ''} onChange={(e) => onChange(seccion, 'telefono_padres', e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label>Nombre Representante</Label>
-            <Input value={odonto.nombre_representante || ''} onChange={(e) => onChange(seccion, 'nombre_representante', e.target.value)} />
+            <Input value={odonto.nombre_representante || ''} onChange={(e) => handleTextChange(seccion, 'nombre_representante', e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label>Teléfono Representante</Label>
@@ -91,14 +157,24 @@ export function TabOdontopediatria({ formData, onChange }: TabOdontoProps) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           <div className="space-y-2">
             <Label>N° Embarazo</Label>
-            <Input type="number" value={odonto.numero_embarazo || ''} onChange={(e) => onChange(seccion, 'numero_embarazo', e.target.value)} />
+            <Input 
+              type="number" min="1" 
+              value={odonto.numero_embarazo || ''} 
+              onKeyDown={(e) => preventInvalidNumberChars(e, false)}
+              onChange={(e) => onChange(seccion, 'numero_embarazo', e.target.value)} 
+            />
           </div>
           <div className="space-y-2">
             <Label>Edad Madre al Embarazo</Label>
-            <Input value={odonto.edad_madre_embarazo || ''} onChange={(e) => onChange(seccion, 'edad_madre_embarazo', e.target.value)} />
+            <Input 
+              type="number" min="10" 
+              value={odonto.edad_madre_embarazo || ''} 
+              onKeyDown={(e) => preventInvalidNumberChars(e, false)}
+              onChange={(e) => onChange(seccion, 'edad_madre_embarazo', e.target.value)} 
+            />
           </div>
           <div className="space-y-2">
-            <Label>Duración del Parto</Label>
+            <Label>Duración del Parto (Ej. 12 horas)</Label>
             <Input value={odonto.duracion_parto || ''} onChange={(e) => onChange(seccion, 'duracion_parto', e.target.value)} />
           </div>
         </div>
@@ -131,6 +207,7 @@ export function TabOdontopediatria({ formData, onChange }: TabOdontoProps) {
 
         {/* Desarrollo Psicomotor */}
         <h3 className="font-bold text-lg mb-4 mt-8 text-slate-800 border-b pb-2">Desarrollo Psicomotor</h3>
+        {/* Se dejan libres porque pueden responder "a los 6 meses", "al año", etc. */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="space-y-2"><Label>Edad se sentó</Label><Input value={odonto.edad_sento || ''} onChange={(e) => onChange(seccion, 'edad_sento', e.target.value)} /></div>
           <div className="space-y-2"><Label>Edad gateó</Label><Input value={odonto.edad_gateo || ''} onChange={(e) => onChange(seccion, 'edad_gateo', e.target.value)} /></div>
@@ -140,7 +217,7 @@ export function TabOdontopediatria({ formData, onChange }: TabOdontoProps) {
           <div className="space-y-2"><Label>1era Palabra</Label><Input value={odonto.edad_primera_palabra || ''} onChange={(e) => onChange(seccion, 'edad_primera_palabra', e.target.value)} /></div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-4">
-          <div className="space-y-2"><Label>Evolución Escolar</Label><Input value={odonto.evolucion_escolar || ''} onChange={(e) => onChange(seccion, 'evolucion_escolar', e.target.value)} /></div>
+          <div className="space-y-2"><Label>Evolución Escolar</Label><Input value={odonto.evolucion_escolar || ''} onChange={(e) => handleTextChange(seccion, 'evolucion_escolar', e.target.value)} /></div>
           <div className="space-y-2"><Label>Vacunas</Label><Input value={odonto.vacunas || ''} onChange={(e) => onChange(seccion, 'vacunas', e.target.value)} /></div>
         </div>
       </TabsContent>
@@ -209,9 +286,17 @@ export function TabOdontopediatria({ formData, onChange }: TabOdontoProps) {
         {/* Higiene Bucal */}
         <h3 className="font-bold text-lg mb-4 mt-8 text-slate-800 border-b pb-2">Higiene y Experiencia Previa</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          <div className="space-y-2"><Label>Cepillados al día</Label><Input value={odonto.veces_cepilla_dia || ''} onChange={(e) => onChange(seccion, 'veces_cepilla_dia', e.target.value)} /></div>
-          <div className="space-y-2"><Label>¿Cuándo cepilla?</Label><Input value={odonto.cuando_cepilla || ''} onChange={(e) => onChange(seccion, 'cuando_cepilla', e.target.value)} /></div>
-          <div className="space-y-2"><Label>Tipo Higiene (Asistido, solo)</Label><Input value={odonto.tipo_higiene || ''} onChange={(e) => onChange(seccion, 'tipo_higiene', e.target.value)} /></div>
+          <div className="space-y-2">
+            <Label>Cepillados al día</Label>
+            <Input 
+              type="number" min="0" max="10"
+              value={odonto.veces_cepilla_dia || ''} 
+              onKeyDown={(e) => preventInvalidNumberChars(e, false)}
+              onChange={(e) => onChange(seccion, 'veces_cepilla_dia', e.target.value)} 
+            />
+          </div>
+          <div className="space-y-2"><Label>¿Cuándo cepilla?</Label><Input value={odonto.cuando_cepilla || ''} onChange={(e) => handleTextChange(seccion, 'cuando_cepilla', e.target.value)} /></div>
+          <div className="space-y-2"><Label>Tipo Higiene (Asistido, solo)</Label><Input value={odonto.tipo_higiene || ''} onChange={(e) => handleTextChange(seccion, 'tipo_higiene', e.target.value)} /></div>
           <div className="space-y-2 md:col-span-2"><Label>Pasta y Cepillo utilizado</Label><Input value={odonto.pasta_y_cepillo || ''} onChange={(e) => onChange(seccion, 'pasta_y_cepillo', e.target.value)} /></div>
           
           <div className="flex flex-col justify-center space-y-3 p-3 border rounded-xl bg-slate-50">
@@ -258,20 +343,41 @@ export function TabOdontopediatria({ formData, onChange }: TabOdontoProps) {
         
         <h3 className="font-bold text-lg mb-4 text-slate-800 border-b pb-2">Examen Físico y Dentición</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="space-y-2"><Label>Peso</Label><Input value={odonto.peso || ''} onChange={(e) => onChange(seccion, 'peso', e.target.value)} /></div>
-          <div className="space-y-2"><Label>Talla</Label><Input value={odonto.talla || ''} onChange={(e) => onChange(seccion, 'talla', e.target.value)} /></div>
-          <div className="space-y-2"><Label>Temperatura</Label><Input value={odonto.temperatura || ''} onChange={(e) => onChange(seccion, 'temperatura', e.target.value)} /></div>
-          <div className="space-y-2"><Label>Presión Arterial</Label><Input value={odonto.presion_arterial || ''} onChange={(e) => onChange(seccion, 'presion_arterial', e.target.value)} /></div>
-          <div className="space-y-2"><Label>Frec. Respiratoria</Label><Input value={odonto.frecuencia_respiratoria || ''} onChange={(e) => onChange(seccion, 'frecuencia_respiratoria', e.target.value)} /></div>
-          <div className="space-y-2"><Label>Frec. Cardíaca</Label><Input value={odonto.frecuencia_cardiaca || ''} onChange={(e) => onChange(seccion, 'frecuencia_cardiaca', e.target.value)} /></div>
-          <div className="space-y-2 md:col-span-2"><Label>Tipo Dentición</Label><Input value={odonto.tipo_denticion || ''} onChange={(e) => onChange(seccion, 'tipo_denticion', e.target.value)} placeholder="Temporal, Mixta, Permanente..." /></div>
+          <div className="space-y-2">
+            <Label>Peso (kg)</Label>
+            <Input type="number" step="0.1" value={odonto.peso || ''} onKeyDown={(e) => preventInvalidNumberChars(e, true)} onChange={(e) => onChange(seccion, 'peso', e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>Talla (m)</Label>
+            <Input type="number" step="0.01" value={odonto.talla || ''} onKeyDown={(e) => preventInvalidNumberChars(e, true)} onChange={(e) => onChange(seccion, 'talla', e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>Temperatura (°C)</Label>
+            <Input type="number" step="0.1" value={odonto.temperatura || ''} onKeyDown={(e) => preventInvalidNumberChars(e, true)} onChange={(e) => onChange(seccion, 'temperatura', e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>Presión Arterial</Label>
+            <Input type="text" value={odonto.presion_arterial || ''} onChange={(e) => handlePAChange(e.target.value)} placeholder="100/60" />
+          </div>
+          <div className="space-y-2">
+            <Label>Frec. Respiratoria (rpm)</Label>
+            <Input type="number" value={odonto.frecuencia_respiratoria || ''} onKeyDown={(e) => preventInvalidNumberChars(e, false)} onChange={(e) => onChange(seccion, 'frecuencia_respiratoria', e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>Frec. Cardíaca (lpm)</Label>
+            <Input type="number" value={odonto.frecuencia_cardiaca || ''} onKeyDown={(e) => preventInvalidNumberChars(e, false)} onChange={(e) => onChange(seccion, 'frecuencia_cardiaca', e.target.value)} />
+          </div>
+          <div className="space-y-2 md:col-span-2">
+            <Label>Tipo Dentición</Label>
+            <Input value={odonto.tipo_denticion || ''} onChange={(e) => handleTextChange(seccion, 'tipo_denticion', e.target.value)} placeholder="Temporal, Mixta, Permanente..." />
+          </div>
         </div>
 
         <h3 className="font-bold text-lg mb-4 mt-8 text-slate-800 border-b pb-2">Oclusión y Análisis Facial</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          <div className="space-y-2"><Label>Competencia Labial</Label><Input value={odonto.competencia_labial || ''} onChange={(e) => onChange(seccion, 'competencia_labial', e.target.value)} /></div>
-          <div className="space-y-2"><Label>Tipo de Perfil</Label><Input value={odonto.tipo_perfil || ''} onChange={(e) => onChange(seccion, 'tipo_perfil', e.target.value)} /></div>
-          <div className="space-y-2"><Label>Línea Media</Label><Input value={odonto.linea_media || ''} onChange={(e) => onChange(seccion, 'linea_media', e.target.value)} /></div>
+          <div className="space-y-2"><Label>Competencia Labial</Label><Input value={odonto.competencia_labial || ''} onChange={(e) => handleTextChange(seccion, 'competencia_labial', e.target.value)} /></div>
+          <div className="space-y-2"><Label>Tipo de Perfil</Label><Input value={odonto.tipo_perfil || ''} onChange={(e) => handleTextChange(seccion, 'tipo_perfil', e.target.value)} /></div>
+          <div className="space-y-2"><Label>Línea Media</Label><Input value={odonto.linea_media || ''} onChange={(e) => handleTextChange(seccion, 'linea_media', e.target.value)} /></div>
           <div className="space-y-2"><Label>Relación Molar Baume</Label><Input value={odonto.relacion_molar_baume || ''} onChange={(e) => onChange(seccion, 'relacion_molar_baume', e.target.value)} /></div>
           <div className="space-y-2"><Label>Tipo Arco Baume</Label><Input value={odonto.tipo_arco_baume || ''} onChange={(e) => onChange(seccion, 'tipo_arco_baume', e.target.value)} /></div>
           <div className="space-y-2"><Label>Relación Molar Angle</Label><Input value={odonto.relacion_molar_angle || ''} onChange={(e) => onChange(seccion, 'relacion_molar_angle', e.target.value)} /></div>
@@ -319,7 +425,7 @@ export function TabOdontopediatria({ formData, onChange }: TabOdontoProps) {
           <Label className="font-bold text-lg text-slate-800">Clasificación de Escobar</Label>
           <Input 
             value={odonto.tipo_escobar || ''} 
-            onChange={(e) => onChange(seccion, 'tipo_escobar', e.target.value)} 
+            onChange={(e) => handleTextChange(seccion, 'tipo_escobar', e.target.value)} 
             placeholder="Ej: Colaborador, No colaborador, Colaborador en potencia" 
             className="max-w-md"
           />

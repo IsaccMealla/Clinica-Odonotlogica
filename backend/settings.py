@@ -3,8 +3,8 @@ Django settings for backend project.
 """
 
 from pathlib import Path
-from datetime import timedelta # <-- Movido arriba (Buenas prácticas de Python)
-
+from datetime import timedelta 
+import os
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -14,7 +14,8 @@ SECRET_KEY = 'django-insecure-4)$gcvxv&7ry&se=m2&z%mo8jt#w3c6*(f6s0unfc#k#(j1pzx
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['192.168.0.6', 'localhost', '127.0.0.1'] 
+# O puedes usar ['*'] para permitir todo temporalmente
 
 # Application definition
 INSTALLED_APPS = [
@@ -26,11 +27,11 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',         # Para crear la API
     'corsheaders',            # Para que React pueda conectarse
-    'gestion_clinica',        # Tu app de la clínica
+    'gestion_clinica',        
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware', # <--- AQUÍ ESTÁ, LISTO PARA FUNCIONAR
+    'corsheaders.middleware.CorsMiddleware', 
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -63,7 +64,7 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'clinica_dental',       
+        'NAME': 'gestion_clinica',       
         'USER': 'postgres',              
         'PASSWORD': 'admin',       
         'HOST': '127.0.0.1',             
@@ -102,12 +103,18 @@ CORS_ALLOWED_ORIGINS = [
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-    )
+        'rest_framework.authentication.SessionAuthentication',  # Fallback para desarrollo
+    ),
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.AllowAny',  # Permitir acceso sin autenticación en desarrollo
+    ] if DEBUG else [
+        'rest_framework.permissions.IsAuthenticated',  # Requerir autenticación en producción
+    ]
 }
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60), 
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),    
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),    
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': False, # Apagado temporalmente para no pedirte nuevas migraciones
     'AUTH_HEADER_TYPES': ('Bearer',),
@@ -120,5 +127,14 @@ EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'isacc.mealla.psn@gmail.com'  
-EMAIL_HOST_PASSWORD = 'kmmp rcny urga htqa'
+EMAIL_HOST_USER = 'jhosuepozo777@gmail.com'  
+EMAIL_HOST_PASSWORD = 'ynpmlrxrvgqlemau'
+
+# ==========================================
+# MODELO DE USUARIO PERSONALIZADO
+# ==========================================
+AUTH_USER_MODEL = 'gestion_clinica.CustomUser'
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+

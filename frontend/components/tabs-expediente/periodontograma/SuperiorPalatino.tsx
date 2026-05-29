@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react"
+import React from "react"
 import { Input } from "@/components/ui/input"
+import { usePeriodontograma } from "@/context/PeriodontogramaContext"
 
 type DienteData = {
   movilidad: string;
@@ -81,26 +82,37 @@ const getMovilidadEstilo = (grado: string) => {
   }
 };
 
-// ¡AQUÍ ESTABA EL ERROR! AHORA SE LLAMA CORRECTAMENTE SuperiorPalatino
 export function SuperiorPalatino() {
-  const [datos, setDatos] = useState(estadoInicial);
+  const { datos, setDatos } = usePeriodontograma();
+
+  const datosPalatino = datos.datos_palatino_superior as Record<number, DienteData>;
 
   const updateDiente = (pieza: number, campo: keyof DienteData, valor: any) => {
-    setDatos(prev => ({ ...prev, [pieza]: { ...prev[pieza], [campo]: valor } }));
+    setDatos({
+      ...datos,
+      datos_palatino_superior: {
+        ...datosPalatino,
+        [pieza]: { ...datosPalatino[pieza], [campo]: valor }
+      }
+    });
   };
 
   const updateArray = (pieza: number, campo: 'sangrado' | 'supuracion' | 'margen' | 'sondaje', index: number, valor: any) => {
-    setDatos(prev => {
-      const nuevoArray = [...prev[pieza][campo]] as any;
-      nuevoArray[index] = valor;
-      return { ...prev, [pieza]: { ...prev[pieza], [campo]: nuevoArray } };
+    const nuevoArray = [...datosPalatino[pieza][campo]] as any;
+    nuevoArray[index] = campo === 'margen' || campo === 'sondaje' ? Number(valor) : valor;
+    setDatos({
+      ...datos,
+      datos_palatino_superior: {
+        ...datosPalatino,
+        [pieza]: { ...datosPalatino[pieza], [campo]: nuevoArray }
+      }
     });
   };
 
   // --- CONSTANTES MATEMÁTICAS ---
   const viewBoxAncho = 790;
   const viewBoxAlto = 162;
-  const altoCanvas = 280; 
+  const altoCanvas = 210; // ❤️ AJUSTADO A 210 PARA MANTENER LA PROPORCIÓN
   const yLAC = 53; 
   const escala = 6.45; 
 
@@ -108,7 +120,7 @@ export function SuperiorPalatino() {
   const ptsSondajeArr: string[] = [];
 
   dientesSuperiores.forEach((pieza) => {
-    const d = datos[pieza];
+    const d = datosPalatino[pieza];
     const xs = coordenadasX[pieza];
     
     xs.forEach((x, index) => {
@@ -146,18 +158,19 @@ export function SuperiorPalatino() {
             <div className="h-10 border-b border-slate-300 flex items-center px-3 text-blue-700">Margen (MG)</div>
             <div className="h-10 border-b border-slate-300 flex items-center px-3 text-red-700">Sondaje (PS)</div>
             <div className="h-10 border-b-2 border-slate-400 flex items-center px-3 bg-emerald-50 text-emerald-700 shadow-inner">NIC (Inserción)</div>
-            <div className="h-[280px] flex items-center justify-center text-slate-400 bg-white border-r-2 border-slate-300">
+            <div className="h-[210px] flex items-center justify-center text-slate-400 bg-white border-r-2 border-slate-300"> {/* ❤️ AJUSTADO A 210px */}
               Gráfico 2D
             </div>
           </div>
 
           {/* COLUMNA 2: DATOS Y GRÁFICO */}
-          <div className="flex flex-col shrink-0 min-w-[1200px]" style={{ width: '100%' }}>
+          {/* ❤️ ANCHO FIJO A 1000px PARA EVITAR EL ESTIRAMIENTO HORIZONTAL */}
+          <div className="flex flex-col shrink-0 w-[1000px]">
             
             {/* TABLA DE INPUTS */}
             <div className="flex w-full">
               {dientesSuperiores.map((pieza) => {
-                const d = datos[pieza];
+                const d = datosPalatino[pieza];
                 const nic = [
                   (Number(d.margen[0]) || 0) + (Number(d.sondaje[0]) || 0),
                   (Number(d.margen[1]) || 0) + (Number(d.sondaje[1]) || 0),
@@ -245,7 +258,7 @@ export function SuperiorPalatino() {
 
                 {/* 2. RENDERIZADO DE IMPLANTES (Corregida la ruta sin el /1/) */}
                 {dientesSuperiores.map((pieza) => {
-                  if (!datos[pieza].implante) return null;
+                  if (!datosPalatino[pieza].implante) return null;
                   
                   const ancho = anchosDientes[pieza];
                   const centroX = coordenadasX[pieza][1];
@@ -277,7 +290,7 @@ export function SuperiorPalatino() {
                 
                 {/* 5. PUNTOS Y MARCADORES (Sangrado, supuración) */}
                 {dientesSuperiores.map((pieza) => {
-                  const d = datos[pieza];
+                  const d = datosPalatino[pieza];
                   const xs = coordenadasX[pieza];
                   
                   return xs.map((x, index) => {

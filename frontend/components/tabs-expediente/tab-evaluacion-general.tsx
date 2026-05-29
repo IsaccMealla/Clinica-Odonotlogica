@@ -44,6 +44,39 @@ export function TabEvaluacionGeneral({ formData, onChange }: TabEvaluacionProps)
   const examen = formData.examen_clinico_fisico || {};
   const habitos = formData.habitos || {};
 
+  // ==========================================
+  // FUNCIONES DE VALIDACIÓN
+  // ==========================================
+
+  // 1. Validar campos de SOLO TEXTO (Letras, acentos, espacios, comas y puntos. SIN NÚMEROS)
+  const handleTextChange = (seccion: string, campo: string, value: string) => {
+    if (/^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s\.,\-]*$/.test(value)) {
+      onChange(seccion, campo, value);
+    }
+  };
+
+  // 2. Validar Presión Arterial (Solo números y una barra inclinada)
+  const handlePAChange = (value: string) => {
+    // Permite hasta 3 dígitos, una barra opcional, y hasta 3 dígitos (Ej: 120/80)
+    if (/^\d{0,3}(\/\d{0,3})?$/.test(value)) {
+      onChange('examen_clinico_fisico', 'presion_arterial', value);
+    }
+  };
+
+  // 3. Bloquear teclas inválidas en inputs type="number" (e, E, +, -)
+  const preventInvalidNumberChars = (e: React.KeyboardEvent<HTMLInputElement>, allowDecimal: boolean = true) => {
+    const invalidChars = ['e', 'E', '+', '-'];
+    // Si es un número entero (ej. Pulso), también bloqueamos el punto y la coma
+    if (!allowDecimal) invalidChars.push('.', ',');
+    
+    if (invalidChars.includes(e.key)) {
+      e.preventDefault();
+    }
+  };
+
+  // ==========================================
+  // RENDER DEL COMPONENTE
+  // ==========================================
   return (
     <Tabs defaultValue="signos" className="w-full">
       <TabsList className="grid w-full grid-cols-4 mb-6 bg-slate-100 p-1 rounded-xl">
@@ -65,6 +98,7 @@ export function TabEvaluacionGeneral({ formData, onChange }: TabEvaluacionProps)
               <Input 
                 type="number" step="0.1" min="30" max="45"
                 value={examen.temperatura_c || ''} 
+                onKeyDown={(e) => preventInvalidNumberChars(e, true)}
                 onChange={(e) => onChange('examen_clinico_fisico', 'temperatura_c', e.target.value)} 
                 className="pr-10" 
                 placeholder="36.5" 
@@ -73,13 +107,13 @@ export function TabEvaluacionGeneral({ formData, onChange }: TabEvaluacionProps)
             </div>
           </div>
 
-          {/* Presión Arterial (Texto porque lleva '/') */}
+          {/* Presión Arterial (Validación estricta de Regex) */}
           <div className="space-y-2">
             <Label className="text-slate-600 font-semibold">Presión Arterial</Label>
             <Input 
               type="text"
               value={examen.presion_arterial || ''} 
-              onChange={(e) => onChange('examen_clinico_fisico', 'presion_arterial', e.target.value)} 
+              onChange={(e) => handlePAChange(e.target.value)} 
               placeholder="120/80" 
             />
           </div>
@@ -91,8 +125,9 @@ export function TabEvaluacionGeneral({ formData, onChange }: TabEvaluacionProps)
               <Input 
                 type="number" min="0" max="300"
                 value={examen.pulso || ''} 
+                onKeyDown={(e) => preventInvalidNumberChars(e, false)}
                 onChange={(e) => onChange('examen_clinico_fisico', 'pulso', e.target.value)} 
-                className="pr-12"
+                className="pr-12" placeholder="80"
               />
               <span className="absolute right-3 top-2 text-sm text-slate-400 font-medium pointer-events-none">lpm</span>
             </div>
@@ -105,8 +140,9 @@ export function TabEvaluacionGeneral({ formData, onChange }: TabEvaluacionProps)
               <Input 
                 type="number" min="0" max="100"
                 value={examen.frecuencia_respiratoria || ''} 
+                onKeyDown={(e) => preventInvalidNumberChars(e, false)}
                 onChange={(e) => onChange('examen_clinico_fisico', 'frecuencia_respiratoria', e.target.value)} 
-                className="pr-12"
+                className="pr-12" placeholder="16"
               />
               <span className="absolute right-3 top-2 text-sm text-slate-400 font-medium pointer-events-none">rpm</span>
             </div>
@@ -121,8 +157,9 @@ export function TabEvaluacionGeneral({ formData, onChange }: TabEvaluacionProps)
               <Input 
                 type="number" step="0.1" min="0"
                 value={examen.peso_kg || ''} 
+                onKeyDown={(e) => preventInvalidNumberChars(e, true)}
                 onChange={(e) => onChange('examen_clinico_fisico', 'peso_kg', e.target.value)} 
-                className="pr-10"
+                className="pr-10" placeholder="70.5"
               />
               <span className="absolute right-3 top-2 text-sm text-slate-400 font-medium pointer-events-none">kg</span>
             </div>
@@ -135,6 +172,7 @@ export function TabEvaluacionGeneral({ formData, onChange }: TabEvaluacionProps)
               <Input 
                 type="number" step="0.01" min="0"
                 value={examen.talla_m || ''} 
+                onKeyDown={(e) => preventInvalidNumberChars(e, true)}
                 onChange={(e) => onChange('examen_clinico_fisico', 'talla_m', e.target.value)} 
                 className="pr-10" placeholder="1.75"
               />
@@ -142,33 +180,37 @@ export function TabEvaluacionGeneral({ formData, onChange }: TabEvaluacionProps)
             </div>
           </div>
 
-          {/* Tipo de Constitución */}
+          {/* Tipo de Constitución (Solo texto) */}
           <div className="space-y-2">
             <Label className="text-slate-600 font-semibold">Constitución</Label>
-            <Input value={examen.tipo_constitucion || ''} onChange={(e) => onChange('examen_clinico_fisico', 'tipo_constitucion', e.target.value)} placeholder="Normolíneo..." />
+            <Input 
+              value={examen.tipo_constitucion || ''} 
+              onChange={(e) => handleTextChange('examen_clinico_fisico', 'tipo_constitucion', e.target.value)} 
+              placeholder="Normolíneo..." 
+            />
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-4">
           <div className="space-y-2">
             <Label className="text-slate-600 font-semibold">Estado General</Label>
-            <Input value={examen.estado_general || ''} onChange={(e) => onChange('examen_clinico_fisico', 'estado_general', e.target.value)} placeholder="Bueno, regular, malo..." />
+            <Input value={examen.estado_general || ''} onChange={(e) => handleTextChange('examen_clinico_fisico', 'estado_general', e.target.value)} placeholder="Bueno, regular, malo..." />
           </div>
           <div className="space-y-2">
             <Label className="text-slate-600 font-semibold">Estado Nutricional</Label>
-            <Input value={examen.estado_nutricional || ''} onChange={(e) => onChange('examen_clinico_fisico', 'estado_nutricional', e.target.value)} />
+            <Input value={examen.estado_nutricional || ''} onChange={(e) => handleTextChange('examen_clinico_fisico', 'estado_nutricional', e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label className="text-slate-600 font-semibold">Estado de Hidratación</Label>
-            <Input value={examen.estado_hidratacion || ''} onChange={(e) => onChange('examen_clinico_fisico', 'estado_hidratacion', e.target.value)} />
+            <Input value={examen.estado_hidratacion || ''} onChange={(e) => handleTextChange('examen_clinico_fisico', 'estado_hidratacion', e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label className="text-slate-600 font-semibold">Actitud / Posición</Label>
-            <Input value={examen.actitud_posicion || ''} onChange={(e) => onChange('examen_clinico_fisico', 'actitud_posicion', e.target.value)} />
+            <Input value={examen.actitud_posicion || ''} onChange={(e) => handleTextChange('examen_clinico_fisico', 'actitud_posicion', e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label className="text-slate-600 font-semibold">Consciencia</Label>
-            <Input value={examen.consciencia || ''} onChange={(e) => onChange('examen_clinico_fisico', 'consciencia', e.target.value)} />
+            <Input value={examen.consciencia || ''} onChange={(e) => handleTextChange('examen_clinico_fisico', 'consciencia', e.target.value)} />
           </div>
           
           <div className="flex items-center space-x-4 mt-8 p-4 bg-blue-50/50 border border-blue-100 rounded-xl hover:bg-blue-50 transition-colors">
@@ -187,32 +229,32 @@ export function TabEvaluacionGeneral({ formData, onChange }: TabEvaluacionProps)
          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label>Cráneo</Label>
-              <Input value={examen.craneo || ''} onChange={(e) => onChange('examen_clinico_fisico', 'craneo', e.target.value)} placeholder="Mesocefalo, doliocefalo..." />
+              <Input value={examen.craneo || ''} onChange={(e) => handleTextChange('examen_clinico_fisico', 'craneo', e.target.value)} placeholder="Mesocefalo, doliocefalo..." />
             </div>
             <div className="space-y-2">
               <Label>Perfil</Label>
-              <Input value={examen.perfil || ''} onChange={(e) => onChange('examen_clinico_fisico', 'perfil', e.target.value)} placeholder="Cóncavo, convexo, recto..." />
+              <Input value={examen.perfil || ''} onChange={(e) => handleTextChange('examen_clinico_fisico', 'perfil', e.target.value)} placeholder="Cóncavo, convexo, recto..." />
             </div>
             
             <div className="space-y-2">
               <Label>Ojos</Label>
-              <Input value={examen.ojos || ''} onChange={(e) => onChange('examen_clinico_fisico', 'ojos', e.target.value)} />
+              <Input value={examen.ojos || ''} onChange={(e) => handleTextChange('examen_clinico_fisico', 'ojos', e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label>Nariz</Label>
-              <Input value={examen.nariz || ''} onChange={(e) => onChange('examen_clinico_fisico', 'nariz', e.target.value)} />
+              <Input value={examen.nariz || ''} onChange={(e) => handleTextChange('examen_clinico_fisico', 'nariz', e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label>Oídos</Label>
-              <Input value={examen.oidos || ''} onChange={(e) => onChange('examen_clinico_fisico', 'oidos', e.target.value)} />
+              <Input value={examen.oidos || ''} onChange={(e) => handleTextChange('examen_clinico_fisico', 'oidos', e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label>Cuello</Label>
-              <Input value={examen.cuello || ''} onChange={(e) => onChange('examen_clinico_fisico', 'cuello', e.target.value)} />
+              <Input value={examen.cuello || ''} onChange={(e) => handleTextChange('examen_clinico_fisico', 'cuello', e.target.value)} />
             </div>
             <div className="space-y-2 md:col-span-2">
               <Label>Ganglios Linfáticos</Label>
-              <Input value={examen.ganglios_linfaticos || ''} onChange={(e) => onChange('examen_clinico_fisico', 'ganglios_linfaticos', e.target.value)} />
+              <Input value={examen.ganglios_linfaticos || ''} onChange={(e) => handleTextChange('examen_clinico_fisico', 'ganglios_linfaticos', e.target.value)} />
             </div>
             
             <div className="flex items-center space-x-3 p-4 bg-slate-50 border rounded-xl md:col-span-2 hover:bg-slate-100 transition-colors">
@@ -250,7 +292,7 @@ export function TabEvaluacionGeneral({ formData, onChange }: TabEvaluacionProps)
                 <Input 
                   placeholder={`Observaciones de ${item.label.toLowerCase()}...`} 
                   value={examen[`${item.id}_obs`] || ''} 
-                  onChange={(e) => onChange('examen_clinico_fisico', `${item.id}_obs`, e.target.value)} 
+                  onChange={(e) => handleTextChange('examen_clinico_fisico', `${item.id}_obs`, e.target.value)} 
                   className="mt-3 text-sm bg-white border-blue-100 focus-visible:ring-blue-500" 
                 />
               )}
@@ -266,6 +308,7 @@ export function TabEvaluacionGeneral({ formData, onChange }: TabEvaluacionProps)
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
             <Label className="text-sm font-semibold text-slate-700">Técnica de cepillado</Label>
+            {/* Aquí no forzamos solo texto, porque pueden usar marcas con números ej: Oral-B 3D */}
             <Input value={habitos.tecnica_cepillado || ''} onChange={(e) => onChange('habitos', 'tecnica_cepillado', e.target.value)} placeholder="Ej: Fones, Bass..." />
           </div>
           <div className="space-y-2">
@@ -304,6 +347,7 @@ export function TabEvaluacionGeneral({ formData, onChange }: TabEvaluacionProps)
 
         <div className="space-y-2 mt-4">
           <Label className="text-sm font-semibold text-slate-700">Otros hábitos</Label>
+          {/* Un textarea general no debería bloquear números porque puede decir "Fuma 3 cajas al día" */}
           <Textarea 
             value={habitos.otros_habitos || ''} 
             onChange={(e) => onChange('habitos', 'otros_habitos', e.target.value)} 
@@ -316,7 +360,4 @@ export function TabEvaluacionGeneral({ formData, onChange }: TabEvaluacionProps)
 
     </Tabs>
   )
-
-
-  
 }
