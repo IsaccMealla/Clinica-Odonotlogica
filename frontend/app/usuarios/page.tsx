@@ -5,6 +5,8 @@ import { NuevoUsuario } from "@/components/usuarios/nuevo-usuario"
 import { TablaUsuarios, Usuario } from "@/components/usuarios/tabla-usuarios"
 import { Loader2, UserPlus } from "lucide-react"
 
+import { UsuariosExport } from "@/components/exporters/usuarios-export"
+
 export default function UsuariosPage() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [cargando, setCargando] = useState(true)
@@ -59,8 +61,11 @@ export default function UsuariosPage() {
           </p>
         </div>
         
-        {/* Pasamos la función fetchUsuarios para que el modal refresque la tabla al guardar */}
-        <NuevoUsuario onUsuarioCreado={fetchUsuarios} />
+        <div className="flex items-center gap-2">
+          <UsuariosExport usuarios={usuarios} />
+          {/* Pasamos la función fetchUsuarios para que el modal refresque la tabla al guardar */}
+          <NuevoUsuario onUsuarioCreado={fetchUsuarios} />
+        </div>
       </div>
 
       {/* Área de Contenido */}

@@ -29,18 +29,128 @@ from .serializers import *
 User = get_user_model()
 
 # =========================================================================
+# MIXIN REUTILIZABLE PARA ELIMINACIÓN LÓGICA + FÍSICA
+# =========================================================================
+class SoftDeleteMixin:
+    """
+    Mixin que proporciona papelera + eliminación física para ViewSets.
+    Los modelos deben tener un campo 'activo' (BooleanField).
+    """
+    
+    def get_queryset(self):
+        """Filtra por activo según la acción"""
+        if not hasattr(self, 'queryset') or self.queryset is None:
+            return super().get_queryset()
+        
+        # Si es una acción de papelera/restauración/destrucción, mostrar solo inactivos
+        if self.action in ['papelera', 'restaurar', 'destroy']: 
+            return self.queryset.filter(activo=False)
+        else:
+            return self.queryset.filter(activo=True)
+    
+    @action(detail=False, methods=['get'])
+    def papelera(self, request):
+        """Obtiene todos los registros en papelera"""
+        registros = self.get_queryset()
+        serializer = self.get_serializer(registros, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def restaurar(self, request, pk=None):
+        """Restaura un registro de la papelera"""
+        try:
+            objeto = self.get_object() 
+            objeto.activo = True
+            objeto.save()
+            return Response({'message': 'Registro restaurado con éxito'}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': f'No encontrado o sin permisos: {str(e)}'}, status=status.HTTP_404_NOT_FOUND)
+    
+    def destroy(self, request, *args, **kwargs):
+        """Eliminación física definitiva"""
+        return super().destroy(request, *args, **kwargs)
+
+# =========================================================================
 # VIEWSET DE USUARIOS 
 # =========================================================================
 class UsuarioViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all().order_by('-date_joined')
     serializer_class = UsuarioSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        """Filtra usuarios activos/inactivos según is_active"""
+        if self.action in ['papelera', 'restaurar', 'destroy']:
+            return User.objects.filter(is_active=False).order_by('-date_joined')
+        else:
+            return User.objects.filter(is_active=True).order_by('-date_joined')
 
     # --- NUEVA ACCIÓN: Obtener solo estudiantes para poder asignarlos ---
     @action(detail=False, methods=['get'])
     def estudiantes(self, request):
-        estudiantes = User.objects.filter(rol='ESTUDIANTE').order_by('first_name', 'last_name')
+        estudiantes = User.objects.filter(rol='ESTUDIANTE', is_active=True).order_by('first_name', 'last_name')
         serializer = self.get_serializer(estudiantes, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def papelera(self, request, pk=None):
+        """Soft delete: marca usuario como inactivo"""
+        usuario = self.get_object()
+        usuario.is_active = False
+        usuario.save()
+        return Response({'message': 'Usuario movido a papelera'}, status=status.HTTP_200_OK)
+    
+    @action(detail=True, methods=['post'])
+    def restaurar(self, request, pk=None):
+        """Restaura usuario de papelera"""
+        try:
+            usuario = self.get_object()
+            usuario.is_active = True
+            usuario.save()
+            return Response({'message': 'Usuario restaurado con éxito'}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': f'No encontrado o sin permisos: {str(e)}'}, status=status.HTTP_404_NOT_FOUND)
+
+
+# =========================================================================
+# VIEWSET DE REGISTRO DE ASISTENCIA (Biométrico)
+# =========================================================================
+class RegistroAsistenciaViewSet(viewsets.ModelViewSet):
+    queryset = RegistroAsistencia.objects.all().order_by('-fecha_hora')
+    serializer_class = RegistroAsistenciaSerializer
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        """Filtra registros por usuario si es estudiante/docente"""
+        user = self.request.user
+        qs = RegistroAsistencia.objects.all()
+        if user.rol in ['ESTUDIANTE', 'DOCENTE', 'RECEPCIONISTA']:
+            # Mostrar solo sus propios registros
+            return RegistroAsistencia.objects.filter(usuario=user).order_by('-fecha_hora')
+        # ADMIN ve todos
+        return RegistroAsistencia.objects.all().order_by('-fecha_hora')
+
+    @action(detail=False, methods=['get'])
+    def ultimo_registro(self, request):
+        """Obtiene el último registro de asistencia del usuario autenticado"""
+        ultimo = RegistroAsistencia.objects.filter(usuario=request.user).first()
+        if ultimo:
+            serializer = self.get_serializer(ultimo)
+            return Response(serializer.data)
+        return Response({"detail": "No hay registros"}, status=404)
+
+    @action(detail=False, methods=['get'])
+    def hoy(self, request):
+        """Obtiene los registros de asistencia de hoy"""
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        hoy = timezone.now().date()
+        registros = RegistroAsistencia.objects.filter(
+            fecha_hora__date=hoy
+        ).order_by('-fecha_hora')
+        
+        serializer = self.get_serializer(registros, many=True)
         return Response(serializer.data)
 
 
@@ -48,9 +158,9 @@ class UsuarioViewSet(viewsets.ModelViewSet):
 # VIEWSET DE PACIENTES Y ANTECEDENTES
 # =========================================================================
 class PacienteViewSet(viewsets.ModelViewSet):
-    queryset = Paciente.objects.all()
+    queryset = Paciente.objects.filter(activo=True)
     serializer_class = PacienteSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get_queryset(self):
         """
@@ -62,8 +172,9 @@ class PacienteViewSet(viewsets.ModelViewSet):
         if not user.is_authenticated:
             return Paciente.objects.none()
 
-        # 2. Filtrar por papelera o activos
-        if self.action in ['papelera', 'restaurar']: 
+        # 2. Filtrar por papelera, restaurar o eliminar definitivamente
+        # 🌟 AGREGAMOS 'destroy' para poder eliminar pacientes de la papelera 🌟
+        if self.action in ['papelera', 'restaurar', 'destroy']: 
             qs = Paciente.objects.filter(activo=False)
         else:
             qs = Paciente.objects.filter(activo=True)
@@ -220,110 +331,54 @@ class PacienteViewSet(viewsets.ModelViewSet):
                     paciente=paciente, defaults=limpiar_datos(data['examen_clinico_fisico'])
                 )
 
-            return Response({'message': 'Historial clínico actualizado correctamente'}, status=status.HTTP_200_OK)
-# Función auxiliar para inyectar el ID en cada sección antes de guardar
-            def limpiar_datos(seccion_data):
-                if isinstance(seccion_data, dict):
-                    # Creamos una copia para evitar el error de "QueryDict is immutable"
-                    data_copia = dict(seccion_data)
-                    data_copia.pop('id', None)
-                    data_copia.pop('paciente', None)
-                    
-                    # 👇 AQUÍ ESTÁ LA MAGIA: Inyectamos el usuario automáticamente 👇
-                    estudiante_final = paciente.estudiante_asignado if paciente.estudiante_asignado else request.user
-                    data_copia['estudiante'] = estudiante_final
-                    return data_copia
-                return seccion_data
-                # 1. Formularios Base
-            if 'familiares' in data:
-                AntecedentePatologicoFamiliar.objects.update_or_create(
-                    paciente=paciente, defaults=limpiar_datos(data['familiares'])
-                )
-            if 'personales' in data:
-                AntecedentePatologicoPersonal.objects.update_or_create(
-                    paciente=paciente, defaults=limpiar_datos(data['personales'])
-                )
-            if 'no_patologicos' in data:
-                AntecedenteNoPatologicoPersonal.objects.update_or_create(
-                    paciente=paciente, defaults=limpiar_datos(data['no_patologicos'])
-                )
-            if 'ginecologicos' in data:
-                AntecedenteGinecologico.objects.update_or_create(
-                    paciente=paciente, defaults=limpiar_datos(data['ginecologicos'])
-                )
-            
-            # 2. Nuevos Formularios
-            if 'habitos' in data:
-                Habitos.objects.update_or_create(
-                    paciente=paciente, defaults=limpiar_datos(data['habitos'])
-                )
-            if 'antecedentes_periodontales' in data:
-                AntecedentesPeriodontales.objects.update_or_create(
-                    paciente=paciente, defaults=limpiar_datos(data['antecedentes_periodontales'])
-                )
-            if 'examen_periodontal' in data:
-                ExamenPeriodontal.objects.update_or_create(
-                    paciente=paciente, defaults=limpiar_datos(data['examen_periodontal'])
-                )
-            if 'historia_odontopediatrica' in data:
-                HistoriaOdontopediatrica.objects.update_or_create(
-                    paciente=paciente, defaults=limpiar_datos(data['historia_odontopediatrica'])
-                )
-            if 'prostodoncia_removible' in data:
-                ProstodonciaRemovible.objects.update_or_create(
-                    paciente=paciente, defaults=limpiar_datos(data['prostodoncia_removible'])
-                )
-            if 'prostodoncia_fija' in data:
-                ProstodonciaFija.objects.update_or_create(
-                    paciente=paciente, defaults=limpiar_datos(data['prostodoncia_fija'])
-                )
-            if 'protocolo_quirurgico' in data:
-                ProtocoloQuirurgico.objects.update_or_create(
-                    paciente=paciente, defaults=limpiar_datos(data['protocolo_quirurgico'])
-                )
-            if 'examen_clinico_fisico' in data:
-                ExamenClinicoFisico.objects.update_or_create(
-                    paciente=paciente, defaults=limpiar_datos(data['examen_clinico_fisico'])
-                )
+            # Devolver los datos guardados en la misma respuesta
+            serializer = self.get_serializer(paciente)
+            return Response({
+                'message': '✅ Antecedentes guardados exitosamente',
+                'data': serializer.data
+            }, status=status.HTTP_200_OK)
 
-            return Response({'message': 'Historial clínico actualizado correctamente'}, status=status.HTTP_200_OK)
 # --- VIEWSETS INDIVIDUALES ---
-class AntecedenteFamiliarViewSet(viewsets.ModelViewSet):
-    queryset = AntecedentePatologicoFamiliar.objects.all()
+class AntecedenteFamiliarViewSet(SoftDeleteMixin, viewsets.ModelViewSet):
+    queryset = AntecedentePatologicoFamiliar.objects.filter(activo=True)
     serializer_class = AntecedenteFamiliarSerializer
 
-class AntecedentePersonalViewSet(viewsets.ModelViewSet):
-    queryset = AntecedentePatologicoPersonal.objects.all()
+class AntecedentePersonalViewSet(SoftDeleteMixin, viewsets.ModelViewSet):
+    queryset = AntecedentePatologicoPersonal.objects.filter(activo=True)
     serializer_class = AntecedentePersonalSerializer
 
-class AntecedenteNoPatologicoViewSet(viewsets.ModelViewSet):
-    queryset = AntecedenteNoPatologicoPersonal.objects.all()
+class AntecedenteNoPatologicoViewSet(SoftDeleteMixin, viewsets.ModelViewSet):
+    queryset = AntecedenteNoPatologicoPersonal.objects.filter(activo=True)
     serializer_class = AntecedenteNoPatologicoSerializer
 
-class AntecedenteGinecologicoViewSet(viewsets.ModelViewSet):
-    queryset = AntecedenteGinecologico.objects.all()
+class AntecedenteGinecologicoViewSet(SoftDeleteMixin, viewsets.ModelViewSet):
+    queryset = AntecedenteGinecologico.objects.filter(activo=True)
     serializer_class = AntecedenteGinecologicoSerializer
 
-class HabitosViewSet(viewsets.ModelViewSet):
-    queryset = Habitos.objects.all()
+class HabitosViewSet(SoftDeleteMixin, viewsets.ModelViewSet):
+    queryset = Habitos.objects.filter(activo=True)
     serializer_class = HabitosSerializer
 
-class AntecedentesPeriodontalesViewSet(viewsets.ModelViewSet):
-    queryset = AntecedentesPeriodontales.objects.all()
+class AntecedentesPeriodontalesViewSet(SoftDeleteMixin, viewsets.ModelViewSet):
+    queryset = AntecedentesPeriodontales.objects.filter(activo=True)
     serializer_class = AntecedentesPeriodontalesSerializer
 
-class ExamenPeriodontalViewSet(viewsets.ModelViewSet):
-    queryset = ExamenPeriodontal.objects.all()
+class ExamenPeriodontalViewSet(SoftDeleteMixin, viewsets.ModelViewSet):
+    queryset = ExamenPeriodontal.objects.filter(activo=True)
     serializer_class = ExamenPeriodontalSerializer
 
-class PeriodontogramaViewSet(viewsets.ModelViewSet):
-    queryset = Periodontograma.objects.all()
+class PeriodontogramaViewSet(SoftDeleteMixin, viewsets.ModelViewSet):
+    queryset = Periodontograma.objects.filter(activo=True)
     serializer_class = PeriodontogramaSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     
     def get_queryset(self):
-        """Filtrar por paciente si se proporciona en la query"""
-        queryset = Periodontograma.objects.all()
+        """Filtrar por activo y paciente si se proporciona en la query"""
+        if self.action in ['papelera', 'restaurar', 'destroy']: 
+            queryset = Periodontograma.objects.filter(activo=False)
+        else:
+            queryset = Periodontograma.objects.filter(activo=True)
+        
         paciente_id = self.request.query_params.get('paciente', None)
         if paciente_id:
             queryset = queryset.filter(paciente_id=paciente_id)
@@ -360,24 +415,24 @@ class PeriodontogramaViewSet(viewsets.ModelViewSet):
         """Al actualizar, mantener el estudiante actual"""
         serializer.save(estudiante=self.request.user)
 
-class HistoriaOdontopediatricaViewSet(viewsets.ModelViewSet):
-    queryset = HistoriaOdontopediatrica.objects.all()
+class HistoriaOdontopediatricaViewSet(SoftDeleteMixin, viewsets.ModelViewSet):
+    queryset = HistoriaOdontopediatrica.objects.filter(activo=True)
     serializer_class = HistoriaOdontopediatricaSerializer
 
-class ProstodonciaRemovibleViewSet(viewsets.ModelViewSet):
-    queryset = ProstodonciaRemovible.objects.all()
+class ProstodonciaRemovibleViewSet(SoftDeleteMixin, viewsets.ModelViewSet):
+    queryset = ProstodonciaRemovible.objects.filter(activo=True)
     serializer_class = ProstodonciaRemovibleSerializer
 
-class ProstodonciaFijaViewSet(viewsets.ModelViewSet):
-    queryset = ProstodonciaFija.objects.all()
+class ProstodonciaFijaViewSet(SoftDeleteMixin, viewsets.ModelViewSet):
+    queryset = ProstodonciaFija.objects.filter(activo=True)
     serializer_class = ProstodonciaFijaSerializer
 
-class ProtocoloQuirurgicoViewSet(viewsets.ModelViewSet):
-    queryset = ProtocoloQuirurgico.objects.all()
+class ProtocoloQuirurgicoViewSet(SoftDeleteMixin, viewsets.ModelViewSet):
+    queryset = ProtocoloQuirurgico.objects.filter(activo=True)
     serializer_class = ProtocoloQuirurgicoSerializer
 
-class ExamenClinicoFisicoViewSet(viewsets.ModelViewSet):
-    queryset = ExamenClinicoFisico.objects.all()
+class ExamenClinicoFisicoViewSet(SoftDeleteMixin, viewsets.ModelViewSet):
+    queryset = ExamenClinicoFisico.objects.filter(activo=True)
     serializer_class = ExamenClinicoFisicoSerializer
 
 
@@ -387,7 +442,18 @@ class ExamenClinicoFisicoViewSet(viewsets.ModelViewSet):
 
 class TratamientoViewSet(viewsets.ModelViewSet):
     serializer_class = TratamientoSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
+    
+    @action(detail=False, methods=['get'])
+    def mis_asignaciones(self, request):
+        """
+        Devuelve únicamente los tratamientos donde el usuario 
+        autenticado es el estudiante a cargo.
+        """
+        tratamientos = Tratamiento.objects.filter(estudiante=request.user, activo=True)
+        tratamientos = tratamientos.order_by('-creado_en')
+        serializer = self.get_serializer(tratamientos, many=True)
+        return Response(serializer.data)
     
     def get_queryset(self):
         user = self.request.user
@@ -395,35 +461,63 @@ class TratamientoViewSet(viewsets.ModelViewSet):
         # 1. Seguridad básica
         if not user.is_authenticated:
             return Tratamiento.objects.none()
+        
+        # Filtrar por activo/inactivo según acción
+        if self.action in ['papelera', 'restaurar', 'destroy']: 
+            qs = Tratamiento.objects.filter(activo=False)
+        else:
+            qs = Tratamiento.objects.filter(activo=True)
             
-        # 2. Superusuario o Docente/Admin ven todos los tratamientos
+        # 2. Superusuario o Docente/Admin ven todos
         if user.is_superuser or getattr(user, 'rol', '') in ['DOCENTE', 'ADMIN', 'ADMINISTRADOR']:
-            return Tratamiento.objects.all().order_by('-creado_en')
+            return qs.order_by('-creado_en')
             
         # 3. Estudiantes solo ven los tratamientos asignados a ellos
         if getattr(user, 'rol', '') == 'ESTUDIANTE':
-            return Tratamiento.objects.filter(estudiante=user).order_by('-creado_en')
+            return qs.filter(estudiante=user).order_by('-creado_en')
             
         # 4. Fallback de seguridad
         return Tratamiento.objects.none()
-
-class AvanceClinicoViewSet(viewsets.ModelViewSet):
-    queryset = AvanceClinico.objects.all()
+    
+    @action(detail=False, methods=['get'])
+    def papelera(self, request):
+        """Obtiene todos los tratamientos en papelera"""
+        tratamientos = self.get_queryset()
+        serializer = self.get_serializer(tratamientos, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def restaurar(self, request, pk=None):
+        """Restaura un tratamiento de la papelera"""
+        try:
+            tratamiento = self.get_object() 
+            tratamiento.activo = True
+            tratamiento.save()
+            return Response({'message': 'Tratamiento restaurado con éxito'}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': f'No encontrado o sin permisos: {str(e)}'}, status=status.HTTP_404_NOT_FOUND)
+    
+    def destroy(self, request, *args, **kwargs):
+        """Eliminación física definitiva de tratamiento"""
+        return super().destroy(request, *args, **kwargs)
+    
+class AvanceClinicoViewSet(SoftDeleteMixin, viewsets.ModelViewSet):
+    queryset = AvanceClinico.objects.filter(activo=True)
     serializer_class = AvanceClinicoSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     # filterset_fields = ['tratamiento', 'estudiante', 'estado_academico'] # Descomenta si usas django-filter
 
-class EvidenciaViewSet(viewsets.ModelViewSet):
-    queryset = Evidencia.objects.all()
+class EvidenciaViewSet(SoftDeleteMixin, viewsets.ModelViewSet):
+    queryset = Evidencia.objects.filter(activo=True)
     serializer_class = EvidenciaSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     # Súper importante: parser_classes permite recibir multipart/form-data (archivos)
     parser_classes = (MultiPartParser, FormParser)
 
-class TransferenciaViewSet(viewsets.ModelViewSet):
-    queryset = Transferencia.objects.all()
+class TransferenciaViewSet(SoftDeleteMixin, viewsets.ModelViewSet):
+    queryset = Transferencia.objects.filter(activo=True)
     serializer_class = TransferenciaSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     # filterset_fields = ['paciente', 'estudiante_origen', 'estudiante_destino', 'estado'] # Descomenta si usas django-filter
 
 
@@ -464,9 +558,34 @@ def estadisticas_3d_view(request):
     """
     Endpoint para el gráfico 3D de React.
     Recibe: ?tipo=usuarios|clinico & tiempo=hoy|semana|mes|siempre
+    Y todos los filtros dinámicos basados en tus modelos.
     """
+    # Si el cliente solicita las opciones disponibles para rellenar los dropdowns
+    if request.GET.get('opciones') == 'true':
+        estudiantes_list = User.objects.filter(rol='ESTUDIANTE', is_active=True).order_by('first_name', 'last_name')
+        docentes_list = User.objects.filter(rol='DOCENTE', is_active=True).order_by('first_name', 'last_name')
+        sillones_list = Sillon.objects.filter(activo=True).order_by('nombre')
+        
+        opciones_data = {
+            'estudiantes': [{'id': str(u.id), 'nombre': f"{u.first_name} {u.last_name} ({u.username})"} for u in estudiantes_list],
+            'docentes': [{'id': str(u.id), 'nombre': f"{u.first_name} {u.last_name} ({u.username})"} for u in docentes_list],
+            'sillones': [{'id': str(s.id), 'nombre': s.nombre} for s in sillones_list],
+        }
+        return Response(opciones_data)
+
     tipo = request.GET.get('tipo', 'usuarios')
     tiempo = request.GET.get('tiempo', 'mes')
+
+    # Filtros avanzados dinámicos
+    estado_carpeta = request.GET.get('estado_carpeta', 'todos')
+    rol = request.GET.get('rol', 'todos')
+    genero = request.GET.get('genero', 'todos')
+    alerta_abandono = request.GET.get('alerta_abandono', 'todos')
+    gabinete = request.GET.get('gabinete', 'todos')
+    docente = request.GET.get('docente', 'todos')
+    estudiante = request.GET.get('estudiante', 'todos')
+    estado_cita = request.GET.get('estado_cita', 'todos')
+    estado_tratamiento = request.GET.get('estado_tratamiento', 'todos')
 
     # Lógica de cálculo de fechas para el filtro de tiempo
     now = timezone.now()
@@ -485,20 +604,49 @@ def estadisticas_3d_view(request):
     # CASO 1: POBLACIÓN (Usuarios y Pacientes)
     # ==========================================
     if tipo == 'usuarios':
-        estudiantes = User.objects.filter(rol='ESTUDIANTE')
-        docentes = User.objects.filter(rol='DOCENTE')
+        estudiantes = User.objects.filter(rol='ESTUDIANTE', is_active=True)
+        docentes = User.objects.filter(rol='DOCENTE', is_active=True)
+        recepcionistas = User.objects.filter(rol='RECEPCIONISTA', is_active=True)
         pacientes = Paciente.objects.filter(activo=True)
 
         # Aplicar filtro de fecha si no es "siempre"
         if start_date:
             estudiantes = estudiantes.filter(date_joined__gte=start_date)
             docentes = docentes.filter(date_joined__gte=start_date)
+            recepcionistas = recepcionistas.filter(date_joined__gte=start_date)
             pacientes = pacientes.filter(creado_en__gte=start_date)
 
+        # Filtro de Rol
+        if rol and rol != 'todos':
+            estudiantes = estudiantes.filter(rol=rol)
+            docentes = docentes.filter(rol=rol)
+            recepcionistas = recepcionistas.filter(rol=rol)
+
+        # Filtro de Estudiante
+        if estudiante and estudiante != 'todos':
+            estudiantes = estudiantes.filter(id=estudiante)
+            pacientes = pacientes.filter(estudiante_asignado_id=estudiante)
+
+        # Filtro de Docente
+        if docente and docente != 'todos':
+            docentes = docentes.filter(id=docente)
+            pacientes = pacientes.filter(asignaciones__docente_id=docente).distinct()
+
+        # Filtro de Género
+        if genero and genero != 'todos':
+            pacientes = pacientes.filter(sexo__iexact=genero)
+
+        # Filtro de Alerta Abandono
+        if alerta_abandono and alerta_abandono != 'todos':
+            es_alerta = (alerta_abandono == 'si')
+            pacientes = pacientes.filter(alerta_abandono=es_alerta)
+
         data = [
-            { "nombre": "Estudiantes", "valor": estudiantes.count(), "desc": "Usuarios activos", "color": "#3b82f6" },
-            { "nombre": "Docentes", "valor": docentes.count(), "desc": "Usuarios activos", "color": "#f59e0b" },
-            { "nombre": "Pacientes", "valor": pacientes.count(), "desc": "Registrados", "color": "#10b981" },
+            { "nombre": "Estudiantes", "valor": estudiantes.count(), "desc": "Usuarios estudiantes", "color": "#3b82f6" },
+            { "nombre": "Docentes", "valor": docentes.count(), "desc": "Docentes supervisores", "color": "#f59e0b" },
+            { "nombre": "Recepcionistas", "valor": recepcionistas.count(), "desc": "Personal recepción", "color": "#ec4899" },
+            { "nombre": "Pacientes Activos", "valor": pacientes.count(), "desc": "Pacientes en sistema", "color": "#10b981" },
+            { "nombre": "Alertas Abandono", "valor": pacientes.filter(alerta_abandono=True).count(), "desc": "En riesgo (>=3 inasist.)", "color": "#ef4444" },
         ]
 
     # ==========================================
@@ -506,23 +654,96 @@ def estadisticas_3d_view(request):
     # ==========================================
     elif tipo == 'clinico':
         pacientes = Paciente.objects.filter(activo=True)
-        # Usamos AntecedentePatologicoPersonal como proxy de "Carpeta Médica" creada
-        carpetas = AntecedentePatologicoPersonal.objects.all()
-        periodontogramas = ExamenPeriodontal.objects.all()
+        carpetas = AntecedentePatologicoPersonal.objects.filter(activo=True)
+        periodontogramas = ExamenPeriodontal.objects.filter(activo=True)
+        citas = Cita.objects.filter(activo=True)
+        tratamientos = Tratamiento.objects.filter(activo=True)
+        avances = AvanceClinico.objects.filter(activo=True)
+        solicitudes = SolicitudSupervision.objects.filter(activo=True)
 
         # Aplicar filtro de fecha
         if start_date:
             pacientes = pacientes.filter(creado_en__gte=start_date)
             carpetas = carpetas.filter(creado_en__gte=start_date)
             periodontogramas = periodontogramas.filter(fecha_aprobacion__gte=start_date)
+            citas = citas.filter(fecha_hora__gte=start_date)
+            tratamientos = tratamientos.filter(creado_en__gte=start_date)
+            avances = avances.filter(fecha_sesion__gte=start_date.date())
+            solicitudes = solicitudes.filter(fecha_solicitud__gte=start_date)
+
+        # Filtro de Estudiante
+        if estudiante and estudiante != 'todos':
+            pacientes = pacientes.filter(estudiante_asignado_id=estudiante)
+            carpetas = carpetas.filter(estudiante_id=estudiante)
+            periodontogramas = periodontogramas.filter(estudiante_id=estudiante)
+            citas = citas.filter(estudiante_id=estudiante)
+            tratamientos = tratamientos.filter(estudiante_id=estudiante)
+            avances = avances.filter(estudiante_id=estudiante)
+            solicitudes = solicitudes.filter(asignacion_caso__estudiante_id=estudiante)
+
+        # Filtro de Docente
+        if docente and docente != 'todos':
+            pacientes = pacientes.filter(asignaciones__docente_id=docente).distinct()
+            carpetas = carpetas.filter(docente_supervisor_id=docente)
+            periodontogramas = periodontogramas.filter(docente_supervisor_id=docente)
+            citas = citas.filter(docente_id=docente)
+            avances = avances.filter(docente_supervisor_id=docente)
+            solicitudes = solicitudes.filter(docente_supervisor_id=docente)
+
+        # Filtro de Género
+        if genero and genero != 'todos':
+            pacientes = pacientes.filter(sexo__iexact=genero)
+            carpetas = carpetas.filter(paciente__sexo__iexact=genero)
+            periodontogramas = periodontogramas.filter(paciente__sexo__iexact=genero)
+            citas = citas.filter(paciente__sexo__iexact=genero)
+            tratamientos = tratamientos.filter(paciente__sexo__iexact=genero)
+            avances = avances.filter(tratamiento__paciente__sexo__iexact=genero)
+            solicitudes = solicitudes.filter(asignacion_caso__paciente__sexo__iexact=genero)
+
+        # Filtro de Alerta Abandono
+        if alerta_abandono and alerta_abandono != 'todos':
+            es_alerta = (alerta_abandono == 'si')
+            pacientes = pacientes.filter(alerta_abandono=es_alerta)
+            carpetas = carpetas.filter(paciente__alerta_abandono=es_alerta)
+            periodontogramas = periodontogramas.filter(paciente__alerta_abandono=es_alerta)
+            citas = citas.filter(paciente__alerta_abandono=es_alerta)
+            tratamientos = tratamientos.filter(paciente__alerta_abandono=es_alerta)
+            avances = avances.filter(tratamiento__paciente__alerta_abandono=es_alerta)
+            solicitudes = solicitudes.filter(asignacion_caso__paciente__alerta_abandono=es_alerta)
+
+        # Filtro de Gabinete (Sillón)
+        if gabinete and gabinete != 'todos':
+            citas = citas.filter(gabinete_id=gabinete)
+            tratamientos = tratamientos.filter(citas__gabinete_id=gabinete).distinct()
+            avances = avances.filter(tratamiento__citas__gabinete_id=gabinete).distinct()
+
+        # Filtro de Estado Académico (estado_carpeta)
+        if estado_carpeta and estado_carpeta != 'todos':
+            carpetas = carpetas.filter(estado_academico=estado_carpeta)
+            periodontogramas = periodontogramas.filter(estado_academico=estado_carpeta)
+            avances = avances.filter(estado_academico=estado_carpeta)
+
+        # Filtro de Estado Cita
+        if estado_cita and estado_cita != 'todos':
+            citas = citas.filter(estado=estado_cita)
+
+        # Filtro de Estado Tratamiento
+        if estado_tratamiento and estado_tratamiento != 'todos':
+            tratamientos = tratamientos.filter(estado=estado_tratamiento)
+            avances = avances.filter(tratamiento__estado=estado_tratamiento)
 
         data = [
-            { "nombre": "Pacientes", "valor": pacientes.count(), "desc": "En sistema", "color": "#10b981" },
-            { "nombre": "Carpetas", "valor": carpetas.count(), "desc": "Antecedentes", "color": "#8b5cf6" },
-            { "nombre": "Periodonto.", "valor": periodontogramas.count(), "desc": "Exámenes", "color": "#ec4899" },
+            { "nombre": "Pacientes", "valor": pacientes.count(), "desc": "Pacientes clínicos", "color": "#10b981" },
+            { "nombre": "Citas Clínicas", "valor": citas.count(), "desc": "Citas agendadas", "color": "#6366f1" },
+            { "nombre": "Tratamientos", "valor": tratamientos.count(), "desc": "Planes en curso", "color": "#0ea5e9" },
+            { "nombre": "Avances Sesión", "valor": avances.count(), "desc": "Sesiones atendidas", "color": "#8b5cf6" },
+            { "nombre": "Carpetas Médicas", "valor": carpetas.count(), "desc": "Historiales médicos", "color": "#f59e0b" },
+            { "nombre": "Periodontogramas", "valor": periodontogramas.count(), "desc": "Exámenes aprobados", "color": "#ec4899" },
+            { "nombre": "Solicitudes Sup.", "valor": solicitudes.count(), "desc": "Supervisiones de hitos", "color": "#14b8a6" },
         ]
 
     return Response(data)
+
 
 # gestion_clinica/views.py
 
@@ -530,8 +751,8 @@ def estadisticas_3d_view(request):
 # ... aquí están tus otras vistas (UsuarioViewSet, PacienteViewSet, etc) ...
 
 # Agrega esto al final de tu archivo views.py
-class SillonViewSet(viewsets.ModelViewSet):
-    queryset = Sillon.objects.all()
+class SillonViewSet(SoftDeleteMixin, viewsets.ModelViewSet):
+    queryset = Sillon.objects.filter(activo=True)
     serializer_class = SillonSerializer
 
 
@@ -539,10 +760,16 @@ class SillonViewSet(viewsets.ModelViewSet):
 # VIEWSET DE CITAS (MEJORADO CON VALIDACIÓN Y AUDITORÍA)
 # =========================================================================
 class CitaViewSet(viewsets.ModelViewSet):
-    queryset = Cita.objects.all().order_by('fecha_hora')
     serializer_class = CitaSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     filterset_fields = ['estado', 'paciente', 'estudiante', 'docente', 'gabinete']
+    
+    def get_queryset(self):
+        """Filtra citas activas/inactivas"""
+        if self.action in ['papelera', 'restaurar', 'destroy']:
+            return Cita.objects.filter(activo=False).order_by('fecha_hora')
+        else:
+            return Cita.objects.filter(activo=True).order_by('fecha_hora')
 
     def validate_conflict(self, paciente, estudiante, docente, gabinete, fecha_hora, duracion, exclude_id=None):
         """Valida conflictos de doble reserva"""
@@ -551,6 +778,7 @@ class CitaViewSet(viewsets.ModelViewSet):
         fecha_fin = fecha_hora + td(minutes=duracion)
         
         conflicts = Cita.objects.filter(
+            activo=True,
             estado__in=['RESERVADA', 'CONFIRMADA', 'EN_ESPERA', 'ATENDIENDO']
         )
         
@@ -675,10 +903,35 @@ class CitaViewSet(viewsets.ModelViewSet):
 # VIEWSET DE CITAS RECURRENTES
 # =========================================================================
 class CitaRecurrenteViewSet(viewsets.ModelViewSet):
-    queryset = CitaRecurrente.objects.all().order_by('fecha_inicio')
     serializer_class = CitaRecurrenteSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     filterset_fields = ['paciente', 'estudiante', 'docente', 'gabinete', 'activa']
+    
+    def get_queryset(self):
+        """Filtra citas recurrentes activas/inactivas (usa 'activa' en vez de 'activo')"""
+        if self.action in ['papelera', 'restaurar', 'destroy']:
+            return CitaRecurrente.objects.filter(activa=False).order_by('fecha_inicio')
+        else:
+            return CitaRecurrente.objects.filter(activa=True).order_by('fecha_inicio')
+    
+    @action(detail=True, methods=['post'])
+    def papelera(self, request, pk=None):
+        """Soft delete: marca cita recurrente como inactiva"""
+        cita = self.get_object()
+        cita.activa = False
+        cita.save()
+        return Response({'message': 'Cita recurrente movida a papelera'}, status=status.HTTP_200_OK)
+    
+    @action(detail=True, methods=['post'])
+    def restaurar(self, request, pk=None):
+        """Restaura cita recurrente de papelera"""
+        try:
+            cita = self.get_object()
+            cita.activa = True
+            cita.save()
+            return Response({'message': 'Cita recurrente restaurada con éxito'}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': f'No encontrado o sin permisos: {str(e)}'}, status=status.HTTP_404_NOT_FOUND)
 
     def perform_create(self, serializer):
         cita_recurrente = serializer.save()
@@ -706,7 +959,7 @@ class CitaRecurrenteViewSet(viewsets.ModelViewSet):
 class ConfiguracionAlertasViewSet(viewsets.ModelViewSet):
     queryset = ConfiguracionAlertas.objects.all()
     serializer_class = ConfiguracionAlertasSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get_queryset(self):
         obj, created = ConfiguracionAlertas.objects.get_or_create(pk=1)
@@ -717,9 +970,9 @@ class ConfiguracionAlertasViewSet(viewsets.ModelViewSet):
 # VIEWSET DE AUDITORÍA DE CITAS
 # =========================================================================
 class AuditoriaCitaViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = AuditoriaCita.objects.all()
+    queryset = AuditoriaCita.objects.filter(activo=True)
     serializer_class = AuditoriaCitaSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     filterset_fields = ['cita', 'tipo_cambio', 'usuario']
 
 
@@ -727,10 +980,16 @@ class AuditoriaCitaViewSet(viewsets.ReadOnlyModelViewSet):
 # VIEWSET DE HISTÓRICO DE ABANDONO
 # =========================================================================
 class HistoricoAbandonoPacienteViewSet(viewsets.ModelViewSet):
-    queryset = HistoricoAbandonoPaciente.objects.all()
     serializer_class = HistoricoAbandonoPacienteSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     filterset_fields = ['paciente', 'reactivado']
+    
+    def get_queryset(self):
+        """Filtra históricos activos/inactivos"""
+        if self.action in ['papelera', 'restaurar', 'destroy']:
+            return HistoricoAbandonoPaciente.objects.filter(activo=False)
+        else:
+            return HistoricoAbandonoPaciente.objects.filter(activo=True)
 
     @action(detail=True, methods=['post'])
     def reactivar(self, request, pk=None):
@@ -761,15 +1020,41 @@ class HistoricoAbandonoPacienteViewSet(viewsets.ModelViewSet):
 # RADIOGRAFIAS
 # =========================================================================
 class ImagenClinicaViewSet(viewsets.ModelViewSet):
-    queryset = ImagenClinica.objects.all()
     serializer_class = ImagenClinicaSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
+    
     def get_queryset(self):
+        """Filtra imágenes activas/inactivas y por paciente si se especifica"""
+        # Filtrar por activo según acción
+        if self.action in ['papelera', 'restaurar', 'destroy']:
+            qs = ImagenClinica.objects.filter(activo=False)
+        else:
+            qs = ImagenClinica.objects.filter(activo=True)
+        
         # Permite filtrar en el frontend usando: /api/imagenes/?paciente=ID
         paciente_id = self.request.query_params.get('paciente')
         if paciente_id:
-            return self.queryset.filter(paciente_id=paciente_id)
-        return self.queryset
+            return qs.filter(paciente_id=paciente_id)
+        return qs
+    
+    @action(detail=True, methods=['post'])
+    def papelera(self, request, pk=None):
+        """Soft delete: marca imagen como inactiva"""
+        imagen = self.get_object()
+        imagen.activo = False
+        imagen.save()
+        return Response({'message': 'Imagen movida a papelera'}, status=status.HTTP_200_OK)
+    
+    @action(detail=True, methods=['post'])
+    def restaurar(self, request, pk=None):
+        """Restaura imagen de papelera"""
+        try:
+            imagen = self.get_object()
+            imagen.activo = True
+            imagen.save()
+            return Response({'message': 'Imagen restaurada con éxito'}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': f'No encontrado o sin permisos: {str(e)}'}, status=status.HTTP_404_NOT_FOUND)
 
     def perform_create(self, serializer):
         # Asigna automáticamente el estudiante que está logueado
@@ -806,17 +1091,57 @@ class ConfiguracionCupoViewSet(viewsets.ModelViewSet):
     ViewSet para gestionar configuraciones de cupo por asignatura
     Acceso: Coordinador/Docente
     """
-    queryset = ConfiguracionCupo.objects.all()
     serializer_class = ConfiguracionCupoSerializer
     permission_classes = [IsAuthenticated, IsCoordinador]
 
     def get_queryset(self):
-        # Filtrar solo activos
-        activo = self.request.query_params.get('activo')
-        qs = ConfiguracionCupo.objects.all()
-        if activo is not None:
-            qs = qs.filter(activo=activo.lower() == 'true')
-        return qs
+        """Filtra cupos activos, con papelera y destrucción"""
+        # 🌟 INCLUIMOS 'destroy' para poder eliminar cupos definitivamente 🌟
+        if self.action in ['papelera', 'restaurar', 'destroy']: 
+            return ConfiguracionCupo.objects.filter(activo=False)
+        else:
+            return ConfiguracionCupo.objects.filter(activo=True)
+
+    @action(detail=False, methods=['get'])
+    def papelera(self, request):
+        """Obtiene todos los cupos en papelera"""
+        cupos = self.get_queryset()
+        serializer = self.get_serializer(cupos, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def restaurar(self, request, pk=None):
+        """Restaura un cupo de la papelera"""
+        try:
+            cupo = self.get_object() 
+            cupo.activo = True
+            cupo.save()
+            return Response({'message': 'Cupo restaurado con éxito'}, status=status.HTTP_200_OK)
+        except Exception:
+            return Response({'error': 'Cupo no encontrado o no tienes permisos'}, status=status.HTTP_404_NOT_FOUND)
+
+    def destroy(self, request, *args, **kwargs):
+        """Eliminación física definitiva de cupo"""
+        return super().destroy(request, *args, **kwargs)
+    
+    @action(detail=True, methods=['post'])
+    def papelera(self, request, pk=None):
+        """Soft delete: marca cita como inactiva"""
+        cita = self.get_object()
+        cita.activo = False
+        cita.save()
+        return Response({'message': 'Cita movida a papelera'}, status=status.HTTP_200_OK)
+    
+    @action(detail=True, methods=['post'])
+    def restaurar(self, request, pk=None):
+        """Restaura cita de papelera"""
+        try:
+            cita = self.get_object()
+            cita.activo = True
+            cita.save()
+            return Response({'message': 'Cita restaurada con éxito'}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': f'No encontrado o sin permisos: {str(e)}'}, status=status.HTTP_404_NOT_FOUND)
 
 
 class AsignacionCasoViewSet(viewsets.ModelViewSet):
@@ -825,24 +1150,49 @@ class AsignacionCasoViewSet(viewsets.ModelViewSet):
     Acceso: Coordinador (crea/actualiza), Estudiante (lee sus propios casos)
     """
     serializer_class = AsignacionCasoSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get_queryset(self):
         user = self.request.user
         
+        # Filtrar por activo según acción
+        if self.action in ['papelera', 'restaurar', 'destroy']:
+            base_qs = AsignacionCaso.objects.filter(activo=False)
+        else:
+            base_qs = AsignacionCaso.objects.filter(activo=True)
+        
         # Superusuario o Coordinador ven todos
         if user.is_superuser or getattr(user, 'rol', '') in ['ADMIN', 'ADMINISTRADOR']:
-            return AsignacionCaso.objects.all().order_by('-fecha_asignacion')
+            return base_qs.order_by('-fecha_asignacion')
         
         # Estudiante solo ve sus propias asignaciones
         if getattr(user, 'rol', '') == 'ESTUDIANTE':
-            return AsignacionCaso.objects.filter(estudiante=user).order_by('-fecha_asignacion')
+            return base_qs.filter(estudiante=user).order_by('-fecha_asignacion')
         
         # Docente ve todos (para supervisar)
         if getattr(user, 'rol', '') == 'DOCENTE':
-            return AsignacionCaso.objects.all().order_by('-fecha_asignacion')
+            return base_qs.order_by('-fecha_asignacion')
         
         return AsignacionCaso.objects.none()
+    
+    @action(detail=True, methods=['post'])
+    def papelera(self, request, pk=None):
+        """Soft delete: marca asignación como inactiva"""
+        asignacion = self.get_object()
+        asignacion.activo = False
+        asignacion.save()
+        return Response({'message': 'Asignación movida a papelera'}, status=status.HTTP_200_OK)
+    
+    @action(detail=True, methods=['post'])
+    def restaurar(self, request, pk=None):
+        """Restaura asignación de papelera"""
+        try:
+            asignacion = self.get_object()
+            asignacion.activo = True
+            asignacion.save()
+            return Response({'message': 'Asignación restaurada con éxito'}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': f'No encontrado o sin permisos: {str(e)}'}, status=status.HTTP_404_NOT_FOUND)
 
     def perform_create(self, serializer):
         """Solo Coordinador puede crear asignaciones"""
@@ -895,28 +1245,53 @@ class SolicitudSupervisionViewSet(viewsets.ModelViewSet):
     Hitos: Diagnóstico, Inicio, Cierre
     """
     serializer_class = SolicitudSupervisionSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get_queryset(self):
         user = self.request.user
         
+        # Filtrar por activo según acción
+        if self.action in ['papelera', 'restaurar', 'destroy']:
+            base_qs = SolicitudSupervision.objects.filter(activo=False)
+        else:
+            base_qs = SolicitudSupervision.objects.filter(activo=True)
+        
         # Estudiante: ve sus propias solicitudes
         if getattr(user, 'rol', '') == 'ESTUDIANTE':
-            return SolicitudSupervision.objects.filter(
+            return base_qs.filter(
                 asignacion_caso__estudiante=user
             ).order_by('-fecha_solicitud')
         
         # Docente: ve solicitudes pendientes de su supervisión
         if getattr(user, 'rol', '') == 'DOCENTE':
-            return SolicitudSupervision.objects.filter(
+            return base_qs.filter(
                 estado='PENDIENTE'
             ).order_by('-fecha_solicitud')
         
         # Admin/Coordinador: ven todas
         if user.is_superuser or getattr(user, 'rol', '') in ['ADMIN', 'ADMINISTRADOR']:
-            return SolicitudSupervision.objects.all().order_by('-fecha_solicitud')
+            return base_qs.order_by('-fecha_solicitud')
         
         return SolicitudSupervision.objects.none()
+    
+    @action(detail=True, methods=['post'])
+    def papelera(self, request, pk=None):
+        """Soft delete: marca solicitud como inactiva"""
+        solicitud = self.get_object()
+        solicitud.activo = False
+        solicitud.save()
+        return Response({'message': 'Solicitud movida a papelera'}, status=status.HTTP_200_OK)
+    
+    @action(detail=True, methods=['post'])
+    def restaurar(self, request, pk=None):
+        """Restaura solicitud de papelera"""
+        try:
+            solicitud = self.get_object()
+            solicitud.activo = True
+            solicitud.save()
+            return Response({'message': 'Solicitud restaurada con éxito'}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': f'No encontrado o sin permisos: {str(e)}'}, status=status.HTTP_404_NOT_FOUND)
 
     def perform_create(self, serializer):
         """Estudiante crea la solicitud"""
@@ -984,17 +1359,42 @@ class EvaluacionDesempeñoViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         
+        # Filtrar por activo según acción
+        if self.action in ['papelera', 'restaurar', 'destroy']:
+            base_qs = EvaluacionDesempeño.objects.filter(activo=False)
+        else:
+            base_qs = EvaluacionDesempeño.objects.filter(activo=True)
+        
         # Docente ve evaluaciones de sus supervisiones
         if getattr(user, 'rol', '') == 'DOCENTE':
-            return EvaluacionDesempeño.objects.filter(
+            return base_qs.filter(
                 solicitud_supervision__docente_supervisor=user
             ).order_by('-fecha_evaluacion')
         
         # Admin ve todas
         if user.is_superuser or getattr(user, 'rol', '') in ['ADMIN', 'ADMINISTRADOR']:
-            return EvaluacionDesempeño.objects.all().order_by('-fecha_evaluacion')
+            return base_qs.order_by('-fecha_evaluacion')
         
         return EvaluacionDesempeño.objects.none()
+    
+    @action(detail=True, methods=['post'])
+    def papelera(self, request, pk=None):
+        """Soft delete: marca evaluación como inactiva"""
+        evaluacion = self.get_object()
+        evaluacion.activo = False
+        evaluacion.save()
+        return Response({'message': 'Evaluación movida a papelera'}, status=status.HTTP_200_OK)
+    
+    @action(detail=True, methods=['post'])
+    def restaurar(self, request, pk=None):
+        """Restaura evaluación de papelera"""
+        try:
+            evaluacion = self.get_object()
+            evaluacion.activo = True
+            evaluacion.save()
+            return Response({'message': 'Evaluación restaurada con éxito'}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': f'No encontrado o sin permisos: {str(e)}'}, status=status.HTTP_404_NOT_FOUND)
 
     def perform_update(self, serializer):
         """Al actualizar evaluación, verificar alerta temprana y notificar"""
@@ -1047,3 +1447,81 @@ class EvaluacionDesempeñoViewSet(viewsets.ModelViewSet):
         alertas = EvaluacionDesempeño.objects.filter(alerta_temprana=True).order_by('-fecha_evaluacion')
         serializer = self.get_serializer(alertas, many=True)
         return Response(serializer.data)
+
+from rest_framework_simplejwt.views import TokenObtainPairView
+from .serializers import MyTokenObtainPairSerializer # Ajusta la importación según tu estructura
+
+class MyTokenObtainPairView(TokenObtainPairView):
+    serializer_class = MyTokenObtainPairSerializer
+
+import json
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth import get_user_model
+from .models import RegistroAsistencia  # Asegúrate de importar desde donde estén tus modelos
+
+# Obtenemos tu CustomUser de forma segura
+User = get_user_model()
+
+@csrf_exempt
+def recibir_huella_esp32(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            huella_id = data.get('huella_id')
+            
+            if not huella_id:
+                return JsonResponse({"status": "error", "mensaje": "Falta el ID de la huella"}, status=400)
+
+            # 1. Buscamos de quién es esta huella en CustomUser
+            usuario = User.objects.filter(huella_id=huella_id).first()
+            
+            if usuario:
+                # 2. Lógica inteligente: ¿Es Ingreso o Salida?
+                # Como el modelo ya ordena por '-fecha_hora', el .first() nos da el último registro
+                ultimo_registro = RegistroAsistencia.objects.filter(usuario=usuario).first()
+                
+                nueva_accion = 'INGRESO'
+                if ultimo_registro and ultimo_registro.accion == 'INGRESO':
+                    nueva_accion = 'SALIDA'
+
+                # 3. Guardamos el registro en la base de datos
+                RegistroAsistencia.objects.create(
+                    usuario=usuario,
+                    accion=nueva_accion,
+                    huella_id=huella_id,
+                    verificado=True
+                )
+                
+                print(f"✅ {nueva_accion} registrado para: {usuario.username} (Rol: {usuario.rol})")
+                return JsonResponse({"status": "success", "mensaje": f"{nueva_accion} registrado exitosamente"})
+            else:
+                print(f"⚠️ Huella {huella_id} recibida, pero no pertenece a nadie en la BD.")
+                return JsonResponse({"status": "warning", "mensaje": "Huella no registrada en el sistema"}, status=404)
+                
+        except Exception as e:
+            print(f"❌ Error en el servidor: {e}")
+            return JsonResponse({"status": "error", "mensaje": str(e)}, status=400)
+            
+    return JsonResponse({"status": "error", "mensaje": "Método no permitido"}, status=405)
+
+from django.http import JsonResponse
+from .models import RegistroAsistencia
+
+def listar_asistencias(request):
+    if request.method == 'GET':
+        # Traemos los últimos 50 registros, ordenados por los más recientes
+        registros = RegistroAsistencia.objects.select_related('usuario').all()[:50]
+        
+        data = []
+        for reg in registros:
+            data.append({
+                "id": reg.id,
+                "usuario": f"{reg.usuario.first_name} {reg.usuario.last_name}".strip() or reg.usuario.username,
+                "rol": reg.usuario.get_rol_display(),
+                "accion": reg.accion,
+                "fecha_hora": reg.fecha_hora.strftime('%Y-%m-%dT%H:%M:%S'), # Formato ISO para JS
+                "verificado": reg.verificado
+            })
+            
+        return JsonResponse(data, safe=False)

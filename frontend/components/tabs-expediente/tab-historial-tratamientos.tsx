@@ -2,7 +2,18 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { Loader2, AlertTriangle, Calendar, Activity, ChevronRight, Plus, ClipboardList } from "lucide-react"
+import { Loader2, AlertTriangle, Calendar, Activity, ChevronRight, Plus, ClipboardList, Download, FileText, Sheet } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu"
+import { exportSubmoduloTratamientosPDF } from "@/lib/exporters/pdf-exporter"
+import { exportSubmoduloTratamientosExcel } from "@/lib/exporters/excel-exporter"
 
 // Definimos que este componente va a recibir el pacienteId como propiedad
 export function TabHistorialTratamientos({ pacienteId }: { pacienteId: string }) {
@@ -136,9 +147,44 @@ export function TabHistorialTratamientos({ pacienteId }: { pacienteId: string })
             <p className="text-sm text-gray-500 mt-1">Línea de tiempo de los tratamientos realizados.</p>
           </div>
           
-          <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-md hover:shadow-lg">
-            <Plus className="w-4 h-4" /> Nuevo Tratamiento
-          </button>
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-sm gap-2 border-indigo-500/30 hover:border-indigo-500 text-indigo-600 dark:text-indigo-400 font-semibold shadow-sm"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>Exportar</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 rounded-xl border-indigo-500/20 bg-slate-50 dark:bg-zinc-950 p-1.5 shadow-xl">
+                <DropdownMenuLabel className="text-[10px] text-slate-500 font-bold uppercase tracking-wider px-2 py-1.5">
+                  Formatos
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => exportSubmoduloTratamientosPDF(paciente, tratamientos)}
+                  className="rounded-lg cursor-pointer hover:bg-indigo-500/10"
+                >
+                  <FileText className="mr-2 h-4 w-4 text-red-500" />
+                  <span>Descargar PDF</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => exportSubmoduloTratamientosExcel(paciente, tratamientos)}
+                  className="rounded-lg cursor-pointer hover:bg-indigo-500/10"
+                >
+                  <Sheet className="mr-2 h-4 w-4 text-green-500" />
+                  <span>Descargar Excel</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-md hover:shadow-lg">
+              <Plus className="w-4 h-4" /> Nuevo Tratamiento
+            </button>
+          </div>
         </div>
 
         {/* Lista de Tratamientos */}

@@ -13,15 +13,29 @@ import {
   ChevronRight, 
   Maximize2, 
   Columns, 
-  FileCode2 
+  FileCode2,
+  Download,
+  FileText,
+  Sheet
 } from "lucide-react"
 import DicomViewer from "./DicomViewer"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu"
+import { exportSubmoduloImagenesPDF } from "@/lib/exporters/pdf-exporter"
+import { exportSubmoduloImagenesExcel } from "@/lib/exporters/excel-exporter"
 
 interface Props {
   imagenes: any[] // Lista de imágenes del paciente (IUP)
+  paciente?: any
 }
 
-export default function VisorRadiologico({ imagenes }: { imagenes: any[] }) {
+export default function VisorRadiologico({ imagenes, paciente }: Props) {
   const [index, setIndex] = useState(0)
   const [imgPre, setImgPre] = useState<string | null>(null)
   const [imgPost, setImgPost] = useState<string | null>(null)
@@ -31,11 +45,46 @@ export default function VisorRadiologico({ imagenes }: { imagenes: any[] }) {
 
   return (
     <Card className="w-full shadow-xl border-slate-200">
-      <CardHeader className="bg-slate-50 border-b">
+      <CardHeader className="bg-slate-50 border-b flex flex-row items-center justify-between">
         <CardTitle className="text-lg flex items-center gap-2">
           <Maximize2 className="w-5 h-5 text-primary" /> 
           Centro de Diagnóstico por Imagen
         </CardTitle>
+
+        {paciente && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs gap-2 border-emerald-500/30 hover:border-emerald-500 text-emerald-600 dark:text-emerald-400 font-semibold shadow-sm bg-white"
+              >
+                <Download className="h-3.5 w-3.5" />
+                <span>Exportar Diagnóstico</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52 rounded-2xl border-emerald-500/20 bg-slate-50 dark:bg-zinc-950 p-1.5 shadow-xl">
+              <DropdownMenuLabel className="text-[10px] text-slate-500 font-bold uppercase tracking-wider px-2 py-1.5">
+                Formatos de Exportación
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => exportSubmoduloImagenesPDF(paciente, imagenes)}
+                className="rounded-xl cursor-pointer hover:bg-emerald-500/10"
+              >
+                <FileText className="mr-2 h-4 w-4 text-red-500" />
+                <span>Descargar PDF</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => exportSubmoduloImagenesExcel(paciente, imagenes)}
+                className="rounded-xl cursor-pointer hover:bg-emerald-500/10"
+              >
+                <Sheet className="mr-2 h-4 w-4 text-green-500" />
+                <span>Descargar Excel</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </CardHeader>
       
       <Tabs defaultValue="carrusel" className="p-4">

@@ -19,7 +19,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
-export function CarpetaMedica({ paciente }: { paciente: any }) {
+export function CarpetaMedica({ paciente, onRefresh }: { paciente: any; onRefresh?: () => void }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -97,16 +97,18 @@ export function CarpetaMedica({ paciente }: { paciente: any }) {
       })
       
       if (res.ok) {
-        toast.success("Expediente actualizado")
+        toast.success("✅ Antecedentes guardados exitosamente")
         setIsEditing(false)
         setOpen(false)
+        // Llamar al callback para actualizar la tabla
+        if (onRefresh) onRefresh()
         router.refresh()
       } else {
         console.error("Fallo al guardar, status:", res.status)
-        toast.error("Hubo un error al guardar los datos. Revisa si tu sesión sigue activa.")
+        toast.error("❌ Error al guardar los datos. Revisa si tu sesión sigue activa.")
       }
     } catch (e) { 
-      toast.error("Error de servidor") 
+      toast.error("❌ Error de conexión con el servidor") 
     }
     finally { setLoading(false) }
   }

@@ -48,8 +48,19 @@ export default function LoginPage() {
     rememberMe: false
   })
 
-  // Detector de movimiento del mouse y detector global de Mayúsculas
+  // Detector de movimiento del mouse y detector global de Mayúsculas + Color del Tab
   useEffect(() => {
+    // 🎨 Cambiar el color del tab del navegador (theme-color)
+    const themeColorMeta = document.querySelector("meta[name='theme-color']")
+    if (themeColorMeta) {
+      themeColorMeta.setAttribute("content", "#043121")
+    } else {
+      const meta = document.createElement("meta")
+      meta.name = "theme-color"
+      meta.content = "#033d28"
+      document.head.appendChild(meta)
+    }
+
     const handleMouseMove = (e: MouseEvent) => {
       setMousePosition({
         x: (e.clientX / window.innerWidth) - 0.5,
@@ -73,6 +84,12 @@ export default function LoginPage() {
       window.removeEventListener("mousemove", handleMouseMove)
       window.removeEventListener("keydown", checkCapsLock)
       window.removeEventListener("keyup", checkCapsLock)
+      
+      // Restaurar el color del tab al salir
+      const meta = document.querySelector("meta[name='theme-color']")
+      if (meta) {
+        meta.setAttribute("content", "#ffffff")
+      }
     }
   }, [])
 
@@ -168,6 +185,29 @@ export default function LoginPage() {
         localStorage.setItem("access_token", data.access)
         localStorage.setItem("refresh_token", data.refresh)
         
+        // 🔐 NUEVO: Obtener el user_id del JWT y luego obtener el rol
+        const decodedToken = JSON.parse(atob(data.access.split('.')[1]))
+        const userId = decodedToken.user_id
+        localStorage.setItem("user_id", userId)
+        
+        // Hacer petición para obtener el rol completo
+        try {
+          const userRes = await fetch(`http://localhost:8000/api/usuarios/${userId}/`, {
+            headers: {
+              'Authorization': `Bearer ${data.access}`,
+              'Content-Type': 'application/json'
+            }
+          })
+          
+          if (userRes.ok) {
+            const userData = await userRes.json()
+            localStorage.setItem("user_role", userData.rol || "")
+            console.log("✅ Rol guardado en localStorage:", userData.rol)
+          }
+        } catch (error) {
+          console.error("⚠️ Error obteniendo rol del usuario:", error)
+        }
+        
         playSound("login")
         setStatus("success")
         toast.success("¡Acceso concedido! Bienvenido.")
@@ -206,7 +246,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className={`min-h-screen flex items-center justify-center p-4 relative overflow-hidden transition-colors duration-500 ${isSuperMode ? 'bg-slate-900' : 'bg-slate-100 dark:bg-[#020617]'}`}>
+    <div className={`min-h-screen flex items-center justify-center p-4 relative overflow-hidden transition-colors duration-500 ${isSuperMode ? 'bg-slate-900' : 'bg-gradient-to-br from-emerald-50 to-cyan-50 dark:from-[#0a2622] dark:to-[#061f1d]'}`}>
       
       {/* EXPLOSIÓN VISUAL DEL EASTER EGG */}
       <AnimatePresence>
@@ -237,12 +277,12 @@ export default function LoginPage() {
       </AnimatePresence>
 
       {/* --- FONDOS DINÁMICOS --- */}
-      <div className="absolute inset-0 bg-[radial-gradient(#94a3b8_1px,transparent_1px)] dark:bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px] opacity-50"></div>
+      <div className="absolute inset-0 bg-[radial-gradient(#a7f3d0_1px,transparent_1px)] dark:bg-[radial-gradient(#1a4a42_1px,transparent_1px)] [background-size:24px_24px] opacity-50"></div>
       
       <motion.div 
         animate={isSuperMode ? { scale: [1, 2], opacity: [0.8, 0], rotate: 180 } : { scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }} 
         transition={{ duration: isSuperMode ? 1 : 8, repeat: isSuperMode ? 0 : Infinity, ease: "easeInOut" }}
-        className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-cyan-400/40 rounded-full filter blur-[120px] pointer-events-none"
+        className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-teal-400/40 rounded-full filter blur-[120px] pointer-events-none"
       />
 
       {/* --- ICONOS FLOTANTES CON PARALAX --- */}
@@ -267,8 +307,8 @@ export default function LoginPage() {
         transition={{ duration: 0.4 }}
         className="w-full max-w-md relative z-10"
       >
-        <Card className={`w-full relative shadow-[0_20px_70px_-15px_rgba(6,182,212,0.4)] border bg-[#0f172a]/95 backdrop-blur-2xl rounded-3xl overflow-visible transition-all duration-500 ${isSuperMode ? 'border-cyan-400 shadow-[0_0_100px_rgba(6,182,212,0.8)]' : 'border-cyan-500/30'}`}>
-          <CardHeader className="space-y-2 items-center text-center pt-12 pb-4">
+        <Card className={`w-full relative shadow-[0_30px_90px_-15px_rgba(1,51,44,0.75)] !border-emerald-500/40 !bg-gradient-to-br !from-[#012521] !via-[#023830] !to-[#011815] backdrop-blur-2xl rounded-3xl overflow-visible transition-all duration-500 ${isSuperMode ? '!border-cyan-400 shadow-[0_0_100px_rgba(6,182,212,0.8)]' : ''}`}>
+          <CardHeader className="space-y-2 items-center text-center pt-12 pb-4 !bg-transparent !bg-none !border-none !shadow-none">
             
             <div className="relative flex justify-center mt-4 mb-6">
               {/* NUBE DE BYTE */}
@@ -296,7 +336,7 @@ export default function LoginPage() {
                   </div>
                 </motion.div>
               </AnimatePresence>
-
+ 
               {/* CONTENEDOR DEL DIENTE */}
               <div className="relative">
                 <motion.div
@@ -324,10 +364,10 @@ export default function LoginPage() {
                       {/* OJOS DE BYTE */}
                       {isSuperMode ? (
                         <g>
-                          <rect x="30" y="38" width="18" height="10" rx="2" fill="#0f172a" />
-                          <rect x="52" y="38" width="18" height="10" rx="2" fill="#0f172a" />
-                          <line x1="48" y1="42" x2="52" y2="42" stroke="#0f172a" strokeWidth="3" />
-                          <path d="M 35 55 Q 50 65 65 55" stroke="#0f172a" strokeWidth="3" fill="none" />
+                           <rect x="30" y="38" width="18" height="10" rx="2" fill="#0f172a" />
+                           <rect x="52" y="38" width="18" height="10" rx="2" fill="#0f172a" />
+                           <line x1="48" y1="42" x2="52" y2="42" stroke="#0f172a" strokeWidth="3" />
+                           <path d="M 35 55 Q 50 65 65 55" stroke="#0f172a" strokeWidth="3" fill="none" />
                         </g>
                       ) : status === "error" ? (
                         <g stroke="#ef4444" strokeWidth="3" strokeLinecap="round">
@@ -356,31 +396,31 @@ export default function LoginPage() {
                     </svg>
                   </motion.div>
                 </motion.div>
-
+ 
                 {/* BOTÓN DE CHISTES */}
                 <motion.button
                   whileHover={{ scale: 1.1, rotate: 10 }}
                   whileTap={{ scale: 0.9 }}
                   onClick={tellAJoke}
                   type="button"
-                  className="absolute -right-3 -bottom-2 bg-cyan-500 hover:bg-cyan-400 text-white p-2 rounded-full shadow-[0_0_15px_rgba(6,182,212,0.6)] border-2 border-[#0f172a] z-30 transition-colors"
+                  className="absolute -right-3 -bottom-2 bg-cyan-400 hover:bg-cyan-300 text-teal-900 p-2 rounded-full shadow-[0_0_15px_rgba(34,211,238,0.6)] border-2 border-cyan-200 z-30 transition-colors"
                 >
                   <Smile className="w-4 h-4" />
                 </motion.button>
               </div>
             </div>
-
+ 
             <div className="space-y-1">
               <CardTitle className="text-3xl font-extrabold tracking-tight text-white">
-                Clínica <span className="text-cyan-400">Pro</span>
+                Clínica <span className="text-cyan-300">Pro</span>
               </CardTitle>
-              <CardDescription className="text-sm font-medium text-slate-400">
+              <CardDescription className="text-sm font-semibold text-emerald-300/80">
                 Sistema Biométrico Odontológico
               </CardDescription>
             </div>
           </CardHeader>
-
-          <CardContent className="px-8 pt-2">
+ 
+          <CardContent className="px-8 pt-2 !bg-transparent !bg-none !border-none !shadow-none">
             {/* ALERTA DE ERROR DEL SERVIDOR */}
             <AnimatePresence>
               {status === "error" && errorMessage && (
@@ -397,40 +437,40 @@ export default function LoginPage() {
                 </motion.div>
               )}
             </AnimatePresence>
-
+ 
             <form onSubmit={handleLogin} className="space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="username" className="text-slate-300 font-semibold">Usuario</Label>
+                <Label htmlFor="username" className="text-emerald-100 font-bold tracking-wide text-xs">Usuario</Label>
                 <div className="relative group">
-                  <User className="absolute left-3 top-3 h-5 w-5 text-slate-500 group-focus-within:text-cyan-400 transition-colors z-10" />
+                  <User className="absolute left-3.5 top-3.5 h-5 w-5 text-emerald-400 group-focus-within:text-cyan-300 transition-colors z-10" />
                   <Input 
                     id="username" 
                     type="text" 
                     placeholder="Escribe tu usuario..." 
-                    className="pl-11 h-12 bg-slate-900/50 text-white placeholder:text-slate-600 focus:bg-slate-900 border-slate-700 focus:ring-2 focus:ring-cyan-500/50 transition-all text-md"
+                    className="pl-11 h-12 !bg-[#02211c]/90 text-white placeholder:text-emerald-300/30 focus:!bg-[#011814] !border-emerald-500/30 focus:!border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 transition-all text-md rounded-2xl"
                     required
                     value={formData.username}
                     onChange={(e) => handleChange("username", e.target.value)}
                   />
                 </div>
               </div>
-
+ 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="password" className="text-slate-300 font-semibold">Contraseña</Label>
-                  <a href="#" className="text-sm text-cyan-400 hover:text-cyan-300 font-bold transition-colors">
+                  <Label htmlFor="password" className="text-emerald-100 font-bold tracking-wide text-xs">Contraseña</Label>
+                  <a href="#" className="text-xs text-cyan-400 hover:text-cyan-300 font-bold transition-colors underline decoration-cyan-400/30 underline-offset-4">
                     ¿Olvidaste tu contraseña?
                   </a>
                 </div>
                 <div className="relative group">
-                  <Lock className={`absolute left-3 top-3 h-5 w-5 z-10 transition-colors ${capsLockOn ? 'text-yellow-500' : 'text-slate-500 group-focus-within:text-cyan-400'}`} />
+                  <Lock className={`absolute left-3.5 top-3.5 h-5 w-5 z-10 transition-colors ${capsLockOn ? 'text-yellow-400' : 'text-emerald-400 group-focus-within:text-cyan-300'}`} />
                   <Input 
                     id="password" 
                     type={showPassword ? "text" : "password"} 
                     placeholder="••••••••" 
                     onFocus={() => setIsPasswordFocused(true)}
                     onBlur={() => setIsPasswordFocused(false)}
-                    className={`pl-11 pr-20 h-12 bg-slate-900/50 text-white placeholder:text-slate-600 focus:bg-slate-900 border-slate-700 focus:ring-2 transition-all text-md ${capsLockOn ? 'focus:ring-yellow-500/50 border-yellow-500/30' : 'focus:ring-cyan-500/50'}`}
+                    className={`pl-11 pr-20 h-12 !bg-[#02211c]/90 text-white placeholder:text-emerald-300/30 focus:!bg-[#011814] !border-emerald-500/30 focus:!border-emerald-400 focus:ring-2 transition-all text-md rounded-2xl ${capsLockOn ? 'focus:ring-yellow-400/50 border-yellow-400/30' : 'focus:ring-emerald-400/20'}`}
                     required
                     value={formData.password}
                     onChange={(e) => handleChange("password", e.target.value)}
@@ -440,7 +480,7 @@ export default function LoginPage() {
                     <AnimatePresence>
                       {capsLockOn && (
                         <motion.div initial={{ opacity: 0, scale: 0 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0 }}>
-                          <ShieldAlert className="h-5 w-5 text-yellow-500" title="Mayúsculas activadas" />
+                          <ShieldAlert className="h-5 w-5 text-yellow-400" />
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -448,13 +488,13 @@ export default function LoginPage() {
                     <button 
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="text-slate-500 hover:text-cyan-400 transition-colors focus:outline-none"
+                      className="text-cyan-400 hover:text-cyan-300 transition-colors focus:outline-none"
                     >
                       {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>
                   </div>
                 </div>
-
+ 
                 {/* BARRA DE SALUD DENTAL (Contraseña) */}
                 <AnimatePresence>
                   {formData.password.length > 0 && (
@@ -464,7 +504,7 @@ export default function LoginPage() {
                       exit={{ opacity: 0, height: 0 }}
                       className="pt-1 overflow-hidden"
                     >
-                      <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden mt-1">
+                      <div className="h-1.5 w-full bg-teal-900/40 rounded-full overflow-hidden mt-1">
                         <div 
                           className={`h-full transition-all duration-500 ease-out ${passColor}`} 
                           style={{ width: `${passLevel}%` }}
@@ -477,40 +517,40 @@ export default function LoginPage() {
                   )}
                 </AnimatePresence>
               </div>
-
+ 
               <div className="flex items-center space-x-3 pt-2">
                 <Checkbox 
                   id="remember" 
                   checked={formData.rememberMe}
                   onCheckedChange={(checked) => handleChange("rememberMe", checked as boolean)}
-                  className="h-5 w-5 data-[state=checked]:bg-cyan-500 data-[state=checked]:border-cyan-500 border-slate-600"
+                  className="h-5 w-5 !border-emerald-500/50 data-[state=checked]:!bg-emerald-500 data-[state=checked]:!border-emerald-400 rounded-md"
                 />
-                <Label htmlFor="remember" className="text-sm font-medium text-slate-300 cursor-pointer select-none">
+                <Label htmlFor="remember" className="text-sm font-semibold text-emerald-200 hover:text-white cursor-pointer select-none transition-colors">
                   Mantener sesión iniciada
                 </Label>
               </div>
-
+ 
               <div className="relative pt-2">
                 <Button 
                   type="submit" 
                   disabled={status === "loading" || status === "success"}
-                  className={`w-full h-12 text-lg font-bold shadow-lg transition-all duration-500 rounded-xl relative overflow-hidden border
+                  className={`w-full h-12 text-lg font-bold shadow-lg transition-all duration-500 rounded-2xl relative overflow-hidden !border
                     ${status === 'success' 
-                      ? 'bg-emerald-500 text-white border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.4)]' 
+                      ? '!bg-emerald-500 !text-white !border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.4)]' 
                       : status === 'error'
-                      ? 'bg-red-900 text-white border-red-700 shadow-red-900/50'
-                      : 'bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-50 border-cyan-500/50 shadow-[0_0_20px_rgba(6,182,212,0.2)]'
+                      ? '!bg-red-900 !text-white !border-red-700 shadow-red-900/50'
+                      : '!bg-gradient-to-r !from-emerald-600 !to-teal-600 hover:!from-emerald-500 hover:!to-teal-500 !text-white !border-emerald-400/40 shadow-[0_4px_25px_rgba(16,185,129,0.35)] hover:shadow-[0_4px_30px_rgba(16,185,129,0.55)]'
                     }`} 
                 >
                   <AnimatePresence mode="wait">
                     {status === "idle" && (
                       <motion.span key="idle" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-2">
-                        <Lock className="w-5 h-5 text-cyan-400" /> Ingresar al Sistema
+                        <Lock className="w-5 h-5 text-cyan-300" /> Ingresar al Sistema
                       </motion.span>
                     )}
                     {status === "loading" && (
                       <motion.span key="loading" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-2">
-                        <Loader2 className="w-5 h-5 animate-spin text-cyan-400" /> Autenticando...
+                        <Loader2 className="w-5 h-5 animate-spin text-cyan-300" /> Autenticando...
                       </motion.span>
                     )}
                     {status === "success" && (
@@ -528,9 +568,9 @@ export default function LoginPage() {
               </div>
             </form>
           </CardContent>
-          <CardFooter className="flex justify-center pb-8 pt-4 border-t border-slate-800/50 mt-4">
-            <p className="text-sm font-medium text-slate-500 flex items-center gap-2">
-              <Lock className="w-3.5 h-3.5 text-slate-600" /> Encriptación Biométrica Nivel 4
+          <CardFooter className="flex justify-center pb-8 pt-4 !border-t !border-teal-700/30 mt-4 !bg-transparent !bg-none !shadow-none">
+            <p className="text-sm font-medium text-cyan-200 flex items-center gap-2">
+              <Lock className="w-3.5 h-3.5 text-cyan-400" /> Encriptación Biométrica Nivel 4
             </p>
           </CardFooter>
         </Card>

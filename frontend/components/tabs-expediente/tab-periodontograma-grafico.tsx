@@ -2,22 +2,33 @@
 
 import React, { useState, useImperativeHandle, forwardRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Save } from "lucide-react";
+import { Save, Download, FileText, Sheet } from "lucide-react";
 import { toast } from "sonner";
 import { SuperiorPalatino } from "./periodontograma/SuperiorPalatino";
 import { SuperiorVestibular } from "./periodontograma/SuperiorVestibular";
 import { InferiorVestibular } from "./periodontograma/InferiorVestibular";
 import { InferiorPalatino } from "./periodontograma/InferiorPalatino";
 import { usePeriodontograma } from "@/context/PeriodontogramaContext";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
+import { exportSubmoduloPeriodontogramaPDF } from "@/lib/exporters/pdf-exporter";
+import { exportSubmoduloPeriodontogramaExcel } from "@/lib/exporters/excel-exporter";
 
 interface TabPeriodontogramaGraficoProps {
   pacienteId: string;
+  paciente?: any;
   ref?: React.Ref<any>;
 }
 
 const TabPeriodontogramaGraficoComponent = forwardRef<any, TabPeriodontogramaGraficoProps>(
-  ({ pacienteId }, ref) => {
-    const { guardarPeriodontograma, loading } = usePeriodontograma();
+  ({ pacienteId, paciente }, ref) => {
+    const { guardarPeriodontograma, loading, datos } = usePeriodontograma();
     const [guardando, setGuardando] = useState(false);
 
     // Exposer método para guardar desde el padre
@@ -49,8 +60,43 @@ const TabPeriodontogramaGraficoComponent = forwardRef<any, TabPeriodontogramaGra
 
     return (
       <div className="flex flex-col gap-8 w-full p-4">
-        {/* BOTÓN DE GUARDADO INDIVIDUAL (OPCIONAL) */}
-        <div className="flex justify-end">
+        {/* BOTONES DE ACCIÓN */}
+        <div className="flex justify-end gap-3">
+          {paciente && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-xs gap-2 border-emerald-500/30 hover:border-emerald-500 text-emerald-600 dark:text-emerald-400 font-semibold shadow-sm"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  <span>Exportar Periodontograma</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52 rounded-2xl border-emerald-500/20 bg-slate-50 dark:bg-zinc-950 p-1.5 shadow-xl">
+                <DropdownMenuLabel className="text-[10px] text-slate-500 font-bold uppercase tracking-wider px-2 py-1.5">
+                  Formatos de Exportación
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => exportSubmoduloPeriodontogramaPDF(paciente, datos)}
+                  className="rounded-xl cursor-pointer hover:bg-emerald-500/10"
+                >
+                  <FileText className="mr-2 h-4 w-4 text-red-500" />
+                  <span>Descargar PDF</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => exportSubmoduloPeriodontogramaExcel(paciente, datos)}
+                  className="rounded-xl cursor-pointer hover:bg-emerald-500/10"
+                >
+                  <Sheet className="mr-2 h-4 w-4 text-green-500" />
+                  <span>Descargar Excel</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
           <Button
             onClick={handleGuardar}
             disabled={guardando || loading}

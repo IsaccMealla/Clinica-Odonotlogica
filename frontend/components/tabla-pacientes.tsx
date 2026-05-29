@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Search, UserX, Stethoscope, Download } from "lucide-react"
+import { Search, UserX, Stethoscope, Download, FileText, Sheet } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,7 +13,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { exportCarpetaMedicaPDF } from "@/lib/exporters/pdf-exporter"
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger, 
+  DropdownMenuSeparator,
+  DropdownMenuLabel 
+} from "@/components/ui/dropdown-menu"
+import { exportPacientesPDF } from "@/lib/exporters/pdf-exporter"
+import { exportPacientesExcel } from "@/lib/exporters/excel-exporter"
+import { ModalExportacionListado } from "./exporters/ModalExportacionListado"
+import { ModalExportacionPaciente } from "./exporters/ModalExportacionPaciente"
 import { toast } from "sonner"
 
 // IMPORTACIÓN DE ACCIONES
@@ -42,49 +53,36 @@ export function TablaPacientes({ pacientesIniciales, onRefresh }: TablaPacientes
     )
   })
 
-  const handleExportPaciente = async (paciente: any) => {
-    try {
-      // Cargar datos completos del paciente desde la API para obtener antecedentes
-      const token = localStorage.getItem("access_token")
-      const res = await fetch(`http://localhost:8000/api/pacientes/${paciente.id}/`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      
-      if (res.ok) {
-        const pacienteCompleto = await res.json()
-        exportCarpetaMedicaPDF(pacienteCompleto)
-        toast.success(`Carpeta de ${paciente.nombres} exportada`)
-      } else {
-        toast.error("Error al cargar los datos del paciente")
-      }
-    } catch (error) {
-      console.error(error)
-      toast.error("Error al exportar")
-    }
-  }
-
   return (
     <div className="space-y-4">
-      {/* BARRA DE BÚSQUEDA */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Buscar por nombre o CI..."
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          className="pl-10 bg-white dark:bg-zinc-950 shadow-sm border-blue-100 focus-visible:ring-blue-500"
-        />
+      {/* BARRA DE BÚSQUEDA Y EXPORTACIÓN GENERAL FILTRADA (Premium UI) */}
+      <div className="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center">
+        <div className="relative max-w-sm flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nombre o CI..."
+            value={busqueda}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBusqueda(e.target.value)}
+            className="pl-10 bg-white dark:bg-zinc-950 shadow-sm border-emerald-100 focus-visible:ring-emerald-500 focus-visible:border-emerald-500 dark:border-emerald-950 animate-in fade-in"
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider mr-1">Lote:</span>
+          <ModalExportacionListado pacientes={pacientesFiltrados} tituloListado="Filtro Actual" />
+          <ModalExportacionListado pacientes={pacientesIniciales} tituloListado="Todo el Universo" />
+        </div>
       </div>
 
       {/* TABLA DE PACIENTES */}
-      <div className="rounded-xl border bg-white dark:bg-zinc-950 shadow-sm overflow-hidden">
+      <div className="rounded-xl border bg-white dark:bg-zinc-950 shadow-sm overflow-hidden border-emerald-500/10">
         <Table>
           <TableHeader className="bg-slate-50 dark:bg-zinc-900/50">
             <TableRow>
-              <TableHead className="font-bold w-[120px]">CI</TableHead>
-              <TableHead className="font-bold">Paciente</TableHead>
-              <TableHead className="font-bold">Contacto</TableHead>
-              <TableHead className="text-right font-bold">Acciones</TableHead>
+              <TableHead className="font-bold w-[120px] text-emerald-800 dark:text-emerald-400">CI</TableHead>
+              <TableHead className="font-bold text-emerald-800 dark:text-emerald-400">Paciente</TableHead>
+              <TableHead className="font-bold text-emerald-800 dark:text-emerald-400">Contacto</TableHead>
+              <TableHead className="text-right font-bold text-emerald-800 dark:text-emerald-400">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -99,14 +97,14 @@ export function TablaPacientes({ pacientesIniciales, onRefresh }: TablaPacientes
               </TableRow>
             ) : (
               pacientesFiltrados.map((paciente) => (
-                <TableRow key={paciente.id} className="hover:bg-blue-50/30 dark:hover:bg-blue-900/10 transition-colors">
-                  <TableCell className="font-mono text-sm font-semibold text-blue-700 dark:text-blue-400">
+                <TableRow key={paciente.id} className="hover:bg-emerald-50/20 dark:hover:bg-emerald-900/5 transition-colors">
+                  <TableCell className="font-mono text-sm font-semibold text-emerald-700 dark:text-emerald-400">
                     {paciente.ci}
                   </TableCell>
                   <TableCell className="font-medium">
                     <div className="flex flex-col">
-                      <span>{paciente.nombres} {paciente.apellido_paterno} {paciente.apellido_materno}</span>
-                      <span className="text-[10px] text-muted-foreground uppercase">{paciente.sexo} - {paciente.edad} años</span>
+                      <span className="text-slate-800 dark:text-slate-200">{paciente.nombres} {paciente.apellido_paterno} {paciente.apellido_materno || ''}</span>
+                      <span className="text-[10px] text-slate-400 uppercase font-semibold">{paciente.sexo} - {paciente.edad} años</span>
                     </div>
                   </TableCell>
                   <TableCell className="text-sm">
@@ -115,28 +113,20 @@ export function TablaPacientes({ pacientesIniciales, onRefresh }: TablaPacientes
                     )}
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
+                    <div className="flex justify-end gap-1 items-center">
                       
-                      {/* ACCIÓN 1: EXPORTAR CARPETA MÉDICA */}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleExportPaciente(paciente)}
-                        className="hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950"
-                        title="Descargar Carpeta Médica (PDF)"
-                      >
-                        <Download className="h-4 w-4" />
-                      </Button>
+                      {/* ACCIÓN 1: MODAL INTERACTIVO DE EXPORTACIÓN GRANULAR (PREMIUM) */}
+                      <ModalExportacionPaciente paciente={paciente} />
                       
                       {/* ACCIÓN 2: CARPETA MÉDICA (Antecedentes Rápidos) */}
-                      <CarpetaMedica paciente={paciente} />
+                      <CarpetaMedica paciente={paciente} onRefresh={onRefresh} />
                       
                       {/* ACCIÓN 3: EXPEDIENTE COMPLETO */}
                       <Link href={`/pacientes/${paciente.id}`}>
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700" 
+                          className="text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:text-emerald-700" 
                           title="Historia Clínica Completa"
                         >
                           <Stethoscope className="h-4 w-4" />
@@ -172,7 +162,7 @@ export function TablaPacientes({ pacientesIniciales, onRefresh }: TablaPacientes
         </div>
         <div className="flex gap-2">
           <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+            <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
             <span className="text-[10px] text-muted-foreground">Activos</span>
           </div>
         </div>

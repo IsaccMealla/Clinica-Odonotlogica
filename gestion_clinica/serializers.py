@@ -22,7 +22,8 @@ from .models import (
     Sillon,  # <-- NUEVO MODELO IMPORTADO AQUÍ
     Cita , # <-- NUEVO MODELO IMPORTADO AQUÍ
     ImagenClinica,
-    Periodontograma  # <-- PERIODONTOGRAMA IMPORTADO
+    Periodontograma,  # <-- PERIODONTOGRAMA IMPORTADO
+    RegistroAsistencia  # <-- REGISTRO DE ASISTENCIA BIOMÉTRICO
 )
 
 User = get_user_model()
@@ -34,10 +35,11 @@ User = get_user_model()
 class UsuarioSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'rol', 'password']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'rol', 'huella_id', 'password']
         extra_kwargs = {
             'password': {'write_only': True},
-            'username': {'required': False} # Le decimos a Django que no obligue al frontend a enviarlo
+            'username': {'required': False}, # Le decimos a Django que no obligue al frontend a enviarlo
+            'huella_id': {'required': False}  # El huella_id es opcional
         }
 
     def create(self, validated_data):
@@ -134,11 +136,11 @@ class ExamenClinicoFisicoSerializer(serializers.ModelSerializer):
 # =========================================================================
 
 class PacienteSerializer(serializers.ModelSerializer):
-    # Usamos 'source' para apuntar al nombre real de la relación en la base de datos (OneToOneField)
-    antecedentes_familiares = AntecedenteFamiliarSerializer(read_only=True, source='antecedentepatologicofamiliar')
-    antecedentes_personales = AntecedentePersonalSerializer(read_only=True, source='antecedentepatologicopersonal')
-    antecedentes_no_patologicos = AntecedenteNoPatologicoSerializer(read_only=True, source='antecedentenopatologicopersonal')
-    antecedentes_ginecologicos = AntecedenteGinecologicoSerializer(read_only=True, source='antecedenteginecologico')
+    # Los related_name en los modelos ya coinciden con estos nombres
+    antecedentes_familiares = AntecedenteFamiliarSerializer(read_only=True)
+    antecedentes_personales = AntecedentePersonalSerializer(read_only=True)
+    antecedentes_no_patologicos = AntecedenteNoPatologicoSerializer(read_only=True)
+    antecedentes_ginecologicos = AntecedenteGinecologicoSerializer(read_only=True)
     
     # Si estos son OneToOneField que ya coinciden con el nombre exacto, se quedan sin source
     habitos = HabitosSerializer(read_only=True)
@@ -182,6 +184,20 @@ class PacienteSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
+        
+        # Asegurar que los antecedentes que no existan se devuelvan como dicts vacíos
+        # en lugar de null, para que el frontend no tenga problemas
+        antecedentes_campos = [
+            'antecedentes_familiares',
+            'antecedentes_personales', 
+            'antecedentes_no_patologicos',
+            'antecedentes_ginecologicos'
+        ]
+        
+        for campo in antecedentes_campos:
+            if ret.get(campo) is None:
+                ret[campo] = {}
+        
         return ret
 
 # ==========================================
@@ -434,4 +450,35 @@ class EvaluacionDesempeñoSerializer(serializers.ModelSerializer):
 
     def get_promedio_criterios(self, obj):
         return obj.promedio_criterios
+
+
+# =========================================================================
+# SERIALIZER REGISTRO DE ASISTENCIA (Biométrico)
+# =========================================================================
+class RegistroAsistenciaSerializer(serializers.ModelSerializer):
+    usuario_nombre = serializers.CharField(source='usuario.get_full_name', read_only=True)
+    usuario_username = serializers.CharField(source='usuario.username', read_only=True)
+    usuario_rol = serializers.CharField(source='usuario.rol', read_only=True)
+
+    class Meta:
+        model = RegistroAsistencia
+        fields = [
+            'id', 'usuario', 'usuario_nombre', 'usuario_username', 'usuario_rol',
+            'fecha_hora', 'accion', 'huella_id', 'verificado'
+        ]
+        read_only_fields = ['id', 'fecha_hora']
     
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+
+class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+
+        # Aquí le decimos a JWT que agregue tu campo personalizado al token
+        token['rol'] = user.rol
+        
+        # Opcional: puedes agregar más datos si los necesitas en el frontend
+        # token['username'] = user.username 
+
+        return token

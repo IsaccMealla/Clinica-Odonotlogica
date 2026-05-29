@@ -24,7 +24,7 @@ interface PeriodontogramaContextType {
   datos: PeriodontogramaData;
   setDatos: (data: PeriodontogramaData) => void;
   cargarPeriodontograma: (pacienteId: string) => Promise<void>;
-  guardarPeriodontograma: (pacienteId: string) => Promise<void>;
+  guardarPeriodontograma: (pacienteId: string) => Promise<boolean>;
   loading: boolean;
   error: string | null;
   periodontogramaId: string | null;

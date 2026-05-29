@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { 
   Calendar, Home, Users, Settings, Syringe, 
-  BarChart3, UserCog, ClipboardList, UserCheck, Wrench
+  BarChart3, UserCog, ClipboardList, UserCheck, Wrench, Fingerprint
 } from "lucide-react"
 import Link from "next/link"
 import {
@@ -19,6 +19,7 @@ import {
 
 const items = [
   { title: "Inicio", url: "/dashboard", icon: Home, roles: ["ADMIN", "DOCENTE", "ESTUDIANTE", "RECEPCIONISTA"] },
+  { title: "Asistencia", url: "/asistencia", icon: Fingerprint, roles: ["ADMIN", "DOCENTE", "ESTUDIANTE", "RECEPCIONISTA"] },
   { title: "Pacientes", url: "/pacientes", icon: Users, roles: ["ADMIN", "DOCENTE", "RECEPCIONISTA"] },
   { title: "Mis Pacientes", url: "/mis-pacientes", icon: UserCheck, roles: ["ESTUDIANTE"] },
   { title: "Asignaciones", url: "/asignacion", icon: ClipboardList, roles: ["ADMIN", "DOCENTE"] },
@@ -57,7 +58,7 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="text-lg font-bold text-primary mb-4 mt-2">
+          <SidebarGroupLabel className="text-lg font-bold text-white mb-6 mt-4 px-4 py-3 bg-gradient-to-r from-cyan-400 to-teal-400 rounded-lg shadow-lg">
             Clinica Dental Pro
           </SidebarGroupLabel>
           <SidebarGroupContent>

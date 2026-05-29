@@ -20,9 +20,63 @@ class CustomUser(AbstractUser):
         ('ESTUDIANTE', 'Estudiante'),
     ]
     rol = models.CharField(max_length=20, choices=ROLES, default='ESTUDIANTE')
+    huella_id = models.IntegerField(
+        unique=True, 
+        null=True, 
+        blank=True, 
+        help_text="ID del sensor biométrico (huella dactilar)"
+    )
 
     def __str__(self):
         return f"{self.username} ({self.get_rol_display()})"
+
+
+# ==========================================
+# REGISTRO DE ASISTENCIA (Biométrico)
+# ==========================================
+class RegistroAsistencia(models.Model):
+    TIPOS_REGISTRO = [
+        ('INGRESO', 'Ingreso'),
+        ('SALIDA', 'Salida'),
+        ('PAUSA', 'Pausa'),
+    ]
+    
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name='registros_asistencia',
+        help_text="Usuario que registra la asistencia"
+    )
+    fecha_hora = models.DateTimeField(default=timezone.now, verbose_name="Fecha y Hora")
+    accion = models.CharField(
+        max_length=20, 
+        choices=TIPOS_REGISTRO, 
+        default='INGRESO',
+        verbose_name="Tipo de Registro"
+    )
+    huella_id = models.IntegerField(
+        null=True, 
+        blank=True, 
+        help_text="ID de huella registrada en el dispositivo biométrico"
+    )
+    verificado = models.BooleanField(
+        default=True, 
+        help_text="¿Huella verificada correctamente por el sistema?"
+    )
+    
+    class Meta:
+        ordering = ['-fecha_hora']
+        indexes = [
+            models.Index(fields=['usuario', '-fecha_hora']),
+            models.Index(fields=['huella_id']),
+        ]
+        verbose_name = "Registro de Asistencia"
+        verbose_name_plural = "Registros de Asistencia"
+
+    def __str__(self):
+        return f"{self.usuario.username} - {self.get_accion_display()} - {self.fecha_hora.strftime('%d/%m/%Y %H:%M')}"
+
+
 # ==========================================
 # 0. CLASE ABSTRACTA DE AUDITORÍA ACADÉMICA
 # ==========================================
@@ -147,6 +201,7 @@ class AntecedentePatologicoFamiliar(SeguimientoAcademico):
 
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
+    activo = models.BooleanField(default=True, help_text="Indica si el antecedente está activo o en papelera")
 
     class Meta:
         db_table = 'antecedentes_familiares'
@@ -207,6 +262,7 @@ class AntecedentePatologicoPersonal(SeguimientoAcademico):
 
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
+    activo = models.BooleanField(default=True, help_text="Indica si el antecedente está activo o en papelera")
 
     class Meta:
         db_table = 'antecedentes_personales'
@@ -231,6 +287,7 @@ class AntecedenteNoPatologicoPersonal(SeguimientoAcademico):
 
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
+    activo = models.BooleanField(default=True, help_text="Indica si el antecedente está activo o en papelera")
 
     class Meta:
         db_table = 'antecedentes_no_patologicos'
@@ -247,6 +304,7 @@ class AntecedenteGinecologico(SeguimientoAcademico):
 
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
+    activo = models.BooleanField(default=True, help_text="Indica si el antecedente está activo o en papelera")
 
     class Meta:
         db_table = 'antecedentes_ginecologicos'
@@ -266,6 +324,7 @@ class Habitos(SeguimientoAcademico):
     bebe = models.BooleanField(default=False, verbose_name="Bebe alcohol")
     interposicion_objetos = models.BooleanField(default=False)
     otros_habitos = models.TextField(blank=True, null=True, verbose_name="Otros hábitos")
+    activo = models.BooleanField(default=True, help_text="Indica si el registro de hábitos está activo o en papelera")
 
     def __str__(self):
         return f"Hábitos de {self.paciente}"
@@ -283,6 +342,7 @@ class AntecedentesPeriodontales(SeguimientoAcademico):
     se_han_separado = models.BooleanField(default=False, verbose_name="¿Se han separado los dientes?")
     se_han_elongado = models.BooleanField(default=False, verbose_name="¿Se han elongado los dientes?")
     halitosis = models.BooleanField(default=False, verbose_name="Halitosis (Mal aliento)")
+    activo = models.BooleanField(default=True, help_text="Indica si el antecedente está activo o en papelera")
 
     def __str__(self):
         return f"Antecedentes Periodontales de {self.paciente}"
@@ -299,6 +359,7 @@ class HistoriaClinica(models.Model):
     creado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='historias_clinicas_creadas')
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
+    activo = models.BooleanField(default=True, help_text="Indica si la historia está activa o en papelera")
 
     class Meta:
         verbose_name = 'Historia Clínica'
@@ -416,6 +477,7 @@ class HistoriaOdontopediatrica(SeguimientoAcademico):
     padres_reganon = models.BooleanField(default=False)
     padres_debil = models.BooleanField(default=False)
     obs_conductual = models.TextField(blank=True, null=True)
+    activo = models.BooleanField(default=True, help_text="Indica si la historia está activa o en papelera")
 
     def __str__(self):
         return f"Historia Odontopediátrica de {self.paciente}"
@@ -470,6 +532,7 @@ class ExamenClinicoFisico(SeguimientoAcademico):
     disminucion_apertura_obs = models.CharField(max_length=255, blank=True, null=True)
     dolor_apertura = models.BooleanField(default=False)
     dolor_apertura_obs = models.CharField(max_length=255, blank=True, null=True)
+    activo = models.BooleanField(default=True, help_text="Indica si el examen está activo o en papelera")
 
     def __str__(self):
         return f"Examen Clínico de {self.paciente}"
@@ -485,6 +548,7 @@ class ExamenPeriodontal(SeguimientoAcademico):
     color = models.CharField(max_length=100, blank=True, null=True)
     textura = models.CharField(max_length=100, blank=True, null=True)
     consistencia = models.CharField(max_length=100, blank=True, null=True)
+    activo = models.BooleanField(default=True, help_text="Indica si el examen está activo o en papelera")
 
     def __str__(self):
         return f"Examen Periodontal de {self.paciente}"
@@ -512,6 +576,7 @@ class ProstodonciaRemovible(SeguimientoAcademico):
     enfilado_y_articulado = models.BooleanField(default=False)
     terminado = models.BooleanField(default=False)
     observaciones_procedimiento = models.TextField(blank=True, null=True)
+    activo = models.BooleanField(default=True, help_text="Indica si el registro está activo o en papelera")
 
     def __str__(self):
         return f"Prostodoncia Removible de {self.paciente}"
@@ -555,6 +620,7 @@ class ProstodonciaFija(SeguimientoAcademico):
     pruebas_iniciales = models.BooleanField(default=False)
     control = models.BooleanField(default=False)
     prueba_final = models.BooleanField(default=False)
+    activo = models.BooleanField(default=True, help_text="Indica si el registro está activo o en papelera")
 
     def __str__(self):
         return f"Prostodoncia Fija de {self.paciente}"
@@ -595,6 +661,7 @@ class ProtocoloQuirurgico(SeguimientoAcademico):
     estudiante_firmo = models.BooleanField(default=False)
     paciente_firmo = models.BooleanField(default=False)
     fecha_firma = models.DateTimeField(blank=True, null=True)
+    activo = models.BooleanField(default=True, help_text="Indica si el protocolo está activo o en papelera")
 
     def __str__(self):
         return f"Protocolo Quirúrgico de {self.paciente}"
@@ -625,6 +692,7 @@ class Tratamiento(models.Model):
     
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
+    activo = models.BooleanField(default=True, help_text="Indica si el tratamiento está activo o en papelera")
 
     def __str__(self):
         return f"{self.nombre_tratamiento} - {self.paciente}"
@@ -644,6 +712,7 @@ class AvanceClinico(SeguimientoAcademico):
     fecha_sesion = models.DateField(default=date.today)
     descripcion_procedimiento = models.TextField(help_text="¿Qué se le hizo al paciente hoy?")
     proxima_cita = models.DateField(blank=True, null=True, help_text="Fecha de la siguiente sesión si es necesaria")
+    activo = models.BooleanField(default=True, help_text="Indica si el avance está activo o en papelera")
 
     def __str__(self):
         return f"Avance {self.fecha_sesion} - {self.tratamiento}"
@@ -670,6 +739,7 @@ class Evidencia(models.Model):
     archivo = models.FileField(upload_to='evidencias_clinicas/%Y/%m/')
     descripcion = models.CharField(max_length=255, blank=True, null=True)
     creado_en = models.DateTimeField(auto_now_add=True)
+    activo = models.BooleanField(default=True, help_text="Indica si la evidencia está activa o en papelera")
 
     def __str__(self):
         return f"Evidencia: {self.get_tipo_evidencia_display()} - Avance {self.avance.fecha_sesion}"
@@ -701,6 +771,7 @@ class Transferencia(models.Model):
     
     fecha_solicitud = models.DateTimeField(auto_now_add=True)
     fecha_resolucion = models.DateTimeField(blank=True, null=True, help_text="Cuando el docente aprobó/rechazó")
+    activo = models.BooleanField(default=True, help_text="Indica si la transferencia está activa o en papelera")
 
     def __str__(self):
         return f"Transferencia de {self.paciente}"
@@ -738,6 +809,7 @@ class Periodontograma(SeguimientoAcademico):
     
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
+    activo = models.BooleanField(default=True, help_text="Indica si el periodontograma está activo o en papelera")
 
     def __str__(self):
         # Como heredas de SeguimientoAcademico, asumimos que tienes acceso al estudiante
@@ -778,6 +850,7 @@ class Sillon(models.Model):
     posicion_x = models.FloatField(default=0.0)
     posicion_y = models.FloatField(default=0.0)
     posicion_z = models.FloatField(default=0.0)
+    activo = models.BooleanField(default=True, help_text="Indica si el sillón está activo o en papelera")
 
     def __str__(self):
         return f"{self.nombre} - {self.estado.upper()}"
@@ -806,10 +879,9 @@ class Cita(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     paciente = models.ForeignKey('Paciente', on_delete=models.CASCADE, related_name='citas')
     estudiante = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.RESTRICT, related_name='citas_estudiante', limit_choices_to={'rol': 'ESTUDIANTE'})
-    docente = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.RESTRICT, related_name='citas_docente', limit_choices_to={'rol': 'DOCENTE'})
-    gabinete = models.ForeignKey('Sillon', on_delete=models.RESTRICT, related_name='citas')
-    motivo = models.ForeignKey('Tratamiento', on_delete=models.CASCADE, related_name='citas')
-    
+    docente = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='citas_docente', limit_choices_to={'rol': 'DOCENTE'})
+    gabinete = models.ForeignKey('Sillon', on_delete=models.SET_NULL, null=True, blank=True, related_name='citas')
+    motivo = models.ForeignKey('Tratamiento', on_delete=models.SET_NULL, null=True, blank=True, related_name='citas')
     fecha_hora = models.DateTimeField(help_text="Fecha y hora de la cita")
     estado = models.CharField(max_length=20, choices=ESTADOS_CITA, default='RESERVADA')
     check_in_time = models.DateTimeField(blank=True, null=True, help_text="Hora de check-in del paciente")
@@ -826,6 +898,7 @@ class Cita(models.Model):
     
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
+    activo = models.BooleanField(default=True, help_text="Indica si la cita está activa o en papelera")
 
     def __str__(self):
         return f"Cita {self.fecha_hora} - {self.paciente} ({self.estado})"
@@ -869,11 +942,9 @@ class CitaRecurrente(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     paciente = models.ForeignKey('Paciente', on_delete=models.CASCADE, related_name='citas_recurrentes')
     estudiante = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.RESTRICT, related_name='citas_recurrentes_estudiante', limit_choices_to={'rol': 'ESTUDIANTE'})
-    docente = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.RESTRICT, related_name='citas_recurrentes_docente', limit_choices_to={'rol': 'DOCENTE'})
-    gabinete = models.ForeignKey('Sillon', on_delete=models.RESTRICT, related_name='citas_recurrentes')
-    motivo = models.ForeignKey('Tratamiento', on_delete=models.CASCADE, related_name='citas_recurrentes')
-
-    # Configuración de recurrencia
+    docente = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='citas_recurrentes_docente', limit_choices_to={'rol': 'DOCENTE'})
+    gabinete = models.ForeignKey('Sillon', on_delete=models.SET_NULL, null=True, blank=True, related_name='citas_recurrentes')
+    motivo = models.ForeignKey('Tratamiento', on_delete=models.SET_NULL, null=True, blank=True, related_name='citas_recurrentes')# Configuración de recurrencia
     frecuencia = models.CharField(max_length=20, choices=FRECUENCIAS, default='SEMANAL')
     hora = models.TimeField(help_text="Hora del día para la cita")
     dias_semana = models.CharField(max_length=20, blank=True, null=True, help_text="Día(s) de la semana (0-6)")
@@ -885,7 +956,7 @@ class CitaRecurrente(models.Model):
     max_ocurrencias = models.IntegerField(blank=True, null=True, help_text="Número máximo de citas a generar")
 
     # Control
-    activa = models.BooleanField(default=True)
+    activa = models.BooleanField(default=True)  # Mantener nombre 'activa' para compatibilidad
     ultima_generacion = models.DateTimeField(auto_now=True)
 
     creado_en = models.DateTimeField(auto_now_add=True)
@@ -908,7 +979,7 @@ class ConfiguracionAlertas(models.Model):
     inasistencias_alerta_abandono = models.IntegerField(default=3, help_text="Número de inasistencias para activar alerta de abandono")
     dias_notificacion_previa = models.IntegerField(default=1, help_text="Días antes de la cita para enviar notificación")
     
-    activa = models.BooleanField(default=True)
+    activa = models.BooleanField(default=True)  # Mantener nombre 'activa' para compatibilidad
     actualizado_en = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -944,6 +1015,7 @@ class AuditoriaCita(models.Model):
     
     descripcion = models.TextField(blank=True, null=True)
     creado_en = models.DateTimeField(auto_now_add=True)
+    activo = models.BooleanField(default=True, help_text="Indica si el registro de auditoria está activo o en papelera")
 
     class Meta:
         db_table = 'auditoria_citas'
@@ -971,6 +1043,7 @@ class HistoricoAbandonoPaciente(models.Model):
     # Reinicio
     reactivado = models.BooleanField(default=False)
     fecha_reactivacion = models.DateTimeField(blank=True, null=True)
+    activo = models.BooleanField(default=True, help_text="Indica si el registro de abandono está activo o en papelera")
 
     class Meta:
         db_table = 'historico_abandono_pacientes'
@@ -1005,6 +1078,7 @@ class ImagenClinica(models.Model):
     pieza_dental = models.IntegerField(null=True, blank=True) # Para radiografías o intraorales
     descripcion = models.TextField(blank=True)
     fecha_adquisicion = models.DateTimeField(auto_now_add=True)
+    activo = models.BooleanField(default=True, help_text="Indica si la imagen está activa o en papelera")
 
     class Meta:
         verbose_name = "Imagen Clínica"
@@ -1079,6 +1153,7 @@ class AsignacionCaso(models.Model):
     # Para calcular avance
     procedimientos_aprobados = models.IntegerField(default=0, help_text="Número de procedimientos aprobados por docente")
     fecha_ultima_actualizacion_avance = models.DateTimeField(auto_now=True)
+    activo = models.BooleanField(default=True, help_text="Indica si la asignación está activa o en papelera")
 
     class Meta:
         db_table = 'asignacion_caso'
@@ -1139,6 +1214,7 @@ class SolicitudSupervision(models.Model):
     
     fecha_solicitud = models.DateTimeField(auto_now_add=True)
     fecha_aprobacion = models.DateTimeField(blank=True, null=True, help_text="Timestamp de la firma electrónica")
+    activo = models.BooleanField(default=True, help_text="Indica si la solicitud está activa o en papelera")
 
     class Meta:
         db_table = 'solicitud_supervision'
@@ -1179,6 +1255,7 @@ class EvaluacionDesempeño(models.Model):
     
     fecha_evaluacion = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
+    activo = models.BooleanField(default=True, help_text="Indica si la evaluación está activa o en papelera")
 
     class Meta:
         db_table = 'evaluacion_desempeño'
@@ -1217,4 +1294,5 @@ class AsignacionPaciente(models.Model):
         null=True, 
         related_name='supervisiones_casos'
     )
+    activo = models.BooleanField(default=True, help_text="Indica si la asignación está activa o en papelera")
     # ... resto de campos

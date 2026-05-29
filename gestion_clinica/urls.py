@@ -1,10 +1,14 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import views 
+from django.urls import path
+from .views import recibir_huella_esp32
 
+from .views import MyTokenObtainPairView 
 # Importamos absolutamente todos los ViewSets
 from .views import (
     UsuarioViewSet,
+    RegistroAsistenciaViewSet,  # <-- NUEVO VIEWSET BIOMÉTRICO
     PacienteViewSet,
     AntecedenteFamiliarViewSet,
     AntecedentePersonalViewSet,
@@ -46,6 +50,9 @@ router = DefaultRouter()
 
 # Registramos USUARIOS
 router.register(r'usuarios', UsuarioViewSet, basename='usuario')
+
+# Registramos REGISTRO DE ASISTENCIA (Biométrico)
+router.register(r'asistencia', RegistroAsistenciaViewSet, basename='asistencia')
 
 # Registramos pacientes
 router.register(r'pacientes', PacienteViewSet, basename='paciente')
@@ -101,7 +108,13 @@ urlpatterns = [
     
     # Ruta para el gráfico 3D de estadísticas
     path('reportes/estadisticas/', views.estadisticas_3d_view, name='estadisticas_3d'),
-    
+    path('api/login/', MyTokenObtainPairView.as_view(), name='token_obtain_pair'), 
     # Ruta personalizada para recuperación de contraseña
     path('recuperar-password/', views.enviar_correo_recuperacion, name='recuperar_password'),
+    path('biometrico/asistencia/', recibir_huella_esp32, name='recibir_huella_esp32'),
 ]
+
+
+
+
+

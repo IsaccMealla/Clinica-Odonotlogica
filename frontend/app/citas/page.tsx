@@ -20,6 +20,8 @@ import Gabinetes3D from "@/components/citas/Gabinetes3D"
 import ReporteProductividad from "@/components/citas/ReporteProductividad"
 import { Cita } from "@/types/cita"
 
+import { CitasExport } from "@/components/exporters/citas-export"
+
 export default function CitasPage() {
   const [citas, setCitas] = useState<Cita[]>([])
   const [loading, setLoading] = useState(true)
@@ -64,15 +66,18 @@ export default function CitasPage() {
           <h1 className="text-3xl font-extrabold tracking-tight">Gestión Operativa de Citas</h1>
           <p className="text-muted-foreground">Monitoreo de gabinetes, flujo de pacientes y control de ausentismo.</p>
         </div>
-        <div className="flex gap-2">
-          <Badge variant="outline" className="px-3 py-1">
-            {citasHoy.length} Citas hoy
-          </Badge>
-          {citasEspera.length > 0 && (
-            <Badge variant="destructive" className="px-3 py-1 animate-bounce">
-              {citasEspera.length} En espera
+        <div className="flex items-center gap-3">
+          <CitasExport citas={citas} />
+          <div className="flex gap-2">
+            <Badge variant="outline" className="px-3 py-1">
+              {citasHoy.length} Citas hoy
             </Badge>
-          )}
+            {citasEspera.length > 0 && (
+              <Badge variant="destructive" className="px-3 py-1 animate-bounce">
+                {citasEspera.length} En espera
+              </Badge>
+            )}
+          </div>
         </div>
       </div>
 

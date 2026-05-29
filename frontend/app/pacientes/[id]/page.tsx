@@ -3,12 +3,20 @@
 import { useState, use, useEffect, useRef } from "react"
 import { 
     ArrowLeft, User, Stethoscope, Activity, FileText, 
-    Save, ClipboardList, ImageIcon, UploadCloud 
+    Save, ClipboardList, ImageIcon, UploadCloud, Download, Sheet
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useRouter } from "next/navigation"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu"
 
 // IMPORTAMOS LOS COMPONENTES DE LAS PESTAÑAS
 import { TabEvaluacionGeneral } from "@/components/tabs-expediente/tab-evaluacion-general"
@@ -18,10 +26,14 @@ import { TabPeriodontogramaGrafico } from "@/components/tabs-expediente/tab-peri
 import { TabHistorialTratamientos } from "@/components/tabs-expediente/tab-historial-tratamientos"
 import { PeriodontogramaProvider } from "@/context/PeriodontogramaContext"
 
+import { exportSubmoduloHistoriaClinicaPDF } from "@/lib/exporters/pdf-exporter"
+import { exportSubmoduloHistoriaClinicaExcel } from "@/lib/exporters/excel-exporter"
+
 // MODULO 5: IMÁGENES
 import VisorRadiologico from "@/components/imagenes/VisorRadiologico"
 import ImageUpload from "@/components/imagenes/ImageUpload"
 import ExploradorImagenes from "@/components/imagenes/ExploradorImagenes"       
+
 
 export default function ExpedientePacientePage({ params }: { params: Promise<{ id: string }> }) {
     const router = useRouter();
@@ -198,22 +210,54 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
                 {/* --- CONTENIDO: HISTORIA CLÍNICA --- */}
                 <TabsContent value="historia" className="mt-6 flex-1">
                     <Card className="h-full border-emerald-100 shadow-sm">
-                        <CardHeader className="bg-emerald-50/50 border-b">
+                        <CardHeader className="bg-emerald-50/50 border-b flex flex-row items-center justify-between">
                             <CardTitle className="text-emerald-800">Historia Clínica Detallada</CardTitle>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="sm" className="gap-2 border-emerald-500/30 hover:border-emerald-500 text-emerald-600 dark:text-emerald-400 font-semibold cursor-pointer shadow-sm">
+                                        <Download className="h-4 w-4" />
+                                        <span>Exportar Historia</span>
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-52 rounded-2xl border-emerald-500/20 bg-slate-50 dark:bg-zinc-950 p-1.5 shadow-xl">
+                                    <DropdownMenuLabel className="text-[10px] text-slate-500 font-bold uppercase tracking-wider px-2 py-1.5">
+                                        Formatos de Exportación
+                                    </DropdownMenuLabel>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                        onClick={() => exportSubmoduloHistoriaClinicaPDF(paciente, formData)}
+                                        className="rounded-xl cursor-pointer hover:bg-emerald-500/10"
+                                    >
+                                        <FileText className="mr-2 h-4 w-4 text-red-500" />
+                                        <span>Descargar PDF</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        onClick={() => exportSubmoduloHistoriaClinicaExcel(paciente, formData)}
+                                        className="rounded-xl cursor-pointer hover:bg-emerald-500/10"
+                                    >
+                                        <Sheet className="mr-2 h-4 w-4 text-green-500" />
+                                        <span>Descargar Excel</span>
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         </CardHeader>
                         <CardContent className="p-6">
                             <Tabs defaultValue="evaluacion" className="w-full">
-                                <TabsList className="grid w-full grid-cols-3 mb-6 bg-slate-100">
+                                <TabsList className={`grid w-full mb-6 bg-slate-100 ${paciente.edad <= 14 ? 'grid-cols-3' : 'grid-cols-2'}`}>
                                     <TabsTrigger value="evaluacion">Evaluación y Hábitos</TabsTrigger>
-                                    <TabsTrigger value="odontopediatria">Odontopediatría</TabsTrigger>
+                                    {paciente.edad <= 14 && (
+                                        <TabsTrigger value="odontopediatria">Odontopediatría</TabsTrigger>
+                                    )}
                                     <TabsTrigger value="periodoncia">Enf. Periodontales</TabsTrigger>
                                 </TabsList>
                                 <TabsContent value="evaluacion">
                                     <TabEvaluacionGeneral formData={formData} onChange={handleInputChange} />
                                 </TabsContent>
-                                <TabsContent value="odontopediatria">
-                                    <TabOdontopediatria formData={formData} onChange={handleInputChange} />
-                                </TabsContent>
+                                {paciente.edad <= 14 && (
+                                    <TabsContent value="odontopediatria">
+                                        <TabOdontopediatria formData={formData} onChange={handleInputChange} />
+                                    </TabsContent>
+                                )}
                                 <TabsContent value="periodoncia">
                                     <TabPeriodoncia formData={formData} onChange={handleInputChange} />
                                 </TabsContent>
@@ -237,7 +281,7 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
                         </CardHeader>
                         <CardContent className="p-6">
                             <PeriodontogramaProvider pacienteId={pacienteId}>
-                                <TabPeriodontogramaGrafico ref={periodontogramaRef} pacienteId={pacienteId} />
+                                <TabPeriodontogramaGrafico ref={periodontogramaRef} pacienteId={pacienteId} paciente={paciente} />
                             </PeriodontogramaProvider>
                         </CardContent>
                     </Card>
@@ -280,7 +324,7 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
                         
                         {/* Columna Derecha: Visor Avanzado */}
                         <div className="lg:col-span-3">
-                            <VisorRadiologico imagenes={imagenes} />
+                            <VisorRadiologico imagenes={imagenes} paciente={paciente} />
                         </div>
                     </div>
                 </TabsContent>

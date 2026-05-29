@@ -17,11 +17,28 @@ interface FormularioCitaProps {
   citasExistentes?: Cita[]
 }
 
+// 🔐 Función para decodificar JWT
+const parseJwt = (token: string) => {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(window.atob(base64));
+  } catch (e) {
+    console.error("Error al decodificar JWT:", e);
+    return null;
+  }
+}
+
 export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = [] }: FormularioCitaProps) {
   const { playSound } = useSoundPlayer()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [conflicto, setConflicto] = useState<string>('')
+  
+  // Estados de usuario
+  const [usuarioActual, setUsuarioActual] = useState({ rol: "", id: "" })
+  const [esEstudiante, setEsEstudiante] = useState(false)
+  
   const [formData, setFormData] = useState({
     paciente: '',
     estudiante: '',
@@ -38,19 +55,54 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
   const [tratamientos, setTratamientos] = useState<Tratamiento[]>([])
   const [sillones, setSillones] = useState<Sillon[]>([])
 
+  // 1. NUEVO EFECTO: Obtenemos el rol y el ID apenas carga el componente
+  useEffect(() => {
+    const role = localStorage.getItem("user_role");
+    const userId = localStorage.getItem("user_id");
+    const token = localStorage.getItem("access_token");
+
+    let finalId = userId || "";
+
+    // Si no tenemos el ID en localStorage, lo intentamos sacar del JWT
+    if (!finalId && token) {
+      const decoded = parseJwt(token);
+      finalId = decoded?.user_id || decoded?.id || "";
+    }
+
+    // Tratamos de obtener el rol del localStorage o del token como respaldo
+    let rolCrudo = role || "";
+    if (!rolCrudo && token) {
+      const decoded = parseJwt(token);
+      rolCrudo = decoded?.rol || decoded?.role || "";
+    }
+
+    if (rolCrudo) {
+      const rolNormalizado = String(rolCrudo).toUpperCase().trim();
+      setUsuarioActual({ rol: rolNormalizado, id: finalId });
+      setEsEstudiante(rolNormalizado.includes("ESTUDIANTE"));
+
+      // Pre-asignar el estudiante si aplica
+      if (rolNormalizado.includes("ESTUDIANTE")) {
+        setFormData(prev => ({ ...prev, estudiante: finalId }));
+      }
+    }
+  }, []);
+
+  // 2. EFECTO: Cargar datos cuando se abre el modal
   useEffect(() => {
     if (open) {
-      fetchData()
+      cargarDatos()
       if (citaEditar) {
-        setFormData({
+        setFormData(prev => ({
+          ...prev, // Mantenemos el estudiante autoasignado si aplica
           paciente: citaEditar.paciente?.toString() || '',
-          estudiante: citaEditar.estudiante?.toString() || '',
+          estudiante: esEstudiante ? usuarioActual.id : (citaEditar.estudiante?.toString() || ''),
           docente: citaEditar.docente?.toString() || '',
           gabinete: citaEditar.gabinete?.toString() || '',
           motivo: citaEditar.motivo?.toString() || '',
           fecha_hora: citaEditar.fecha_hora ? citaEditar.fecha_hora.slice(0, 16) : '',
           duracion_estimada: citaEditar.duracion_estimada || 30
-        })
+        }))
       }
     }
   }, [open, citaEditar])
@@ -61,28 +113,43 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
     return []
   }
 
-  const fetchData = async () => {
+  // 3. FUNCIÓN LIMPIA: Solo hace peticiones a la API
+  const cargarDatos = async () => {
     try {
       const token = localStorage.getItem('access_token')
-      const headers: HeadersInit = { 'Content-Type': 'application/json' }
-      if (token) headers.Authorization = `Bearer ${token}`
+      if (!token) return
 
-      const [pacRes, estRes, docRes, tratRes, silRes] = await Promise.all([
-        fetch('http://127.0.0.1:8000/api/pacientes/', { headers }),
-        fetch('http://127.0.0.1:8000/api/usuarios/?rol=ESTUDIANTE', { headers }),
-        fetch('http://127.0.0.1:8000/api/usuarios/?rol=DOCENTE', { headers }),
+      const headers: HeadersInit = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
+      
+      // Usamos el rol que ya calculamos en el estado (o el localStorage como respaldo)
+      const rolActual = usuarioActual.rol || localStorage.getItem("user_role")?.toUpperCase().trim() || "";
+
+      const [pacRes, tratRes, silRes, docRes] = await Promise.all([
+        fetch('http://127.0.0.1:8000/api/pacientes/mis_asignaciones/', { headers }),
         fetch('http://127.0.0.1:8000/api/tratamientos/', { headers }),
-        fetch('http://127.0.0.1:8000/api/sillones/', { headers })
+        fetch('http://127.0.0.1:8000/api/sillones/', { headers }),
+        fetch('http://127.0.0.1:8000/api/usuarios/?rol=DOCENTE', { headers })
       ])
 
-      setPacientes(normalizeList(await pacRes.json()))
-      setEstudiantes(normalizeList(await estRes.json()))
-      setDocentes(normalizeList(await docRes.json()).filter((u: Usuario) => u.rol === 'DOCENTE'))
-      setTratamientos(normalizeList(await tratRes.json()))
-      setSillones(normalizeList(await silRes.json()))
+      const pacData = await pacRes.json()
+      const tratData = await tratRes.json()
+      const silData = await silRes.json()
+      const docData = await docRes.json()
+
+      setPacientes(normalizeList(pacData))
+      setTratamientos(normalizeList(tratData))
+      setSillones(normalizeList(silData))
+      setDocentes(normalizeList(docData).filter((u: Usuario) => u.rol === 'DOCENTE'))
+      
+      // Solo cargar todos los estudiantes si NO es estudiante
+      if (!rolActual.includes("ESTUDIANTE")) {
+        const estRes = await fetch('http://127.0.0.1:8000/api/usuarios/?rol=ESTUDIANTE', { headers })
+        const estData = await estRes.json()
+        setEstudiantes(normalizeList(estData))
+      }
       
     } catch (error) {
-      console.error('Error fetching data:', error)
+      console.error('Error cargando datos:', error)
     }
   }
 
@@ -90,7 +157,11 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
   const validarConflictosHorario = () => {
     setConflicto('')
     
-    if (!formData.paciente || !formData.estudiante || !formData.fecha_hora) {
+    const camposObligatorios = esEstudiante 
+      ? !formData.paciente || !formData.fecha_hora
+      : !formData.paciente || !formData.estudiante || !formData.fecha_hora
+
+    if (camposObligatorios) {
       setConflicto('⚠️ Faltan campos obligatorios para agendar la cita.')
       return false
     }
@@ -137,8 +208,18 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
 
     setLoading(true)
     
-    // Debug para ver qué se envía exactamente al backend
-    console.log("Payload enviado:", formData)
+    // 🧹 LIMPIEZA DE DATOS: Convertimos los textos vacíos a null
+    const datosAEnviar = {
+      paciente: formData.paciente,
+      fecha_hora: formData.fecha_hora,
+      duracion_estimada: formData.duracion_estimada,
+      estudiante: esEstudiante ? usuarioActual.id : formData.estudiante,
+      docente: formData.docente === "" ? null : formData.docente,
+      gabinete: formData.gabinete === "" ? null : formData.gabinete,
+      motivo: formData.motivo === "" ? null : formData.motivo,
+    }
+
+    console.log("Enviando cita:", datosAEnviar)
 
     try {
       const url = citaEditar
@@ -151,27 +232,27 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('access_token')}`
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(datosAEnviar)
       })
 
       if (response.ok) {
         playSound('exito')
         setOpen(false)
-        setFormData({
+        setFormData(prev => ({
           paciente: '',
-          estudiante: '',
+          estudiante: esEstudiante ? usuarioActual.id : '',
           docente: '',
           gabinete: '',
           motivo: '',
           fecha_hora: '',
           duracion_estimada: 30
-        })
+        }))
         setConflicto('')
         onCitaCreated()
       } else {
         const errorData = await response.json()
-        console.error("Error del servidor (Django):", errorData)
-        setConflicto(`Error del servidor: ${JSON.stringify(errorData)}`)
+        console.error("Error del servidor:", errorData)
+        setConflicto(`Error: ${JSON.stringify(errorData)}`)
       }
     } catch (error) {
       console.error('Error saving cita:', error)
@@ -203,124 +284,173 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
             </Alert>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* PACIENTE */}
-            <div className="space-y-1">
-              <Label htmlFor="paciente">Paciente <span className="text-red-500">*</span></Label>
-              <Select value={formData.paciente} onValueChange={(value) => setFormData({...formData, paciente: value})}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar paciente" />
-                </SelectTrigger>
-                <SelectContent>
-                  {pacientes.map(p => (
-                    <SelectItem key={p.id} value={p.id.toString()}>
-                      {p.apellido_paterno} {p.nombres}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          {/* FORMULARIO SIMPLIFICADO PARA ESTUDIANTES */}
+          {esEstudiante ? (
+            <div className="space-y-4">
+              {/* PACIENTE */}
+              <div className="space-y-2">
+                <Label htmlFor="paciente">Paciente <span className="text-red-500">*</span></Label>
+                <Select value={formData.paciente} onValueChange={(value) => setFormData({...formData, paciente: value})}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar paciente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {pacientes.map(p => (
+                      <SelectItem key={p.id} value={p.id.toString()}>
+                        {p.apellido_paterno} {p.nombres}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-blue-600">Tus pacientes asignados</p>
+              </div>
 
-            {/* ESTUDIANTE */}
-            <div className="space-y-1">
-              <Label htmlFor="estudiante">Estudiante Asignado <span className="text-red-500">*</span></Label>
-              <Select value={formData.estudiante} onValueChange={(value) => setFormData({...formData, estudiante: value})}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar estudiante" />
-                </SelectTrigger>
-                <SelectContent>
-                  {estudiantes.map(est => (
-                    <SelectItem key={est.id} value={est.id.toString()}>
-                      {est.first_name} {est.last_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+              {/* FECHA Y HORA */}
+              <div className="space-y-2">
+                <Label htmlFor="fecha_hora">Fecha y Hora <span className="text-red-500">*</span></Label>
+                <Input
+                  id="fecha_hora"
+                  type="datetime-local"
+                  value={formData.fecha_hora}
+                  onChange={(e) => setFormData({...formData, fecha_hora: e.target.value})}
+                  required
+                />
+              </div>
 
-            {/* DOCENTE */}
-            <div className="space-y-1">
-              <Label htmlFor="docente">Docente Supervisor</Label>
-              <Select value={formData.docente} onValueChange={(value) => setFormData({...formData, docente: value})}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar docente" />
-                </SelectTrigger>
-                <SelectContent>
-                  {docentes.map(doc => (
-                    <SelectItem key={doc.id} value={doc.id.toString()}>
-                      {doc.first_name} {doc.last_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {/* DURACIÓN */}
+              <div className="space-y-2">
+                <Label htmlFor="duracion">Duración Estimada (min)</Label>
+                <Input
+                  id="duracion"
+                  type="number"
+                  value={formData.duracion_estimada}
+                  onChange={(e) => setFormData({...formData, duracion_estimada: parseInt(e.target.value) || 30})}
+                  min="15"
+                  max="180"
+                />
+              </div>
             </div>
+          ) : (
+            /* FORMULARIO COMPLETO PARA ADMIN/DOCENTES */
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* PACIENTE */}
+              <div className="space-y-2">
+                <Label htmlFor="paciente">Paciente <span className="text-red-500">*</span></Label>
+                <Select value={formData.paciente} onValueChange={(value) => setFormData({...formData, paciente: value})}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar paciente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {pacientes.map(p => (
+                      <SelectItem key={p.id} value={p.id.toString()}>
+                        {p.apellido_paterno} {p.nombres}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            {/* GABINETE / SILLÓN */}
-            <div className="space-y-1">
-              <Label htmlFor="gabinete">Gabinete / Sillón</Label>
-              <Select value={formData.gabinete} onValueChange={(value) => setFormData({...formData, gabinete: value})}>
-                <SelectTrigger>
-                  <SelectValue placeholder={sillones.length > 0 ? "Seleccionar gabinete" : "Sin gabinetes en la base de datos"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {sillones.map(sillon => (
-                    <SelectItem key={sillon.id} value={sillon.id.toString()}>
-                      {sillon.nombre || `Gabinete ${sillon.numero}`} {sillon.estado ? `(${sillon.estado})` : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+              {/* ESTUDIANTE */}
+              <div className="space-y-2">
+                <Label htmlFor="estudiante">Estudiante <span className="text-red-500">*</span></Label>
+                <Select value={formData.estudiante} onValueChange={(value) => setFormData({...formData, estudiante: value})}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar estudiante" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {estudiantes.map(est => (
+                      <SelectItem key={est.id} value={est.id.toString()}>
+                        {est.first_name} {est.last_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            {/* MOTIVO / TRATAMIENTO */}
-            <div className="space-y-1">
-              <Label htmlFor="motivo">Motivo (Tratamiento)</Label>
-              <Select value={formData.motivo} onValueChange={(value) => setFormData({...formData, motivo: value})}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar tratamiento" />
-                </SelectTrigger>
-                <SelectContent>
-                  {tratamientos.map(trat => (
-                    <SelectItem key={trat.id} value={trat.id.toString()}>
-                      {trat.nombre_tratamiento}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+              {/* DOCENTE */}
+              <div className="space-y-2">
+                <Label htmlFor="docente">Docente Supervisor</Label>
+                <Select value={formData.docente} onValueChange={(value) => setFormData({...formData, docente: value})}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar docente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {docentes.map(doc => (
+                      <SelectItem key={doc.id} value={doc.id.toString()}>
+                        {doc.first_name} {doc.last_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            {/* FECHA Y HORA */}
-            <div className="space-y-1">
-              <Label htmlFor="fecha_hora">Fecha y Hora <span className="text-red-500">*</span></Label>
-              <Input
-                id="fecha_hora"
-                type="datetime-local"
-                value={formData.fecha_hora}
-                onChange={(e) => setFormData({...formData, fecha_hora: e.target.value})}
-                required
-              />
-            </div>
+              {/* GABINETE */}
+              <div className="space-y-2">
+                <Label htmlFor="gabinete">Gabinete / Sillón</Label>
+                <Select value={formData.gabinete} onValueChange={(value) => setFormData({...formData, gabinete: value})}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={sillones.length > 0 ? "Seleccionar gabinete" : "Sin gabinetes"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sillones.map(sillon => (
+                      <SelectItem key={sillon.id} value={sillon.id.toString()}>
+                        {sillon.nombre || `Gabinete ${sillon.numero}`} {sillon.estado ? `(${sillon.estado})` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            {/* DURACIÓN */}
-            <div className="space-y-1">
-              <Label htmlFor="duracion">Duración Estimada (min)</Label>
-              <Input
-                id="duracion"
-                type="number"
-                value={formData.duracion_estimada}
-                onChange={(e) => setFormData({...formData, duracion_estimada: parseInt(e.target.value) || 30})}
-                min="15"
-                max="180"
-              />
+              {/* MOTIVO */}
+              <div className="space-y-2">
+                <Label htmlFor="motivo">Motivo (Tratamiento)</Label>
+                <Select value={formData.motivo} onValueChange={(value) => setFormData({...formData, motivo: value})}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar tratamiento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tratamientos.map(trat => (
+                      <SelectItem key={trat.id} value={trat.id.toString()}>
+                        {trat.nombre_tratamiento}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* FECHA Y HORA */}
+              <div className="space-y-2">
+                <Label htmlFor="fecha_hora">Fecha y Hora <span className="text-red-500">*</span></Label>
+                <Input
+                  id="fecha_hora"
+                  type="datetime-local"
+                  value={formData.fecha_hora}
+                  onChange={(e) => setFormData({...formData, fecha_hora: e.target.value})}
+                  required
+                />
+              </div>
+
+              {/* DURACIÓN */}
+              <div className="space-y-2">
+                <Label htmlFor="duracion">Duración (min)</Label>
+                <Input
+                  id="duracion"
+                  type="number"
+                  value={formData.duracion_estimada}
+                  onChange={(e) => setFormData({...formData, duracion_estimada: parseInt(e.target.value) || 30})}
+                  min="15"
+                  max="180"
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-4 border-t mt-6">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancelar
             </Button>
             <Button type="submit" disabled={loading} className="bg-green-600 hover:bg-green-700 text-white min-w-[120px]">
-              {loading ? 'Procesando...' : (citaEditar ? 'Actualizar Cita' : 'Confirmar Cita')}
+              {loading ? 'Procesando...' : (citaEditar ? 'Actualizar' : 'Agendar')}
             </Button>
           </div>
         </form>
