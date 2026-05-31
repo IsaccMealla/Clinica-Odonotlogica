@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useRouter } from "next/navigation"
+import { BotonSupervisado } from "@/components/seguridad/BotonSupervisado"
 
 // IMPORTAMOS LOS COMPONENTES DE LAS PESTAÑAS
 import { TabEvaluacionGeneral } from "@/components/tabs-expediente/tab-evaluacion-general"
@@ -18,11 +19,12 @@ import { TabPeriodontogramaGrafico } from "@/components/tabs-expediente/tab-peri
 import { TabHistorialTratamientos } from "@/components/tabs-expediente/tab-historial-tratamientos"
 import { PeriodontogramaProvider } from "@/context/PeriodontogramaContext"
 import { HistorialCitasPorPaciente } from "@/components/citas/HistorialCitasPorPaciente"
+import { OdontogramaDinamico } from "@/components/tabs-expediente/odontograma-dinamico"
 
 // MODULO 5: IMÁGENES
-import VisorRadiologico from "@/components/imagenes/VisorRadiologico"
+import VisorRadiografiasAvanzado from "@/components/imagenes/VisorRadiografiasAvanzado"
 import ImageUpload from "@/components/imagenes/ImageUpload"
-import ExploradorImagenes from "@/components/imagenes/ExploradorImagenes"       
+import AuditRadiografias from "@/components/imagenes/AuditRadiografias"       
 
 export default function ExpedientePacientePage({ params }: { params: Promise<{ id: string }> }) {
     const router = useRouter();
@@ -35,12 +37,14 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
         familiares: {}, personales: {}, no_patologicos: {}, ginecologicos: {},
         habitos: {}, antecedentes_periodontales: {}, examen_periodontal: {},
         historia_odontopediatrica: {}, prostodoncia_removible: {},
-        prostodoncia_fija: {}, protocolo_quirurgico: {}, examen_clinico_fisico: {}
+        prostodoncia_fija: {}, protocolo_quirurgico: {}, examen_clinico_fisico: {},
+        odontograma: {}
     });
     const [paciente, setPaciente] = useState<any>(null);
     const [imagenes, setImagenes] = useState([]);
     const [guardando, setGuardando] = useState(false);
     const [cargando, setCargando] = useState(true);
+    const [showUploadRadiografia, setShowUploadRadiografia] = useState(false);
 
     // --- CARGA DE DATOS (PACIENTE, ANTECEDENTES E IMÁGENES) ---
     const cargarPaciente = async (id: string) => {
@@ -100,6 +104,13 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
         setFormData((prev) => ({
             ...prev,
             [seccion]: { ...prev[seccion as keyof typeof prev], [campo]: valor }
+        }));
+    };
+
+    const handleOdontogramaChange = (updater: any) => {
+        setFormData(prev => ({
+            ...prev,
+            odontograma: typeof updater === 'function' ? updater(prev.odontograma || {}) : updater
         }));
     };
 
@@ -169,16 +180,25 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
                     </div>
                 </div>
 
-                <Button onClick={guardarExpediente} disabled={guardando} className="bg-blue-600 hover:bg-blue-700 text-white">
+                <BotonSupervisado
+                    modulo="M2_DIAGNOSTICO"
+                    accionLabel={guardando ? "Guardando..." : "Guardar Expediente"}
+                    accionDescripcion="Guardar Diagnóstico y Odontograma del Expediente"
+                    onAccionPermitida={guardarExpediente}
+                    disabled={guardando}
+                    pacienteId={pacienteId}
+                    pacienteNombre={paciente ? `${paciente.nombres} ${paciente.apellido_paterno}` : ''}
+                    className="min-w-[180px]"
+                >
                     <Save className="h-4 w-4 mr-2" />
                     {guardando ? "Guardando..." : "Guardar Expediente"}
-                </Button>
+                </BotonSupervisado>
             </div>
 
             {/* --- TABS PRINCIPALES (AHORA 6 COLUMNAS) --- */}
             <Tabs defaultValue="historia" className="w-full flex-1 flex flex-col">
 
-                <TabsList className="grid w-full grid-cols-6 h-14 bg-white border shadow-sm rounded-xl p-1">
+                <TabsList className="grid w-full grid-cols-7 h-14 bg-white border shadow-sm rounded-xl p-1">
                     <TabsTrigger value="historia" className="text-md data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700">
                         <FileText className="h-4 w-4 mr-2" /> Historia Clínica
                     </TabsTrigger>
@@ -191,11 +211,14 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
                     <TabsTrigger value="tratamientos" className="text-md data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700">
                         <ClipboardList className="h-4 w-4 mr-2" /> Tratamientos
                     </TabsTrigger>
-                    <TabsTrigger value="imagenes" className="text-md data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700">
-                        <ImageIcon className="h-4 w-4 mr-2" /> Imágenes/RX
+                    <TabsTrigger value="radiografias" className="text-md data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700">
+                        <ImageIcon className="h-4 w-4 mr-2" /> Radiografías
                     </TabsTrigger>
                     <TabsTrigger value="historial-citas" className="text-md data-[state=active]:bg-cyan-50 data-[state=active]:text-cyan-700">
                         <History className="h-4 w-4 mr-2" /> Historial Citas
+                    </TabsTrigger>
+                    <TabsTrigger value="auditoria" className="text-md data-[state=active]:bg-orange-50 data-[state=active]:text-orange-700">
+                        <ClipboardList className="h-4 w-4 mr-2" /> Auditoría
                     </TabsTrigger>
                 </TabsList>
 
@@ -227,9 +250,20 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
                 </TabsContent>
 
                 {/* --- CONTENIDO: ODONTOGRAMA 3D --- */}
-                <TabsContent value="odontograma" className="mt-6">
-                    <Card className="h-[600px] flex items-center justify-center bg-slate-900">
-                        <p className="text-slate-400 font-mono">THREE.JS CANVAS: ODONTOGRAMA EN TIEMPO REAL</p>
+                <TabsContent value="odontograma" className="mt-6 flex-1">
+                    <Card className="border-purple-100 shadow-sm">
+                        <CardHeader className="bg-purple-50/50 border-b">
+                            <CardTitle className="text-purple-800">Odontograma Interactivo</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-6">
+                            <OdontogramaDinamico 
+                                pacienteId={pacienteId}
+                                esPediatrico={paciente?.edad !== null && paciente?.edad <= 14}
+                                edadPaciente={paciente?.edad}
+                                data={formData.odontograma || {}}
+                                onDataChange={handleOdontogramaChange}
+                            />
+                        </CardContent>
                     </Card>
                 </TabsContent>
 
@@ -259,33 +293,38 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
                     </Card>
                 </TabsContent>
 
-                {/* --- NUEVO CONTENIDO: MÓDULO 5 IMÁGENES Y RAYOS X --- */}
-                <TabsContent value="imagenes" className="mt-6 flex-1">
-                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-full">
-                        {/* Columna Izquierda: Panel de Carga */}
-                        <div className="lg:col-span-1 space-y-4">
-                            <Card className="border-blue-100 shadow-sm">
-                                <CardHeader className="bg-blue-50/50 border-b">
-                                    <CardTitle className="text-sm flex items-center gap-2">
-                                        <UploadCloud className="w-4 h-4" /> Adquisición de Imagen
+                {/* --- NUEVO CONTENIDO: MÓDULO 5 RADIOGRAFÍAS Y RAYOS X --- */}
+                <TabsContent value="radiografias" className="mt-6 flex-1">
+                    <div className="space-y-6">
+                        <div className="flex justify-between items-center bg-blue-50/50 p-4 rounded-lg border border-blue-100">
+                            <div>
+                                <h3 className="text-lg font-semibold text-blue-900">Radiografías e Imágenes</h3>
+                                <p className="text-sm text-blue-700">Explora las imágenes existentes o sube una nueva.</p>
+                            </div>
+                            <Button 
+                                onClick={() => setShowUploadRadiografia(!showUploadRadiografia)}
+                                className={showUploadRadiografia ? "bg-slate-500 hover:bg-slate-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white shadow-md"}
+                            >
+                                {showUploadRadiografia ? "Cancelar" : "+ Agregar Nueva Radiografía"}
+                            </Button>
+                        </div>
+
+                        {/* Panel de Carga Superior */}
+                        {showUploadRadiografia && (
+                            <Card className="border-blue-100 shadow-md transition-all duration-300">
+                                <CardHeader className="bg-blue-50 border-b">
+                                    <CardTitle className="text-base flex items-center gap-2 text-blue-800">
+                                        <UploadCloud className="w-5 h-5" /> Adquisición de Imagen
                                     </CardTitle>
                                 </CardHeader>
-                                <CardContent className="pt-4">
+                                <CardContent className="pt-4 space-y-4">
                                     <ImageUpload pacienteId={pacienteId} onUploadSuccess={cargarImagenes} />
                                 </CardContent>
                             </Card>
-                            
-                            <Card className="p-4 bg-blue-50 border-blue-100">
-                                <p className="text-xs text-blue-800 font-medium italic">
-                                    "Recuerde etiquetar correctamente la pieza dental y el plano de corte para capturas CBCT."
-                                </p>
-                            </Card>
-                        </div>
+                        )}
                         
-                        {/* Columna Derecha: Visor Avanzado */}
-                        <div className="lg:col-span-3">
-                            <VisorRadiologico imagenes={imagenes} />
-                        </div>
+                        {/* Visor Avanzado */}
+                        <VisorRadiografiasAvanzado imagenes={imagenes} />
                     </div>
                 </TabsContent>
 
@@ -303,6 +342,23 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
                                 pacienteId={pacienteId} 
                                 pacienteNombre={`${paciente.apellido_paterno} ${paciente.nombres}`}
                             />
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* --- NUEVO CONTENIDO: AUDITORÍA DE RADIOGRAFÍAS --- */}
+                <TabsContent value="auditoria" className="mt-6 flex-1">
+                    <Card className="border-orange-100 shadow-sm">
+                        <CardHeader className="bg-orange-50/50 border-b">
+                            <CardTitle className="text-orange-800 flex items-center gap-2">
+                                <History className="h-5 w-5" /> Auditoría de Radiografías
+                            </CardTitle>
+                            <CardDescription className="text-orange-700">
+                                Registro detallado de todas las acciones realizadas en las radiografías del paciente
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="p-6">
+                            <AuditRadiografias />
                         </CardContent>
                     </Card>
                 </TabsContent>

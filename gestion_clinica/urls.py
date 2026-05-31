@@ -41,6 +41,7 @@ from .views import (
     SolicitudSupervisionViewSet,
     EvaluacionDesempeñoViewSet,
 )
+from .views_roles import RoleViewSet
 
 # Creamos el router automático
 router = DefaultRouter()
@@ -93,6 +94,8 @@ router.register(r'configuracion-cupo', ConfiguracionCupoViewSet, basename='confi
 router.register(r'asignacion-caso', AsignacionCasoViewSet, basename='asignacion-caso')
 router.register(r'solicitud-supervision', SolicitudSupervisionViewSet, basename='solicitud-supervision')
 router.register(r'evaluacion-desempeño', EvaluacionDesempeñoViewSet, basename='evaluacion-desempeño')
+# Roles (gestión de permisos)
+router.register(r'roles', RoleViewSet, basename='roles')
 
 
 urlpatterns = [

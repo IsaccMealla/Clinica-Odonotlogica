@@ -1,9 +1,11 @@
 "use client"
 
+// FILE: frontend/components/app-sidebar.tsx
 import { useEffect, useState } from "react"
+import { loadMe } from '@/lib/permissions'
 import { 
   Calendar, Home, Users, Settings, Syringe, 
-  BarChart3, UserCog, ClipboardList, UserCheck, Wrench
+  BarChart3, UserCog, ClipboardList, UserCheck, Wrench, Shield, BookOpen
 } from "lucide-react"
 import Link from "next/link"
 import {
@@ -19,31 +21,31 @@ import {
 
 const items = [
   { title: "Inicio", url: "/dashboard", icon: Home, roles: ["ADMIN", "DOCENTE", "ESTUDIANTE", "RECEPCIONISTA"] },
-  { title: "Pacientes", url: "/pacientes", icon: Users, roles: ["ADMIN", "DOCENTE", "RECEPCIONISTA"] },
+  { title: "Pacientes", url: "/pacientes", icon: Users, roles: ["ADMIN", "DOCENTE"] },
   { title: "Mis Pacientes", url: "/mis-pacientes", icon: UserCheck, roles: ["ESTUDIANTE"] },
   { title: "Asignaciones", url: "/asignacion", icon: ClipboardList, roles: ["ADMIN", "DOCENTE"] },
-  { title: "Agenda", url: "/citas", icon: Calendar, roles: ["ADMIN", "DOCENTE", "RECEPCIONISTA", "ESTUDIANTE"] },
-  { title: "Tratamientos", url: "/tratamientos", icon: Syringe, roles: ["ADMIN", "DOCENTE", "ESTUDIANTE"] },
+  { title: "Agenda", url: "/citas", icon: Calendar, roles: ["ADMIN", "DOCENTE", "RECEPCIONISTA"] },
+  { title: "Tratamientos", url: "/tratamientos", icon: Syringe, roles: ["ADMIN", "DOCENTE"] },
+  { title: "Supervisión", url: "/supervision", icon: Shield, roles: ["ADMIN", "DOCENTE"] },
   { title: "Reportes 3D", url: "/reportes", icon: BarChart3, roles: ["ADMIN", "DOCENTE"] },
-  { title: "Mantenimiento", url: "/mantenimiento", icon: Wrench, roles: ["ADMIN", "DOCENTE", "ESTUDIANTE", "RECEPCIONISTA"] },
+  { title: "Récord Académico", url: "/academico", icon: BookOpen, roles: ["ADMIN", "ESTUDIANTE"] },
+  { title: "Mantenimiento", url: "/mantenimiento", icon: Wrench, roles: ["ADMIN", "DOCENTE"] },
   { title: "Usuarios", url: "/usuarios", icon: UserCog, roles: ["ADMIN"] }, 
-  { title: "Configuración", url: "/configuracion", icon: Settings, roles: ["ADMIN", "DOCENTE", "ESTUDIANTE", "RECEPCIONISTA"] },
+  { title: "Configuración", url: "/configuracion", icon: Settings, roles: ["ADMIN", "DOCENTE"] },
+  { title: "Gestión de Roles", url: "/gestion-roles", icon: Shield, roles: ["ADMIN"] },
 ]
 
 export function AppSidebar() {
   const [userRole, setUserRole] = useState<string | null>(null)
 
   useEffect(() => {
-    // 1. Obtenemos el rol
-    const role = localStorage.getItem("user_role")
-    
-    // 2. LOG DE DEPURACIÓN: Abre la consola del navegador (F12) y mira qué imprime esto
-    console.log("Rol detectado en Sidebar:", role)
-
-    if (role) {
-      // Normalizamos a MAYÚSCULAS para que coincida con el array 'roles'
-      setUserRole(role.toUpperCase())
-    }
+    // Intenta cargar datos del usuario desde backend y actualizar localStorage
+    (async ()=>{
+      const me = await loadMe()
+      const role = me?.rol || localStorage.getItem('user_role')
+      console.log('Rol detectado en Sidebar:', role)
+      if(role) setUserRole(role.toUpperCase())
+    })()
   }, [])
 
   // Si aún está cargando el rol, mostramos los items básicos que todos ven (como Inicio)

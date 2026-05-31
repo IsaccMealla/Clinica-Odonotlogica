@@ -63,6 +63,25 @@ class UsuarioViewSet(viewsets.ModelViewSet):
     serializer_class = UsuarioSerializer
     permission_classes = [IsAuthenticated]
 
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def me(self, request):
+        user = request.user
+        role_name = getattr(user, 'rol', None)
+        permissions = {}
+        try:
+            from .models_roles import Role
+            role = Role.objects.filter(name__iexact=role_name).first()
+            if role:
+                permissions = role.permissions or {}
+        except Exception:
+            permissions = {}
+
+        serializer = self.get_serializer(user)
+        data = serializer.data
+        data['rol'] = role_name
+        data['permissions'] = permissions
+        return Response(data)
+
     # --- NUEVA ACCIÓN: Obtener solo estudiantes para poder asignarlos ---
     @action(detail=False, methods=['get'])
     def estudiantes(self, request):
@@ -377,15 +396,21 @@ class PeriodontogramaViewSet(viewsets.ModelViewSet):
             raise
     
     def perform_create(self, serializer):
-        """Al crear, asegurarse de que estudiante es el usuario actual y estado es BORRADOR"""
+        """Al crear, asegurarse de que estudiante es el asignado al paciente o el usuario actual y estado es BORRADOR"""
+        paciente = serializer.validated_data.get('paciente')
+        estudiante_final = paciente.estudiante_asignado if paciente and paciente.estudiante_asignado else self.request.user
         serializer.save(
-            estudiante=self.request.user,
+            estudiante=estudiante_final,
             estado_academico='BORRADOR'
         )
     
     def perform_update(self, serializer):
-        """Al actualizar, mantener el estudiante actual"""
-        serializer.save(estudiante=self.request.user)
+        """Al actualizar, mantener el estudiante actual o el asignado"""
+        paciente = serializer.validated_data.get('paciente')
+        if not paciente and self.get_object():
+             paciente = self.get_object().paciente
+        estudiante_final = paciente.estudiante_asignado if paciente and paciente.estudiante_asignado else self.request.user
+        serializer.save(estudiante=estudiante_final)
 
 class HistoriaOdontopediatricaViewSet(viewsets.ModelViewSet):
     queryset = HistoriaOdontopediatrica.objects.all()

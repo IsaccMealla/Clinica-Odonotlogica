@@ -3,6 +3,7 @@
 import { Activity, Eye, FileText } from "lucide-react"
 import { Tratamiento } from "@/app/tratamientos/page"
 import { useRouter } from "next/navigation" // IMPORTANTE
+import PaginatedTable from '@/components/common/PaginatedTable'
 
 interface TablaTratamientosProps {
   tratamientosIniciales: Tratamiento[]
@@ -37,69 +38,68 @@ export function TablaTratamientos({ tratamientosIniciales, onRefresh }: TablaTra
     })
   }
 
+  const searchFields = [
+    { key: 'tratamiento', label: 'Tratamiento', accessor: (t: Tratamiento) => t.nombre_tratamiento || '' },
+    { key: 'paciente', label: 'Paciente', accessor: (t: Tratamiento) => t.paciente_nombre_completo || '' },
+    { key: 'pieza', label: 'Pieza dental', accessor: (t: Tratamiento) => t.diente_pieza || '' },
+    { key: 'estado', label: 'Estado', accessor: (t: Tratamiento) => t.estado || '' },
+  ]
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-          <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-300 border-b dark:border-gray-700">
-            <tr>
-              <th className="px-6 py-4 font-semibold">Tratamiento</th>
-              <th className="px-6 py-4 font-semibold">Pieza Dental</th>
-              <th className="px-6 py-4 font-semibold">Estado</th>
-              <th className="px-6 py-4 font-semibold">Fecha Inicio</th>
-              <th className="px-6 py-4 font-semibold text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-            {tratamientosIniciales.map((tratamiento) => (
-              <tr key={tratamiento.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
-                      <Activity className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-white">{tratamiento.nombre_tratamiento}</p>
-                      <p className="text-xs text-gray-500">Paciente: {tratamiento.paciente_nombre_completo}</p>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  {tratamiento.diente_pieza ? (
-                    <span className="font-mono bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-gray-700 dark:text-gray-300">
-                      {tratamiento.diente_pieza}
-                    </span>
-                  ) : (
-                    <span className="text-gray-400">N/A</span>
-                  )}
-                </td>
-                <td className="px-6 py-4">
-                  {getEstadoBadge(tratamiento.estado)}
-                </td>
-                <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
-                  {formatearFecha(tratamiento.creado_en)}
-                </td>
-                <td className="px-6 py-4 text-right space-x-2">
-                  
-                  {/* BOTÓN ACTUALIZADO PARA NAVEGAR A LA RUTA DINÁMICA */}
-                  <button 
-                    onClick={() => router.push(`/tratamientos/${tratamiento.id}`)}
-                    className="text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-md transition-colors text-xs font-medium inline-flex items-center gap-1"
-                  >
-                    <FileText className="w-4 h-4" />
-                    Avances
-                  </button>
-
-                  <button className="text-gray-600 hover:text-gray-800 bg-gray-50 hover:bg-gray-200 px-3 py-1.5 rounded-md transition-colors text-xs font-medium inline-flex items-center gap-1">
-                    <Eye className="w-4 h-4" />
-                    Ver
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <PaginatedTable
+        data={tratamientosIniciales}
+        searchFields={searchFields}
+        emptyMessage="No se encontraron tratamientos"
+        header={
+          <tr className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-300 border-b dark:border-gray-700">
+            <th className="px-6 py-4 font-semibold text-left">Tratamiento</th>
+            <th className="px-6 py-4 font-semibold text-left">Pieza Dental</th>
+            <th className="px-6 py-4 font-semibold text-left">Estado</th>
+            <th className="px-6 py-4 font-semibold text-left">Fecha Inicio</th>
+            <th className="px-6 py-4 font-semibold text-right">Acciones</th>
+          </tr>
+        }
+        renderRow={(tratamiento: Tratamiento) => (
+          <>
+            <td className="px-6 py-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+                  <Activity className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900 dark:text-white">{tratamiento.nombre_tratamiento}</p>
+                  <p className="text-xs text-gray-500">Paciente: {tratamiento.paciente_nombre_completo}</p>
+                </div>
+              </div>
+            </td>
+            <td className="px-6 py-4">
+              {tratamiento.diente_pieza ? (
+                <span className="font-mono bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-gray-700 dark:text-gray-300">
+                  {tratamiento.diente_pieza}
+                </span>
+              ) : (
+                <span className="text-gray-400">N/A</span>
+              )}
+            </td>
+            <td className="px-6 py-4">{getEstadoBadge(tratamiento.estado)}</td>
+            <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{formatearFecha(tratamiento.creado_en)}</td>
+            <td className="px-6 py-4 text-right space-x-2">
+              <button
+                onClick={() => router.push(`/tratamientos/${tratamiento.id}`)}
+                className="text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-md transition-colors text-xs font-medium inline-flex items-center gap-1"
+              >
+                <FileText className="w-4 h-4" />
+                Avances
+              </button>
+              <button className="text-gray-600 hover:text-gray-800 bg-gray-50 hover:bg-gray-200 px-3 py-1.5 rounded-md transition-colors text-xs font-medium inline-flex items-center gap-1">
+                <Eye className="w-4 h-4" />
+                Ver
+              </button>
+            </td>
+          </>
+        )}
+      />
     </div>
   )
 }

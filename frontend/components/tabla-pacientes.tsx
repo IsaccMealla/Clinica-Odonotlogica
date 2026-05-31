@@ -1,18 +1,9 @@
 "use client"
 
-import { useState } from "react"
-import { Search, UserX, Stethoscope, Download } from "lucide-react"
+import { Stethoscope, Download } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+import PaginatedTable from '@/components/common/PaginatedTable'
 import { exportCarpetaMedicaPDF } from "@/lib/exporters/pdf-exporter"
 import { toast } from "sonner"
 
@@ -29,18 +20,11 @@ interface TablaPacientesProps {
 }
 
 export function TablaPacientes({ pacientesIniciales, onRefresh }: TablaPacientesProps) {
-  const [busqueda, setBusqueda] = useState("")
-
-  // Lógica de filtrado por CI o Nombre
-  const pacientesFiltrados = pacientesIniciales.filter((p) => {
-    const termino = busqueda.toLowerCase()
-    return (
-      p.ci.toLowerCase().includes(termino) ||
-      p.nombres.toLowerCase().includes(termino) ||
-      p.apellido_paterno.toLowerCase().includes(termino) ||
-      (p.apellido_materno && p.apellido_materno.toLowerCase().includes(termino))
-    )
-  })
+  const searchFields = [
+    { key: 'ci', label: 'Buscar por Carnet (CI)', accessor: (p:any) => p.ci || '' },
+    { key: 'nombres', label: 'Buscar por Nombre', accessor: (p:any) => p.nombres || '' },
+    { key: 'apellido_paterno', label: 'Buscar por Apellido', accessor: (p:any) => p.apellido_paterno || '' },
+  ]
 
   const handleExportPaciente = async (paciente: any) => {
     try {
@@ -65,118 +49,43 @@ export function TablaPacientes({ pacientesIniciales, onRefresh }: TablaPacientes
 
   return (
     <div className="space-y-4">
-      {/* BARRA DE BÚSQUEDA */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Buscar por nombre o CI..."
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          className="pl-10 bg-white dark:bg-zinc-950 shadow-sm border-blue-100 focus-visible:ring-blue-500"
-        />
-      </div>
-
-      {/* TABLA DE PACIENTES */}
-      <div className="rounded-xl border bg-white dark:bg-zinc-950 shadow-sm overflow-hidden">
-        <Table>
-          <TableHeader className="bg-slate-50 dark:bg-zinc-900/50">
-            <TableRow>
-              <TableHead className="font-bold w-[120px]">CI</TableHead>
-              <TableHead className="font-bold">Paciente</TableHead>
-              <TableHead className="font-bold">Contacto</TableHead>
-              <TableHead className="text-right font-bold">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {pacientesFiltrados.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={4} className="h-40 text-center">
-                  <div className="flex flex-col items-center justify-center text-muted-foreground">
-                    <UserX className="h-10 w-10 mb-2 opacity-20" />
-                    <p>No se encontraron pacientes con "{busqueda}"</p>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : (
-              pacientesFiltrados.map((paciente) => (
-                <TableRow key={paciente.id} className="hover:bg-blue-50/30 dark:hover:bg-blue-900/10 transition-colors">
-                  <TableCell className="font-mono text-sm font-semibold text-blue-700 dark:text-blue-400">
-                    {paciente.ci}
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    <div className="flex flex-col">
-                      <span>{paciente.nombres} {paciente.apellido_paterno} {paciente.apellido_materno}</span>
-                      <span className="text-[10px] text-muted-foreground uppercase">{paciente.sexo} - {paciente.edad} años</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {paciente.celular || paciente.telefono || (
-                      <span className="text-xs text-muted-foreground italic">Sin registro</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
-                      
-                      {/* ACCIÓN 1: EXPORTAR CARPETA MÉDICA */}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleExportPaciente(paciente)}
-                        className="hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950"
-                        title="Descargar Carpeta Médica (PDF)"
-                      >
-                        <Download className="h-4 w-4" />
-                      </Button>
-                      
-                      {/* ACCIÓN 2: CARPETA MÉDICA (Antecedentes Rápidos) */}
-                      <CarpetaMedica paciente={paciente} />
-                      
-                      {/* ACCIÓN 3: EXPEDIENTE COMPLETO */}
-                      <Link href={`/pacientes/${paciente.id}`}>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700" 
-                          title="Historia Clínica Completa"
-                        >
-                          <Stethoscope className="h-4 w-4" />
-                        </Button>
-                      </Link>
-                      
-                      {/* ACCIÓN 4: VER PERFIL DETALLADO */}
-                      <VerPaciente paciente={paciente} />
-                      
-                      {/* ACCIÓN 5: EDITAR DATOS */}
-                      <EditarPaciente paciente={paciente} onRefresh={onRefresh} />
-                      
-                      {/* ACCIÓN 6: ELIMINAR (BORRADO LÓGICO) */}
-                      <EliminarPaciente 
-                        id={paciente.id} 
-                        nombre={`${paciente.nombres} ${paciente.apellido_paterno}`} 
-                        esLogico={true} 
-                        onRefresh={onRefresh}
-                      />
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-      
-      {/* FOOTER DE LA TABLA */}
-      <div className="flex items-center justify-between px-2">
-        <div className="text-xs text-muted-foreground">
-          Mostrando {pacientesFiltrados.length} de {pacientesIniciales.length} pacientes registrados.
-        </div>
-        <div className="flex gap-2">
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-            <span className="text-[10px] text-muted-foreground">Activos</span>
-          </div>
-        </div>
-      </div>
+      <PaginatedTable
+        data={pacientesIniciales}
+        searchFields={searchFields}
+        emptyMessage="No se encontraron pacientes"
+        header={
+          <tr className="bg-slate-50 dark:bg-zinc-900/50">
+            <th className="font-bold w-[120px] px-4 py-3 text-left">CI</th>
+            <th className="font-bold px-4 py-3 text-left">Paciente</th>
+            <th className="font-bold px-4 py-3 text-left">Contacto</th>
+            <th className="text-right font-bold px-4 py-3">Acciones</th>
+          </tr>
+        }
+        renderRow={(paciente:any) => (
+          <>
+            <td className="font-mono text-sm font-semibold text-blue-700 dark:text-blue-400 px-4 py-4">{paciente.ci}</td>
+            <td className="font-medium px-4 py-4">
+              <div className="flex flex-col gap-1">
+                <span>{paciente.nombres} {paciente.apellido_paterno} {paciente.apellido_materno}</span>
+                <span className="text-[10px] text-muted-foreground uppercase">{paciente.sexo} - {paciente.edad} años</span>
+              </div>
+            </td>
+            <td className="text-sm px-4 py-4">{paciente.celular || paciente.telefono || (<span className="text-xs text-muted-foreground italic">Sin registro</span>)}</td>
+            <td className="text-right px-4 py-4">
+              <div className="flex justify-end gap-1 flex-wrap">
+                <Button variant="ghost" size="icon" onClick={() => handleExportPaciente(paciente)} className="hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950" title="Descargar Carpeta Médica (PDF)"><Download className="h-4 w-4" /></Button>
+                <CarpetaMedica paciente={paciente} />
+                <Link href={`/pacientes/${paciente.id}`}>
+                  <Button variant="ghost" size="icon" className="text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700" title="Historia Clínica Completa"><Stethoscope className="h-4 w-4" /></Button>
+                </Link>
+                <VerPaciente paciente={paciente} />
+                <EditarPaciente paciente={paciente} onRefresh={onRefresh} />
+                <EliminarPaciente id={paciente.id} nombre={`${paciente.nombres} ${paciente.apellido_paterno}`} esLogico={true} onRefresh={onRefresh} />
+              </div>
+            </td>
+          </>
+        )}
+      />
     </div>
   )
 }

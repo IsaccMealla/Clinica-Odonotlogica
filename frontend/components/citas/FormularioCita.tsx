@@ -331,7 +331,7 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
                   <Badge variant="destructive" className="text-xs">Duplicado</Badge>
                 )}
               </Label>
-              <Select value={formData.paciente} onValueChange={(value) => setFormData({...formData, paciente: value})}>
+              <Select value={formData.paciente ?? ""} onValueChange={(value) => setFormData({...formData, paciente: value})}>
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar paciente" />
                 </SelectTrigger>
@@ -353,7 +353,7 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
                   <Badge variant="destructive" className="text-xs">Duplicado</Badge>
                 )}
               </Label>
-              <Select value={formData.estudiante} onValueChange={(value) => setFormData({...formData, estudiante: value})}>
+              <Select value={formData.estudiante ?? ""} onValueChange={(value) => setFormData({...formData, estudiante: value})}>
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar estudiante" />
                 </SelectTrigger>
@@ -375,7 +375,7 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
                   <Badge variant="destructive" className="text-xs">Ocupado</Badge>
                 )}
               </Label>
-              <Select value={formData.docente} onValueChange={(value) => setFormData({...formData, docente: value})}>
+              <Select value={formData.docente ?? ""} onValueChange={(value) => setFormData({...formData, docente: value})}>
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar docente" />
                 </SelectTrigger>
@@ -397,7 +397,7 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
                   <Badge variant="destructive" className="text-xs">Ocupado</Badge>
                 )}
               </Label>
-              <Select value={formData.gabinete} onValueChange={(value) => setFormData({...formData, gabinete: value})}>
+              <Select value={formData.gabinete ?? ""} onValueChange={(value) => setFormData({...formData, gabinete: value})}>
                 <SelectTrigger>
                   <SelectValue placeholder={sillones.length > 0 ? "Seleccionar gabinete" : "Sin gabinetes"} />
                 </SelectTrigger>
@@ -414,18 +414,14 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
             {/* MOTIVO / TRATAMIENTO */}
             <div className="space-y-1">
               <Label htmlFor="motivo">Motivo (Tratamiento)</Label>
-              <Select value={formData.motivo} onValueChange={(value) => setFormData({...formData, motivo: value})}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar tratamiento" />
-                </SelectTrigger>
-                <SelectContent>
-                  {tratamientos.map(trat => (
-                    <SelectItem key={trat.id} value={trat.id.toString()}>
-                      {trat.nombre_tratamiento}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Input
+                id="motivo"
+                type="text"
+                placeholder="Escribir el motivo o tratamiento..."
+                value={formData.motivo ?? ""}
+                onChange={(e) => setFormData({ ...formData, motivo: e.target.value })}
+                className="w-full"
+              />
             </div>
 
             {/* FECHA Y HORA */}
@@ -439,7 +435,7 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
               <Input
                 id="fecha_hora"
                 type="datetime-local"
-                value={formData.fecha_hora}
+                value={formData.fecha_hora ?? ""}
                 onChange={(e) => setFormData({...formData, fecha_hora: e.target.value})}
                 required
               />
@@ -451,7 +447,7 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
               <Input
                 id="duracion"
                 type="number"
-                value={formData.duracion_estimada}
+                value={formData.duracion_estimada ?? 30}
                 onChange={(e) => setFormData({...formData, duracion_estimada: parseInt(e.target.value) || 30})}
                 min="15"
                 max="180"
@@ -463,9 +459,18 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading} className="bg-green-600 hover:bg-green-700 text-white min-w-[120px]">
-              {loading ? 'Procesando...' : (citaEditar ? 'Actualizar Cita' : 'Confirmar Cita')}
-            </Button>
+            <DocenteAuthModal
+              accion="Agendar Cita Clínica"
+              onAprobado={(auditoriaInfo) => {
+                // Inyectar auditoriaInfo en formData si hace falta y guardar
+                const fakeEvent = { preventDefault: () => { } } as React.FormEvent;
+                handleSubmit(fakeEvent);
+              }}
+            >
+              <Button type="button" disabled={loading} className="bg-green-600 hover:bg-green-700 text-white min-w-[120px]">
+                {loading ? 'Procesando...' : (citaEditar ? 'Actualizar Cita' : 'Confirmar Cita')}
+              </Button>
+            </DocenteAuthModal>
           </div>
         </form>
       </DialogContent>

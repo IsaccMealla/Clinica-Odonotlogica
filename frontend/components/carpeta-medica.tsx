@@ -167,7 +167,9 @@ export function CarpetaMedica({ paciente }: { paciente: any }) {
               <TabsTrigger value="personales">Patológicos</TabsTrigger>
               <TabsTrigger value="familiares">Familiares</TabsTrigger>
               <TabsTrigger value="no_patologicos">No Patológicos</TabsTrigger>
-              <TabsTrigger value="ginecologicos" disabled={paciente.sexo !== 'Femenino'}>Ginecología</TabsTrigger>
+              {['Femenino', 'Mujer', 'F'].includes(paciente.sexo) && (
+                <TabsTrigger value="ginecologicos" className="text-pink-700">Ginecología</TabsTrigger>
+              )}
             </TabsList>
             {isEditing && (
                 <Button variant="ghost" size="sm" className="text-red-500 text-xs" onClick={() => {

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useRef, useMemo } from "react"
+import React, { useRef, useMemo, useState } from "react"
 import { Canvas, useFrame, useThree } from "@react-three/fiber"
 import { ScrollControls, useScroll, Environment, Float, Gltf, Scroll, Stars } from "@react-three/drei"
 import * as THREE from "three"
@@ -98,7 +98,7 @@ function DNAHelix() {
 }
 
 // --- 3. DASHBOARD UI (Estética pulida y glassmorphism) ---
-function DashboardUI() {
+const DashboardUI = React.memo(function DashboardUI({role}: {role: string | null}) {
   const scroll = useScroll();
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -129,11 +129,23 @@ function DashboardUI() {
           viewport={{ once: false, amount: 0.5 }}
           className="z-10"
         >
-          <div className="flex items-center gap-3 mb-6">
-            <div className="h-[1px] w-12 bg-gradient-to-r from-cyan-500 to-transparent" />
-            <span className="text-cyan-400 font-mono tracking-[0.5em] text-[10px] uppercase drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]">
-              Biometric Dental Pro
-            </span>
+          <div className="flex flex-col gap-2 mb-6">
+            <div className="flex items-center gap-3">
+              <div className="h-[1px] w-12 bg-gradient-to-r from-cyan-500 to-transparent" />
+              <span className="text-cyan-400 font-mono tracking-[0.5em] text-[10px] uppercase drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]">
+                Biometric Dental Pro
+              </span>
+            </div>
+            {role && (
+              <div className="flex items-center gap-2">
+                <div className="inline-block px-3 py-1 bg-cyan-900/30 border border-cyan-500/30 rounded-full text-cyan-300 text-xs font-bold tracking-widest uppercase">
+                  Rol: {role}
+                </div>
+                <div className="inline-block px-3 py-1 bg-white/5 border border-white/10 rounded-full text-white text-xs font-semibold tracking-wide">
+                  {typeof window !== 'undefined' ? (localStorage.getItem('user_name') || 'Usuario Clínico') : 'Usuario'}
+                </div>
+              </div>
+            )}
           </div>
           <h1 className="text-[6rem] md:text-[9rem] font-black leading-[0.85] tracking-tighter mb-6">
             CLINICA<br/>
@@ -204,12 +216,36 @@ function DashboardUI() {
       </section>
     </div>
   );
-}
+});
+
+import { PanelRecepcion } from "@/components/panel-recepcion"
+import { AlertaAsistencia } from "@/components/alerta-asistencia"
+import { loadMe } from "@/lib/permissions"
 
 // --- 4. COMPONENTE PRINCIPAL ---
 export default function DashboardPage() {
+  const [role, setRole] = useState<string | null>(null);
+  const dashboardUI = useMemo(() => <DashboardUI role={role} />, [role]);
+
+  React.useEffect(() => {
+    (async () => {
+      const me = await loadMe()
+      const r = me?.rol || localStorage.getItem('user_role')
+      if (r) setRole(r.toUpperCase())
+    })()
+  }, [])
+
+  if (role === 'RECEPCIONISTA') {
+    return (
+      <main className="w-full min-h-screen bg-[#020617]">
+        <PanelRecepcion />
+      </main>
+    )
+  }
+  
   return (
     <main className="w-full h-screen bg-[#020617] relative overflow-hidden">
+      <AlertaAsistencia />
       
       <div className="absolute inset-0 z-0">
         <Canvas camera={{ position: [0, 0, 8], fov: 45 }}>
@@ -228,7 +264,7 @@ export default function DashboardPage() {
           <ScrollControls pages={3} damping={0.25} distance={1.2}>
             <DNAHelix />
             <Scroll html className="w-full">
-              <DashboardUI />
+              {dashboardUI}
             </Scroll>
           </ScrollControls>
         </Canvas>

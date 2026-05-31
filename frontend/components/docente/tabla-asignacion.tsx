@@ -1,11 +1,10 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Search, Loader2, UserCheck, AlertCircle, UserX, Stethoscope } from "lucide-react"
+import { Loader2, UserCheck, Stethoscope } from "lucide-react"
 import Link from "next/link"
-import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import PaginatedTable from '@/components/common/PaginatedTable'
 
 // IMPORTACIÓN DE ACCIONES
 import { NuevaAsignacion } from "./nueva-asignacion"
@@ -34,7 +33,6 @@ interface Paciente {
 export function TablaAsignacion({ token }: { token: string }) {
   const [pacientes, setPacientes] = useState<Paciente[]>([])
   const [estudiantes, setEstudiantes] = useState<Estudiante[]>([])
-  const [busqueda, setBusqueda] = useState("")
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -67,15 +65,11 @@ export function TablaAsignacion({ token }: { token: string }) {
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  const asignacionesActivas = pacientes.filter((p) => {
-    if (!p.estudiante_asignado) return false
-    const termino = busqueda.toLowerCase()
-    return (
-      p.ci.toLowerCase().includes(termino) ||
-      p.nombres.toLowerCase().includes(termino) ||
-      p.apellido_paterno.toLowerCase().includes(termino)
-    )
-  })
+  const searchFields = [
+    { key: 'ci', label: 'CI', accessor: (p: Paciente) => p.ci || '' },
+    { key: 'nombres', label: 'Nombre', accessor: (p: Paciente) => p.nombres || '' },
+    { key: 'apellido_paterno', label: 'Apellido', accessor: (p: Paciente) => p.apellido_paterno || '' },
+  ]
 
   if (cargando) return (
     <div className="flex flex-col items-center justify-center p-20 gap-2">
@@ -87,15 +81,6 @@ export function TablaAsignacion({ token }: { token: string }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-        <div className="relative max-w-sm flex-1 w-full">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input 
-            placeholder="Buscar por CI o nombre..." 
-            className="pl-10 bg-white border-blue-100" 
-            value={busqueda} 
-            onChange={(e) => setBusqueda(e.target.value)} 
-          />
-        </div>
         <NuevaAsignacion 
           pacientes={pacientes} 
           estudiantes={estudiantes} 
@@ -104,89 +89,61 @@ export function TablaAsignacion({ token }: { token: string }) {
         />
       </div>
 
-      <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
-        <Table>
-          <TableHeader className="bg-slate-50">
-            <TableRow>
-              <TableHead className="font-bold w-[120px]">CI</TableHead>
-              <TableHead className="font-bold">Paciente</TableHead>
-              <TableHead className="font-bold">Estudiante Responsable</TableHead>
-              <TableHead className="text-right font-bold">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {asignacionesActivas.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
-                  <div className="flex flex-col items-center justify-center">
-                    <UserX className="h-8 w-8 mb-2 opacity-20" />
-                    <p>No se encontraron asignaciones.</p>
+      <PaginatedTable
+        data={pacientes.filter(p => !!p.estudiante_asignado)}
+        searchFields={searchFields}
+        emptyMessage="No se encontraron asignaciones"
+        header={
+          <tr className="bg-slate-50">
+            <th className="font-bold w-[120px] px-4 py-3 text-left">CI</th>
+            <th className="font-bold px-4 py-3 text-left">Paciente</th>
+            <th className="font-bold px-4 py-3 text-left">Estudiante Responsable</th>
+            <th className="text-right font-bold px-4 py-3">Acciones</th>
+          </tr>
+        }
+        renderRow={(paciente: Paciente) => {
+          const estudiante = estudiantes.find((e) => e.id === paciente.estudiante_asignado)
+          return (
+            <>
+              <td className="font-mono text-sm font-semibold text-blue-700 px-4 py-4">{paciente.ci}</td>
+              <td className="font-medium px-4 py-4">
+                <div className="flex flex-col gap-1">
+                  <span>{paciente.nombres} {paciente.apellido_paterno}</span>
+                  <span className="text-[10px] text-muted-foreground uppercase">{paciente.sexo} - {paciente.edad} años</span>
+                </div>
+              </td>
+              <td className="px-4 py-4">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-full bg-emerald-50 flex items-center justify-center border border-emerald-100">
+                    <UserCheck className="h-4 w-4 text-emerald-600" />
                   </div>
-                </TableCell>
-              </TableRow>
-            ) : (
-              asignacionesActivas.map((paciente) => {
-                const estudiante = estudiantes.find((e) => e.id === paciente.estudiante_asignado)
-                
-                return (
-                  <TableRow key={paciente.id} className="hover:bg-blue-50/30 transition-colors">
-                    <TableCell className="font-mono text-sm font-semibold text-blue-700">
-                      {paciente.ci}
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      <div className="flex flex-col">
-                        <span>{paciente.nombres} {paciente.apellido_paterno}</span>
-                        <span className="text-[10px] text-muted-foreground uppercase">
-                          {paciente.sexo} - {paciente.edad} años
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className="h-8 w-8 rounded-full bg-emerald-50 flex items-center justify-center border border-emerald-100">
-                          <UserCheck className="h-4 w-4 text-emerald-600" />
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-sm font-medium">
-                            {estudiante ? `${estudiante.first_name} ${estudiante.last_name}` : "No encontrado"}
-                          </span>
-                          <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">Asignado</span>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        {/* ACCIONES DE SUPERVISIÓN (Igual que en pacientes) */}
-                        <CarpetaMedica paciente={paciente} />
-                        
-                        <Link href={`/pacientes/${paciente.id}/expediente`}>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="text-emerald-600 hover:bg-emerald-50"
-                            title="Ver Expediente Clínico"
-                          >
-                            <Stethoscope className="h-4 w-4" />
-                          </Button>
-                        </Link>
-
-                        <VerPaciente paciente={paciente} />
-
-                        {/* ELIMINAR ASIGNACIÓN */}
-                        <EliminarAsignacion 
-                          pacienteId={paciente.id} 
-                          token={token} 
-                          onSuccess={fetchData} 
-                        />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )
-              })
-            )}
-          </TableBody>
-        </Table>
-      </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium">{estudiante ? `${estudiante.first_name} ${estudiante.last_name}` : "No encontrado"}</span>
+                    <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">Asignado</span>
+                  </div>
+                </div>
+              </td>
+              <td className="text-right px-4 py-4">
+                <div className="flex justify-end gap-1 flex-wrap">
+                  <CarpetaMedica paciente={paciente} />
+                  <Link href={`/pacientes/${paciente.id}/expediente`}>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="text-emerald-600 hover:bg-emerald-50"
+                      title="Ver Expediente Clínico"
+                    >
+                      <Stethoscope className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                  <VerPaciente paciente={paciente} />
+                  <EliminarAsignacion pacienteId={paciente.id} token={token} onSuccess={fetchData} />
+                </div>
+              </td>
+            </>
+          )
+        }}
+      />
     </div>
   )
 }

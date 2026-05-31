@@ -1,3 +1,4 @@
+// FILE: frontend/app/citas/page.tsx
 "use client"
 
 import { useState, useEffect } from "react"
@@ -30,8 +31,9 @@ export default function CitasPage() {
   const fetchCitas = async () => {
     try {
       setLoading(true)
-      const response = await fetch("http://127.0.0.1:8000/api/citas/", {
+      const response = await fetch("http://localhost:8000/api/citas/", {
         headers: {
+          'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('access_token')}`
         }
       })

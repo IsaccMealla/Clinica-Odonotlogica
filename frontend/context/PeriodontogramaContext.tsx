@@ -54,15 +54,50 @@ const dientesSuperiores = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 2
 const dientesInferiores = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
 
 export function PeriodontogramaProvider({ children, pacienteId }: { children: React.ReactNode; pacienteId?: string }) {
-  const [datos, setDatos] = useState<PeriodontogramaData>({
-    datos_vestibular_superior: generarDatosIniciales(dientesSuperiores),
-    datos_palatino_superior: generarDatosIniciales(dientesSuperiores),
-    datos_vestibular_inferior: generarDatosIniciales(dientesInferiores),
-    datos_lingual_inferior: generarDatosIniciales(dientesInferiores),
+  const [datos, setDatosInternal] = useState<PeriodontogramaData>(() => {
+    // Intentar restaurar backup de localStorage
+    if (pacienteId) {
+      try {
+        const stored = localStorage.getItem(`hc_backup_${pacienteId}_periodontograma_ctx`);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed.data) return parsed.data;
+        }
+      } catch (e) {
+        console.warn('[Periodontograma] Error leyendo backup:', e);
+      }
+    }
+    return {
+      datos_vestibular_superior: generarDatosIniciales(dientesSuperiores),
+      datos_palatino_superior: generarDatosIniciales(dientesSuperiores),
+      datos_vestibular_inferior: generarDatosIniciales(dientesInferiores),
+      datos_lingual_inferior: generarDatosIniciales(dientesInferiores),
+    };
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [periodontogramaId, setPeriodontogramaId] = useState<string | null>(null);
+
+  // Wrapper de setDatos que también persiste en localStorage
+  const setDatos = (newData: PeriodontogramaData) => {
+    setDatosInternal(newData);
+  };
+
+  // Auto-persistir cambios en localStorage (debounced)
+  useEffect(() => {
+    if (!pacienteId) return;
+    const timeout = setTimeout(() => {
+      try {
+        localStorage.setItem(
+          `hc_backup_${pacienteId}_periodontograma_ctx`,
+          JSON.stringify({ data: datos, timestamp: new Date().toISOString() })
+        );
+      } catch (e) {
+        console.warn('[Periodontograma] Error guardando backup:', e);
+      }
+    }, 500);
+    return () => clearTimeout(timeout);
+  }, [datos, pacienteId]);
 
   // Cargar periodontograma cuando se proporcione pacienteId
   useEffect(() => {

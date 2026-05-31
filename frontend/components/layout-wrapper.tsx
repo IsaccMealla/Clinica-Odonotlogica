@@ -1,14 +1,22 @@
 "use client"
 
 import { usePathname } from "next/navigation"
+import { useEffect, useState } from "react"
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 import { ModeToggle } from "@/components/mode-toggle"
-// 1. Importamos el nuevo botón
 import { BotonCerrarSesion } from "@/components/boton-cerrar-sesion" 
+import { BotonAsistencia } from "@/components/boton-asistencia"
 
 export function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const [userName, setUserName] = useState("")
+  const [userRole, setUserRole] = useState("")
+
+  useEffect(() => {
+    setUserName(localStorage.getItem("user_name") || "Usuario Clínico")
+    setUserRole(localStorage.getItem("user_role") || "Invitado")
+  }, [pathname])
   
   // Aquí definimos en qué páginas NO queremos que salga el menú lateral
   const isPublicPage = pathname === "/login" || pathname === "/recuperar-password"
@@ -29,7 +37,12 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
           <SidebarTrigger />
           
           {/* Lado Derecho: Controles de usuario agrupados */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-4">
+            <div className="hidden md:flex flex-col items-end mr-4">
+              <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{userName}</span>
+              <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold">{userRole}</span>
+            </div>
+            <BotonAsistencia />
             <ModeToggle />
             <BotonCerrarSesion />
           </div>

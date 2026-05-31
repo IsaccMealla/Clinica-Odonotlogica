@@ -38,9 +38,10 @@ function BotonSwitch({
 interface TabEvaluacionProps {
   formData: any;
   onChange: (seccion: string, campo: string, valor: any) => void;
+  paciente?: any;
 }
 
-export function TabEvaluacionGeneral({ formData, onChange }: TabEvaluacionProps) {
+export function TabEvaluacionGeneral({ formData, onChange, paciente }: TabEvaluacionProps) {
   const examen = formData.examen_clinico_fisico || {};
   const habitos = formData.habitos || {};
 

@@ -38,9 +38,10 @@ function BotonSwitch({
 interface TabOdontoProps {
   formData: any;
   onChange: (seccion: string, campo: string, valor: any) => void;
+  paciente?: any;
 }
 
-export function TabOdontopediatria({ formData, onChange }: TabOdontoProps) {
+export function TabOdontopediatria({ formData, onChange, paciente }: TabOdontoProps) {
   const odonto = formData.historia_odontopediatrica || {};
   const seccion = 'historia_odontopediatrica';
 
@@ -48,7 +49,7 @@ export function TabOdontopediatria({ formData, onChange }: TabOdontoProps) {
   // CÁLCULO DE EDAD Y VALIDACIÓN DE ACCESO
   // ==========================================
   // NOTA: Ajusta la ruta de 'fecha_nacimiento' según la estructura exacta de tu JSON
-  const fechaNacimiento = formData?.datos_personales?.fecha_nacimiento || formData?.fecha_nacimiento;
+  const fechaNacimiento = paciente?.fecha_nacimiento || formData?.datos_personales?.fecha_nacimiento || formData?.fecha_nacimiento;
   const EDAD_LIMITE_PEDIATRIA = 14; // Cambia este número si tu clínica considera niños hasta otra edad (ej. 12 o 15)
 
   const calcularEdad = (fecha: string) => {

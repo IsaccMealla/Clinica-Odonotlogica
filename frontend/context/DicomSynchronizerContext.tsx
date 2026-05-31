@@ -1,5 +1,5 @@
 'use client'
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react'
+import React, { createContext, useContext, useRef, useCallback, ReactNode } from 'react'
 
 interface DicomViewerState {
   zoom: number
@@ -18,27 +18,23 @@ interface DicomSynchronizerContextType {
 const DicomSynchronizerContext = createContext<DicomSynchronizerContextType | undefined>(undefined)
 
 export const DicomSynchronizerProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [viewers, setViewers] = useState<Map<string, (state: DicomViewerState) => void>>(new Map())
+  const viewersRef = useRef<Map<string, (state: DicomViewerState) => void>>(new Map())
 
   const registerViewer = useCallback((id: string, updateState: (state: DicomViewerState) => void) => {
-    setViewers(prev => new Map(prev).set(id, updateState))
+    viewersRef.current.set(id, updateState)
   }, [])
 
   const unregisterViewer = useCallback((id: string) => {
-    setViewers(prev => {
-      const newMap = new Map(prev)
-      newMap.delete(id)
-      return newMap
-    })
+    viewersRef.current.delete(id)
   }, [])
 
   const syncViewers = useCallback((id: string, state: DicomViewerState) => {
-    viewers.forEach((updateState, viewerId) => {
+    viewersRef.current.forEach((updateState, viewerId) => {
       if (viewerId !== id) {
         updateState(state)
       }
     })
-  }, [viewers])
+  }, [])
 
   return (
     <DicomSynchronizerContext.Provider value={{ registerViewer, unregisterViewer, syncViewers }}>

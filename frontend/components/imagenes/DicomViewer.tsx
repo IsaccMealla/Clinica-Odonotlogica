@@ -2,7 +2,8 @@
 
 import React, { useRef, useEffect, useState, useCallback, useId } from 'react'
 import { useDicomSynchronizer } from '@/context/DicomSynchronizerContext'
-import { ChevronUp, ChevronDown } from 'lucide-react'
+import { ChevronUp, ChevronDown, Printer } from 'lucide-react'
+import { jsPDF } from 'jspdf'
 
 interface DicomViewerProps {
   imageIds: string[]
@@ -10,9 +11,7 @@ interface DicomViewerProps {
   enableSync?: boolean
 }
 
-interface ImageData {
-  canvas: HTMLCanvasElement
-  ctx: CanvasRenderingContext2D
+interface ViewerImageState {
   imageData: ImageData | null
   originalImageData: ImageData | null
 }
@@ -33,9 +32,7 @@ export default function DicomViewer({
   const viewerId = useId()
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const imageDataRef = useRef<ImageData>({
-    canvas: null as any,
-    ctx: null as any,
+  const imageDataRef = useRef<ViewerImageState>({
     imageData: null,
     originalImageData: null
   })
@@ -106,10 +103,9 @@ export default function DicomViewer({
     canvas.height = img.height
 
     ctx.drawImage(img, 0, 0)
-    imageDataRef.current.originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+    const loadedData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+    imageDataRef.current.originalImageData = loadedData
     imageDataRef.current.imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-    imageDataRef.current.canvas = canvas
-    imageDataRef.current.ctx = ctx
 
     renderImage()
   }, [imageIds, loadedImages])
@@ -122,44 +118,27 @@ export default function DicomViewer({
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
     const original = imageDataRef.current.originalImageData
+    const output = ctx.createImageData(original.width, original.height)
 
-    // Aplicar Window/Level
-    const data = imageData.data
+    const data = output.data
     const originalData = original.data
 
     for (let i = 0; i < data.length; i += 4) {
       let pixel = originalData[i]
-
-      // Convertir a rango [-128, 127]
-      const normalized = pixel - 128
-
-      // Aplicar WW/WC
       const minWindow = windowCenter - windowWidth / 2
-      const maxWindow = windowCenter + windowWidth / 2
-
-      let normalized2 = (normalized - minWindow) / (maxWindow - minWindow)
-      normalized2 = Math.max(0, Math.min(1, normalized2))
-      pixel = Math.round(normalized2 * 255)
+      let normalized = (pixel - minWindow) / windowWidth
+      normalized = Math.max(0, Math.min(1, normalized))
+      pixel = Math.round(normalized * 255)
 
       data[i] = pixel
       data[i + 1] = pixel
       data[i + 2] = pixel
+      data[i + 3] = originalData[i + 3]
     }
 
-    ctx.putImageData(imageData, 0, 0)
-
-    // Aplicar zoom y pan
-    const transform = new DOMMatrix()
-    transform.translateSelf(panX, panY)
-    transform.scaleSelf(zoom)
-
-    ctx.save()
-    ctx.setTransform(transform)
-    ctx.drawImage(canvas, 0, 0)
-    ctx.restore()
-  }, [windowCenter, windowWidth, zoom, panX, panY])
+    ctx.putImageData(output, 0, 0)
+  }, [windowCenter, windowWidth])
 
   // Evento de rueda (scroll)
   const handleWheel = useCallback((e: WheelEvent) => {
@@ -249,6 +228,43 @@ export default function DicomViewer({
     loadAndCacheImage(currentImageIdIndex)
   }, [currentImageIdIndex, loadAndCacheImage])
 
+  const exportToPDF = () => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    
+    try {
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4'
+      })
+      
+      pdf.setFontSize(16)
+      pdf.text(`Expediente Radiológico - ${patientName}`, 14, 15)
+      pdf.setFontSize(10)
+      pdf.text(`Filtro Aplicado - WW: ${Math.round(windowWidth)} / WC: ${Math.round(windowCenter)}`, 14, 22)
+      pdf.text(`Fecha de Impresión: ${new Date().toLocaleDateString('es-ES')}`, 14, 28)
+      
+      // Capturamos el canvas con las transformaciones visuales o solo los filtros? 
+      // Si usamos toDataURL, capturamos el canvas entero (los filtros sí, pero el CSS de transform no, 
+      // lo cual es mejor para impresión en alta calidad sin el paneo).
+      const imgData = canvas.toDataURL('image/jpeg', 0.95)
+      
+      // Calculamos para que encaje en el A4 horizontal
+      const pdfWidth = 269 
+      const pdfHeight = 170
+      const ratio = Math.min(pdfWidth / canvas.width, pdfHeight / canvas.height)
+      const width = canvas.width * ratio
+      const height = canvas.height * ratio
+      
+      pdf.addImage(imgData, 'JPEG', 14, 35, width, height)
+      pdf.save(`Radiografia_Filtrada_${Date.now()}.pdf`)
+    } catch (e) {
+      console.error("Error al exportar PDF:", e)
+      alert("Error al generar el PDF.")
+    }
+  }
+
   return (
     <div ref={containerRef} className="w-full h-full flex flex-col bg-black rounded-lg overflow-hidden border-2 border-slate-700">
       {/* Header con información */}
@@ -266,11 +282,27 @@ export default function DicomViewer({
         </div>
       </div>
 
+      {/* Controles Rápidos (Presets DICOM) */}
+      <div className="bg-slate-900 border-b border-slate-700 px-4 py-2 flex flex-wrap gap-2 items-center justify-between">
+        <div className="flex flex-wrap gap-2 items-center">
+          <span className="text-xs text-slate-400 font-semibold mr-2">Filtros (8-bit):</span>
+          <button onClick={() => { setWindowWidth(256); setWindowCenter(128) }} className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded transition-colors border border-slate-600">Estándar</button>
+          <button onClick={() => { setWindowWidth(100); setWindowCenter(128) }} className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded transition-colors border border-slate-600">Tejido Blando</button>
+          <button onClick={() => { setWindowWidth(150); setWindowCenter(200) }} className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded transition-colors border border-slate-600">Hueso / Dental</button>
+          <button onClick={() => { setWindowWidth(50); setWindowCenter(128) }} className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded transition-colors border border-slate-600">Contraste Alto</button>
+          <div className="w-px h-5 bg-slate-700 mx-1"></div>
+          <button onClick={() => { setZoom(1); setPanX(0); setPanY(0) }} className="px-3 py-1 bg-blue-900/50 hover:bg-blue-800/80 text-blue-300 text-xs rounded transition-colors border border-blue-800/50">Restaurar Zoom</button>
+        </div>
+        <button onClick={exportToPDF} className="px-4 py-1 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded transition-colors flex items-center gap-2 shadow-md">
+          <Printer className="w-4 h-4" /> Exportar a PDF
+        </button>
+      </div>
+
       {/* Canvas principal */}
-      <div className="flex-1 relative overflow-hidden flex items-center justify-center bg-black group cursor-crosshair">
+      <div className="flex-1 relative overflow-hidden flex items-center justify-center bg-black group cursor-crosshair min-h-[400px]">
         <canvas
           ref={canvasRef}
-          className="max-w-full max-h-full object-contain"
+          className="w-full h-full object-contain"
           style={{
             transform: `scale(${zoom}) translate(${panX}px, ${panY}px)`,
             transformOrigin: 'center',

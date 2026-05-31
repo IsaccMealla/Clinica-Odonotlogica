@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useSoundPlayer } from "@/hooks/useSoundPlayer"
+import { PanelAdmisionMetadata } from "@/components/metadatos/MetadatosPanel"
 import {
   Select,
   SelectContent,
@@ -33,10 +34,10 @@ export function NuevoPaciente({ onPacienteCreado }: NuevoPacienteProps) {
   const [cargando, setCargando] = useState(false)
 
   const [formData, setFormData] = useState({
-    ci: "", nombres: "", apellido_paterno: "", apellido_materno: "", 
-    sexo: "", fecha_nacimiento: "", lugar_nacimiento: "", 
-    estado_civil: "", ocupacion: "", direccion: "", celular: "", 
-    telefono: "", contacto_emergencia: "", telefono_emergencia: "", 
+    ci: "", nombres: "", apellido_paterno: "", apellido_materno: "",
+    sexo: "", fecha_nacimiento: "", lugar_nacimiento: "",
+    estado_civil: "", ocupacion: "", direccion: "", celular: "",
+    telefono: "", contacto_emergencia: "", telefono_emergencia: "",
     fecha_ultima_consulta: "", motivo_ultima_consulta: ""
   })
 
@@ -82,7 +83,7 @@ export function NuevoPaciente({ onPacienteCreado }: NuevoPacienteProps) {
 
       const res = await fetch("http://localhost:8000/api/pacientes/", {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}` // Lo enviamos
         },
@@ -96,7 +97,7 @@ export function NuevoPaciente({ onPacienteCreado }: NuevoPacienteProps) {
         if (onPacienteCreado) {
           onPacienteCreado();
         }
-        
+
         setFormData({
           ci: "", nombres: "", apellido_paterno: "", apellido_materno: "", sexo: "", fecha_nacimiento: "",
           lugar_nacimiento: "", estado_civil: "", ocupacion: "", direccion: "", celular: "", telefono: "",
@@ -123,7 +124,7 @@ export function NuevoPaciente({ onPacienteCreado }: NuevoPacienteProps) {
             <DialogTitle className="text-2xl font-bold">Ficha de Registro de Paciente</DialogTitle>
             <DialogDescription>Complete todos los campos para el historial clínico electrónico.</DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-8">
             {/* --- SECCIÓN 1: DATOS DE IDENTIDAD --- */}
             <div className="grid grid-cols-2 gap-4">
@@ -217,7 +218,7 @@ export function NuevoPaciente({ onPacienteCreado }: NuevoPacienteProps) {
               </div>
             </div>
           </div>
-          
+          <PanelAdmisionMetadata />
           <DialogFooter className="mt-8 border-t pt-4">
             <Button type="button" variant="outline" onClick={() => setAbierto(false)}>Cancelar</Button>
             <Button type="submit" disabled={cargando} className="bg-blue-600 hover:bg-blue-700 px-8">

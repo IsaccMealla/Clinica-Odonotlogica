@@ -5,10 +5,12 @@ import { NuevoPaciente } from "@/components/nuevo-paciente"
 import { PapeleraPacientes } from "@/components/papelera-pacientes"
 import { TablaPacientes } from "@/components/tabla-pacientes"
 import { PacientesExport } from "@/components/exporters/pacientes-export"
-
+import { AccesoDenegado } from "@/components/acceso-denegado"
+import { loadMe } from "@/lib/permissions"
 export default function PacientesPage() {
   const [pacientes, setPacientes] = useState([])
   const [cargando, setCargando] = useState(true)
+  const [role, setRole] = useState<string | null>(null)
 
   // Creamos la función para buscar pacientes con el token
   const fetchPacientes = async () => {
@@ -45,8 +47,17 @@ export default function PacientesPage() {
 
   // Ejecutamos la búsqueda al cargar la página
   useEffect(() => {
-    fetchPacientes()
+    (async () => {
+      const me = await loadMe()
+      const r = me?.rol || localStorage.getItem('user_role')
+      if (r) setRole(r.toUpperCase())
+      fetchPacientes()
+    })()
   }, [])
+
+  if (role === 'ESTUDIANTE') {
+    return <AccesoDenegado />
+  }
 
   return (
     <div className="space-y-6">
