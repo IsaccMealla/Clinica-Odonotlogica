@@ -51,7 +51,7 @@ export function MallaCurricularUI() {
     switch (estado) {
       case 'APROBADA': return "bg-green-100 border-green-500 text-green-800 hover:bg-green-200"
       case 'REPROBADA': return "bg-red-100 border-red-500 text-red-800 hover:bg-red-200"
-      case 'CURSANDO': return "bg-blue-100 border-blue-500 text-blue-800 hover:bg-blue-200"
+      case 'CURSANDO': return "bg-clinica-primary/10 border-clinica-primary text-clinica-primary hover:bg-clinica-primary/20"
       case 'BLOQUEADA': return "bg-gray-100 border-gray-300 text-gray-400 opacity-70 cursor-not-allowed"
       case 'PENDIENTE': return "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
     }
@@ -61,7 +61,7 @@ export function MallaCurricularUI() {
     switch (estado) {
       case 'APROBADA': return <CheckCircle2 className="w-4 h-4 text-green-600" />
       case 'REPROBADA': return <AlertCircle className="w-4 h-4 text-red-600" />
-      case 'CURSANDO': return <BookOpen className="w-4 h-4 text-blue-600" />
+      case 'CURSANDO': return <BookOpen className="w-4 h-4 text-clinica-primary" />
       case 'BLOQUEADA': return <Lock className="w-4 h-4 text-gray-400" />
       case 'PENDIENTE': return null
     }
@@ -76,14 +76,14 @@ export function MallaCurricularUI() {
         </div>
         <div className="text-right">
           <div className="text-sm font-semibold text-slate-500">Estudiante</div>
-          <div className="text-lg font-bold text-blue-600">{record.nombre}</div>
+          <div className="text-lg font-bold text-clinica-primary">{record.nombre}</div>
         </div>
       </div>
 
       <div className="flex gap-4 mb-4 text-sm font-medium">
         <span className="flex items-center gap-1"><div className="w-3 h-3 bg-green-500 rounded-full"></div> Aprobada</span>
         <span className="flex items-center gap-1"><div className="w-3 h-3 bg-red-500 rounded-full"></div> Reprobada</span>
-        <span className="flex items-center gap-1"><div className="w-3 h-3 bg-blue-500 rounded-full"></div> Cursando</span>
+        <span className="flex items-center gap-1"><div className="w-3 h-3 bg-clinica-primary rounded-full"></div> Cursando</span>
         <span className="flex items-center gap-1"><div className="w-3 h-3 bg-gray-300 rounded-full"></div> Bloqueada</span>
       </div>
 

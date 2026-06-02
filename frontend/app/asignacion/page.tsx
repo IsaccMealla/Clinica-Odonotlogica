@@ -23,7 +23,7 @@ export default function AsignacionesPage() {
   if (!token) {
     return (
       <div className="flex h-[80vh] flex-col items-center justify-center gap-2">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        <Loader2 className="h-8 w-8 animate-spin text-clinica-primary" />
         <p className="text-sm text-muted-foreground animate-pulse">Verificando credenciales...</p>
       </div>
     )
@@ -47,12 +47,12 @@ export default function AsignacionesPage() {
   }
 
   return (
-    <div className="flex-1 space-y-6 p-8 pt-6 bg-slate-50/50 min-h-screen">
+    <div className="flex-1 space-y-6 p-8 pt-6 bg-clinica-bg min-h-screen">
       {/* Encabezado Principal */}
       <div className="flex items-center justify-between border-b pb-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <div className="bg-blue-600 p-2 rounded-lg">
+            <div className="bg-clinica-primary p-2 rounded-lg">
               <ClipboardList className="h-6 w-6 text-white" />
             </div>
             <h2 className="text-3xl font-bold tracking-tight text-slate-900">

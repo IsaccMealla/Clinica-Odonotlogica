@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { Plus, AlertTriangle, AlertCircle } from "lucide-react"
 import { useSoundPlayer } from "@/hooks/useSoundPlayer"
 import { Paciente, Usuario, Tratamiento, Sillon, Cita } from "@/types/cita"
+import { BotonSupervisado } from "@/components/seguridad/BotonSupervisado"
 
 interface FormularioCitaProps {
   onCitaCreated: () => void
@@ -459,18 +460,19 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancelar
             </Button>
-            <DocenteAuthModal
-              accion="Agendar Cita Clínica"
-              onAprobado={(auditoriaInfo) => {
-                // Inyectar auditoriaInfo en formData si hace falta y guardar
+            <BotonSupervisado
+              modulo="M4_CITAS"
+              accionLabel={loading ? 'Procesando...' : (citaEditar ? 'Actualizar Cita' : 'Confirmar Cita')}
+              accionDescripcion="Agendar Cita Clínica"
+              pacienteId={formData.paciente}
+              pacienteNombre="Paciente"
+              disabled={loading}
+              className="bg-green-600 hover:bg-green-700 text-white min-w-[120px]"
+              onAccionPermitida={() => {
                 const fakeEvent = { preventDefault: () => { } } as React.FormEvent;
                 handleSubmit(fakeEvent);
               }}
-            >
-              <Button type="button" disabled={loading} className="bg-green-600 hover:bg-green-700 text-white min-w-[120px]">
-                {loading ? 'Procesando...' : (citaEditar ? 'Actualizar Cita' : 'Confirmar Cita')}
-              </Button>
-            </DocenteAuthModal>
+            />
           </div>
         </form>
       </DialogContent>

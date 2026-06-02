@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function MantenimientoPage() {
   return (
-    <div className="flex-1 space-y-6 p-4 md:p-8 pt-6 bg-slate-50/50 min-h-screen">
+    <div className="flex-1 space-y-6 p-4 md:p-8 pt-6 bg-clinica-bg min-h-screen">
       {/* HEADER DE LA PÁGINA */}
       <div className="flex flex-col md:flex-row md:items-center justify-between space-y-2 md:space-y-0 pb-4 border-b border-slate-200">
         <div>
@@ -27,7 +27,7 @@ export default function MantenimientoPage() {
           <button className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 font-semibold py-2 px-4 rounded-xl shadow-sm transition-all text-sm">
             Descargar Reporte
           </button>
-          <button className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-xl shadow-sm transition-all text-sm">
+          <button className="bg-clinica-secondary hover:bg-clinica-secondary/80 text-white font-semibold py-2 px-4 rounded-xl shadow-md shadow-clinica-secondary/30 transition-all text-sm">
             + Nueva Orden
           </button>
         </div>

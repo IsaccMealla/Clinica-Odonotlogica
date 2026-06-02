@@ -1,6 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import views 
+from . import views_qa
 
 # Importamos absolutamente todos los ViewSets
 from .views import (
@@ -108,6 +109,11 @@ urlpatterns = [
     path('reportes/estadisticas/', views.estadisticas_3d_view, name='estadisticas_3d'),
     
     # Ruta personalizada para recuperación de contraseña
-   path('api/notificaciones/', include('notificaciones.urls')),
+    path('api/notificaciones/', include('notificaciones.urls')),
     path('recuperar-password/', views.enviar_correo_recuperacion, name='recuperar_password'),
+    
+    # --- RUTAS PARA QA AUTOMATION ---
+    path('qa/ejecutar/', views_qa.ejecutar_qa_command, name='ejecutar_qa'),
+    path('qa/evidencias/', views_qa.listar_evidencias, name='listar_evidencias'),
+    path('qa/evidencias/limpiar/', views_qa.limpiar_evidencias, name='limpiar_evidencias'),
 ]

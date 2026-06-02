@@ -138,7 +138,7 @@ export function verificarAccesoModulo(estudianteId: string, modulo: string): 'BL
   if (typeof window !== 'undefined') {
     const userRol = (localStorage.getItem('user_rol') || '').toUpperCase().trim();
     const isSuperuser = localStorage.getItem('is_superuser') === 'true';
-    if (isSuperuser || userRol === 'ADMIN' || userRol === 'ADMINISTRADOR' || userRol === 'DOCENTE') {
+    if (isSuperuser || userRol === 'ADMIN' || userRol === 'ADMINISTRADOR' || userRol === 'DOCENTE' || userRol === 'RECEPCIONISTA') {
       return 'PERMISO_PROACTIVO'; // Acceso total sin modal
     }
   }
@@ -197,10 +197,31 @@ const DEFAULT_ESTUDIANTES = [
 export function getEstudiantesDemo(): any[] {
   if (typeof window === 'undefined') return DEFAULT_ESTUDIANTES
   try {
+    let list = DEFAULT_ESTUDIANTES;
     const stored = localStorage.getItem('estudiantes_demo')
-    if (stored) return JSON.parse(stored)
-    localStorage.setItem('estudiantes_demo', JSON.stringify(DEFAULT_ESTUDIANTES))
-    return DEFAULT_ESTUDIANTES
+    if (stored) {
+      list = JSON.parse(stored)
+    } else {
+      localStorage.setItem('estudiantes_demo', JSON.stringify(DEFAULT_ESTUDIANTES))
+    }
+
+    // Inyección dinámica del estudiante local (para pruebas cross-tab Recepción/Docente)
+    const isPresente = localStorage.getItem("estudiante_presente") === "true";
+    if (isPresente) {
+       const nombre = localStorage.getItem("estudiante_nombre") || "Estudiante Local";
+       const materia = localStorage.getItem("estudiante_materia") || "";
+       if (!list.find(e => e.nombre === nombre)) {
+         list = [...list, {
+           id: `LOCAL-${Date.now()}`,
+           nombre,
+           paciente: "Paciente de Turno",
+           pacienteId: "0",
+           sillon: "S-Pendiente",
+           materia
+         }];
+       }
+    }
+    return list;
   } catch {
     return DEFAULT_ESTUDIANTES
   }

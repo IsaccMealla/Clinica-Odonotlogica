@@ -33,6 +33,7 @@ const items = [
   { title: "Usuarios", url: "/usuarios", icon: UserCog, roles: ["ADMIN"] }, 
   { title: "Configuración", url: "/configuracion", icon: Settings, roles: ["ADMIN", "DOCENTE"] },
   { title: "Gestión de Roles", url: "/gestion-roles", icon: Shield, roles: ["ADMIN"] },
+  { title: "⚙️ Panel de Calidad (QA)", url: "/admin/qa", icon: Settings, roles: ["ADMIN"] },
 ]
 
 export function AppSidebar() {
@@ -68,7 +69,7 @@ export function AppSidebar() {
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <Link href={item.url} className="text-base py-5">
-                      <item.icon className={`w-5 h-5 ${item.title === "Mis Pacientes" ? "text-blue-500" : ""}`} />
+                      <item.icon className={`w-5 h-5 ${item.title === "Mis Pacientes" ? "text-clinica-secondary" : ""}`} />
                       <span>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>

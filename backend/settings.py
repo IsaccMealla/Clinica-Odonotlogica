@@ -129,6 +129,13 @@ EMAIL_HOST_PASSWORD = 'ynpmlrxrvgqlemau'
 # ==========================================
 AUTH_USER_MODEL = 'gestion_clinica.CustomUser'
 
+# ==========================================
+# BACKEND DE AUTENTICACIÓN PERSONALIZADO
+# ==========================================
+AUTHENTICATION_BACKENDS = [
+    'gestion_clinica.auth_backend.CaseInsensitiveBackend',
+]
+
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 

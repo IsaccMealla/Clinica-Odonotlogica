@@ -39,12 +39,49 @@ export function BotonSupervisado({
   const [enviado, setEnviado] = useState(false)
   const [estudianteId, setEstudianteId] = useState("")
 
+  // ========================================
+  // BYPASS ADMIN — CORTOCIRCUITO TOTAL
+  // Si el usuario es Administrador/Admin, acceso irrestricto inmediato.
+  // NO muestra modal de "Pedir Permiso" ni congela botones.
+  // El flujo de bloqueo académico es EXCLUSIVO para el rol 'Estudiante'.
+  // ========================================
+  const esAdmin = useCallback((): boolean => {
+    try {
+      const role = (localStorage.getItem('user_role') || '').toUpperCase().trim()
+      const rolAlt = (localStorage.getItem('user_rol') || '').toUpperCase().trim()
+      const isSuperuser = localStorage.getItem('is_superuser') === 'true'
+      return isSuperuser || role === 'ADMIN' || role === 'ADMINISTRADOR' || rolAlt === 'ADMIN' || rolAlt === 'ADMINISTRADOR'
+    } catch { return false }
+  }, [])
+
+  const esDocente = useCallback((): boolean => {
+    try {
+      const role = (localStorage.getItem('user_role') || '').toUpperCase().trim()
+      const rolAlt = (localStorage.getItem('user_rol') || '').toUpperCase().trim()
+      return role === 'DOCENTE' || rolAlt === 'DOCENTE'
+    } catch { return false }
+  }, [])
+
+  const esRecepcionista = useCallback((): boolean => {
+    try {
+      const role = (localStorage.getItem('user_role') || '').toUpperCase().trim()
+      const rolAlt = (localStorage.getItem('user_rol') || '').toUpperCase().trim()
+      return role === 'RECEPCIONISTA' || rolAlt === 'RECEPCIONISTA'
+    } catch { return false }
+  }, [])
+
   const verificar = useCallback(() => {
+    // BYPASS ADMIN/DOCENTE/RECEPCIONISTA: acceso directo sin modal
+    if (esAdmin() || esDocente() || esRecepcionista()) {
+      setEstado('PERMISO_PROACTIVO')
+      return
+    }
+    // Solo estudiantes pasan por el flujo de supervisión
     const id = localStorage.getItem("user_id") || "4"
     setEstudianteId(id)
     const acceso = verificarAccesoModulo(id, modulo)
     setEstado(acceso)
-  }, [modulo])
+  }, [modulo, esAdmin, esDocente, esRecepcionista])
 
   useEffect(() => {
     verificar()
@@ -59,6 +96,12 @@ export function BotonSupervisado({
   }, [verificar])
 
   const handleClick = () => {
+    // BYPASS: Admin/Docente/Recepcionista siempre ejecuta directamente
+    if (esAdmin() || esDocente() || esRecepcionista()) {
+      onAccionPermitida()
+      return
+    }
+
     if (estado === 'PERMISO_PROACTIVO' || estado === 'SOLICITUD_APROBADA') {
       // El docente ya dio permiso, ejecutar la acción directamente
       onAccionPermitida()
@@ -88,6 +131,21 @@ export function BotonSupervisado({
 
   // Renderizado dinámico del botón según estado
   const renderBoton = () => {
+    // BYPASS: Admin/Docente siempre ve el botón verde desbloqueado
+    if (esAdmin() || esDocente() || esRecepcionista()) {
+      return (
+        <Button
+          type="button"
+          disabled={disabled}
+          onClick={handleClick}
+          className={`bg-green-600 hover:bg-green-700 text-white ring-2 ring-green-300 ring-offset-1 ${className}`}
+        >
+          <CheckCircle2 className="w-4 h-4 mr-2" />
+          {children || accionLabel}
+        </Button>
+      )
+    }
+
     if (estado === 'SOLICITUD_PENDIENTE') {
       return (
         <Button
@@ -116,7 +174,7 @@ export function BotonSupervisado({
       )
     }
 
-    // BLOQUEADO
+    // BLOQUEADO — Solo para estudiantes
     return (
       <Button
         type="button"

@@ -39,8 +39,8 @@ export function AlertaAsistencia() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
       <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-8 text-center animate-in zoom-in-95 duration-300">
-        <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-          <ShieldAlert className="w-10 h-10 text-blue-600" />
+        <div className="w-20 h-20 bg-clinica-secondary/20 rounded-full flex items-center justify-center mx-auto mb-6">
+          <ShieldAlert className="w-10 h-10 text-clinica-secondary" />
         </div>
         
         <h2 className="text-3xl font-black text-slate-900 mb-4">Registro de Asistencia Requerido</h2>
@@ -58,7 +58,7 @@ export function AlertaAsistencia() {
           </Button>
           <Button 
             onClick={handleMarcar}
-            className="bg-blue-600 hover:bg-blue-700 text-white py-6 px-6 text-base shadow-lg shadow-blue-200"
+            className="bg-clinica-secondary hover:bg-clinica-secondary/90 text-white py-6 px-6 text-base shadow-lg shadow-clinica-secondary/30"
           >
             <LogIn className="w-5 h-5 mr-2" /> Marcar Ingreso Ahora
           </Button>

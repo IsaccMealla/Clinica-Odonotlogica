@@ -13,12 +13,11 @@ export function PanelRecepcion() {
     const checkAsistencia = () => {
       const presente = localStorage.getItem("estudiante_presente") === "true"
       const materia = localStorage.getItem("estudiante_materia") || ""
+      const nombre = localStorage.getItem("estudiante_nombre") || "Estudiante Local"
       
-      // Simulamos que vemos al menos al estudiante que está usando la misma PC/Browser para la demo,
-      // y agregamos unos simulados si queremos que no esté vacío.
       const lista = []
       if (presente) {
-        lista.push({ nombre: "Estudiante Actual", materia, presente })
+        lista.push({ nombre, materia, presente })
       }
       
       lista.push(

@@ -2,7 +2,7 @@
 
 import React, { useRef, useMemo, useState, useCallback, useEffect } from 'react';
 import { Canvas, useThree, ThreeEvent } from '@react-three/fiber';
-import { OrbitControls, Environment, ContactShadows, Text, Html } from '@react-three/drei';
+import { OrbitControls, ContactShadows, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { Maximize2, Minimize2 } from 'lucide-react';
 
@@ -25,29 +25,36 @@ const DIENTES_ADULTO_INFERIOR = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34,
 const DIENTES_DECIDUO_SUPERIOR = [55, 54, 53, 52, 51, 61, 62, 63, 64, 65];
 const DIENTES_DECIDUO_INFERIOR = [85, 84, 83, 82, 81, 71, 72, 73, 74, 75];
 
-// Mapa de colores por hallazgo
+// ==========================================
+// MAPA DE COLORES REACTIVO — CORRECCIÓN CRÍTICA
+// Cada hallazgo del JSON se mapea a su color 3D exacto
+// ==========================================
 const HALLAZGO_COLORS: Record<string, string> = {
-  'caries': '#ef4444',
-  'obturacion': '#3b82f6',
-  'sellante': '#22c55e',
-  'corona': '#eab308',
-  'ausente': '#1e293b',
-  'fractura': '#f97316',
-  'endodoncia': '#a855f7',
-  'protesis': '#14b8a6',
-  'sano': '#34d399',
+  'caries': '#ef4444',        // Rojo vivo
+  'obturacion': '#3b82f6',    // Azul
+  'resina': '#10b981',        // Esmeralda (tratado)
+  'tratado': '#10b981',       // Esmeralda (alias)
+  'sellante': '#22c55e',      // Verde
+  'corona': '#eab308',        // Amarillo
+  'ausente': '#1e293b',       // Gris oscuro
+  'fractura': '#f97316',      // Naranja
+  'endodoncia': '#a855f7',    // Púrpura
+  'protesis': '#14b8a6',      // Teal
+  'sano': '#f8fafc',          // Blanco/Neutral — Corrección: sano = blanco, no verde
 };
 
 const HALLAZGO_EMISSIVE: Record<string, string> = {
   'caries': '#991b1b',
   'obturacion': '#1e3a5f',
+  'resina': '#064e3b',
+  'tratado': '#064e3b',
   'sellante': '#14532d',
   'corona': '#713f12',
   'ausente': '#0f172a',
   'fractura': '#9a3412',
   'endodoncia': '#581c87',
   'protesis': '#134e4a',
-  'sano': '#064e3b',
+  'sano': '#000000',
 };
 
 // Constantes para el arco
@@ -55,7 +62,8 @@ const RADIO_X = 5.5;
 const RADIO_Z = 4.2;
 
 // ==========================================
-// COMPONENTE CARA 3D INDIVIDUAL
+// COMPONENTE CARA 3D INDIVIDUAL — EDICIÓN INMERSIVA
+// Al hacer clic en cualquier cara, muta el JSON global
 // ==========================================
 function Cara3D({
   position,
@@ -85,7 +93,7 @@ function Cara3D({
       scale={scale}
       onClick={(e: ThreeEvent<MouseEvent>) => {
         e.stopPropagation();
-        onClick();
+        onClick(); // Muta el JSON global — sincronización bidireccional con 2D
       }}
       onPointerOver={(e: ThreeEvent<PointerEvent>) => {
         e.stopPropagation();
@@ -101,7 +109,7 @@ function Cara3D({
       <meshStandardMaterial
         color={hovered ? '#60a5fa' : color}
         emissive={hovered ? '#1e40af' : emissive}
-        emissiveIntensity={hovered ? 0.4 : 0.1}
+        emissiveIntensity={hovered ? 0.4 : 0.15}
         roughness={0.3}
         metalness={0.05}
       />
@@ -147,8 +155,11 @@ function Diente3DInteractivo({
 
   const isAusente = data[`${numero}_oclusal`] === 'ausente';
 
-  // Obtener color para cada cara
-  const getCaraVisual = (cara: CaraDiente) => {
+  // CORRECCIÓN DE COLOR REACTIVO:
+  // Lee el valor del JSON para cada cara y retorna el color correspondiente.
+  // Si no tiene hallazgo → blanco neutral (#f8fafc).
+  // 'caries' → Rojo, 'tratado'/'resina' → Esmeralda, 'sano' → Blanco/Neutral
+  const getCaraVisual = useCallback((cara: CaraDiente) => {
     const key = `${numero}_${cara}`;
     const hallazgoId = data[key];
     if (hallazgoId && HALLAZGO_COLORS[hallazgoId]) {
@@ -157,8 +168,9 @@ function Diente3DInteractivo({
         emissive: HALLAZGO_EMISSIVE[hallazgoId] || '#000000',
       };
     }
+    // Sin hallazgo = blanco neutral (diente limpio)
     return { color: '#f8fafc', emissive: '#000000' };
-  };
+  }, [numero, data]);
 
   if (isAusente) return null;
 
@@ -190,7 +202,7 @@ function Diente3DInteractivo({
         />
       </mesh>
 
-      {/* 5 caras interactivas */}
+      {/* 5 caras interactivas — cada una lee su estado del JSON */}
       {caras.map(({ cara, pos, rot, sc }) => {
         const visual = getCaraVisual(cara);
         return (
@@ -229,12 +241,12 @@ function Diente3DInteractivo({
 }
 
 // ==========================================
-// COMPONENTE DE CÁMARA CENTRADA
+// COMPONENTE DE CÁMARA CENTRADA — CORRECCIÓN DE CENTRADO
 // ==========================================
 function CameraAdjust() {
   const { camera } = useThree();
   useEffect(() => {
-    camera.position.set(0, 6, 11);
+    camera.position.set(0, 7, 12);
     camera.lookAt(0, 0, 0);
     camera.updateProjectionMatrix();
   }, [camera]);
@@ -268,11 +280,11 @@ export function Odontograma3D({ esPediatrico, data, hallazgoActivo, onCaraClick 
   return (
     <div
       ref={containerRef}
-      className="w-full h-full min-h-[520px] bg-gradient-to-b from-slate-900 via-slate-850 to-slate-900 rounded-2xl overflow-hidden relative"
-      style={{ contain: 'layout' }}
+      className="w-full bg-gradient-to-b from-slate-900 via-slate-850 to-slate-900 rounded-2xl overflow-hidden relative flex items-center justify-center"
+      style={{ contain: 'layout', height: isFullscreen ? '100vh' : '560px', minHeight: '520px' }}
     >
       <Canvas
-        camera={{ position: [0, 6, 11], fov: 42 }}
+        camera={{ position: [0, 7, 12], fov: 40 }}
         style={{ width: '100%', height: '100%' }}
         gl={{ antialias: true, alpha: false }}
       >
@@ -282,7 +294,7 @@ export function Odontograma3D({ esPediatrico, data, hallazgoActivo, onCaraClick 
         <pointLight position={[-8, -8, -8]} intensity={0.4} color="#a5b4fc" />
         <directionalLight position={[0, 10, 0]} intensity={0.3} />
 
-        {/* Arcada Superior */}
+        {/* Arcada Superior — centrada */}
         <group position={[0, 0.5, 0]}>
           {superiores.map((num, i) => (
             <Diente3DInteractivo
@@ -298,7 +310,7 @@ export function Odontograma3D({ esPediatrico, data, hallazgoActivo, onCaraClick 
           ))}
         </group>
 
-        {/* Arcada Inferior */}
+        {/* Arcada Inferior — centrada */}
         <group position={[0, -0.5, 0]}>
           {inferiores.map((num, i) => (
             <Diente3DInteractivo
@@ -331,13 +343,17 @@ export function Odontograma3D({ esPediatrico, data, hallazgoActivo, onCaraClick 
         Clic en cara para registrar hallazgo • Arrastre para rotar • Scroll para zoom
       </div>
 
-      {/* Botón Pantalla Completa */}
+      {/* Botón Pantalla Completa — Estilizado flotante ⛶ */}
       <button
         onClick={toggleFullscreen}
-        className="absolute top-4 right-4 bg-white/10 hover:bg-white/25 text-white p-2.5 rounded-xl backdrop-blur-sm border border-white/20 transition-all hover:scale-105 active:scale-95"
+        className="absolute top-4 right-4 bg-white/10 hover:bg-white/25 text-white p-2.5 rounded-xl backdrop-blur-sm border border-white/20 transition-all hover:scale-110 active:scale-95 shadow-lg shadow-black/20 group"
         title={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
       >
-        {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+        {isFullscreen ? (
+          <Minimize2 className="w-5 h-5 group-hover:text-cyan-300 transition-colors" />
+        ) : (
+          <Maximize2 className="w-5 h-5 group-hover:text-cyan-300 transition-colors" />
+        )}
       </button>
 
       {/* Leyenda del hallazgo activo */}

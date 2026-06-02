@@ -1,7 +1,7 @@
 // FILE: components/seguridad/PanelDocenteSupervision.tsx
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import React, { useState, useEffect, useCallback, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -31,6 +31,8 @@ export function PanelDocenteSupervision() {
   const [estudiantesDocente, setEstudiantesDocente] = useState<any[]>([])
   const [activeTab, setActiveTab] = useState<'bandeja' | 'estudiantes' | 'dashboard'>('dashboard')
   const [filtroMateria, setFiltroMateria] = useState<string>('Todas')
+  // IDs de solicitudes que están parpadeando en rojo
+  const [flashingIds, setFlashingIds] = useState<Set<string>>(new Set())
 
   const materiasDocente = ['Todas', 'Clínica de Operatoria I', 'Clínica de Endodoncia', 'Cirugía Bucal']
 
@@ -57,13 +59,91 @@ export function PanelDocenteSupervision() {
     }
   }, [cargarDatos])
 
+  // ==========================================
+  // NOTIFICACIÓN CON AUDIO — Alerta sonora médica limpia
+  // Usa AudioContext sintetizado (0.3 seg) al recibir nueva solicitud
+  // La tarjeta del alumno parpadea en rojo en la bandeja en tiempo real
+  // ==========================================
+  const prevSolicitudesCount = useRef(0)
+  const prevSolicitudesIds = useRef<Set<string>>(new Set())
+
+  useEffect(() => {
+    const currentIds = new Set(solicitudesPendientes.map(s => s.id))
+    
+    // Detectar nuevas solicitudes (que no existían antes)
+    const nuevasIds: string[] = []
+    currentIds.forEach(id => {
+      if (!prevSolicitudesIds.current.has(id)) {
+        nuevasIds.push(id)
+      }
+    })
+
+    if (nuevasIds.length > 0 && prevSolicitudesIds.current.size > 0) {
+      // Marcar las nuevas para parpadeo rojo
+      setFlashingIds(prev => {
+        const next = new Set(prev)
+        nuevasIds.forEach(id => next.add(id))
+        return next
+      })
+
+      // Quitar el parpadeo después de 6 segundos
+      setTimeout(() => {
+        setFlashingIds(prev => {
+          const next = new Set(prev)
+          nuevasIds.forEach(id => next.delete(id))
+          return next
+        })
+      }, 6000)
+
+      // Reproducir alerta sonora médica limpia
+      try {
+        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
+        
+        // Tono 1: Alerta suave ascendente (tipo notificación clínica)
+        const osc1 = audioCtx.createOscillator()
+        const gain1 = audioCtx.createGain()
+        osc1.type = 'sine'
+        osc1.frequency.setValueAtTime(660, audioCtx.currentTime) // E5
+        osc1.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.08) // A5
+        gain1.gain.setValueAtTime(0, audioCtx.currentTime)
+        gain1.gain.linearRampToValueAtTime(0.25, audioCtx.currentTime + 0.03)
+        gain1.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2)
+        osc1.connect(gain1)
+        gain1.connect(audioCtx.destination)
+        osc1.start(audioCtx.currentTime)
+        osc1.stop(audioCtx.currentTime + 0.2)
+
+        // Tono 2: Segundo ping (doble alerta médica)
+        const osc2 = audioCtx.createOscillator()
+        const gain2 = audioCtx.createGain()
+        osc2.type = 'sine'
+        osc2.frequency.setValueAtTime(880, audioCtx.currentTime + 0.15) // A5
+        osc2.frequency.exponentialRampToValueAtTime(1320, audioCtx.currentTime + 0.22) // E6
+        gain2.gain.setValueAtTime(0, audioCtx.currentTime + 0.15)
+        gain2.gain.linearRampToValueAtTime(0.2, audioCtx.currentTime + 0.18)
+        gain2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35)
+        osc2.connect(gain2)
+        gain2.connect(audioCtx.destination)
+        osc2.start(audioCtx.currentTime + 0.15)
+        osc2.stop(audioCtx.currentTime + 0.35)
+      } catch (e) {
+        console.log('AudioContext error:', e)
+      }
+    }
+
+    prevSolicitudesCount.current = solicitudesPendientes.length
+    prevSolicitudesIds.current = currentIds
+  }, [solicitudesPendientes])
+
   const handleAprobar = (id: string) => {
     aprobarSolicitud(id, docenteId, docenteNombre)
+    setFlashingIds(prev => { const n = new Set(prev); n.delete(id); return n })
     cargarDatos()
   }
 
   const handleRechazar = (id: string) => {
     rechazarSolicitud(id, docenteId, docenteNombre)
+    setFlashingIds(prev => { const n = new Set(prev); n.delete(id); return n })
     cargarDatos()
   }
 
@@ -253,26 +333,47 @@ export function PanelDocenteSupervision() {
                   <p className="text-xs">Todos los estudiantes tienen sus permisos al día.</p>
                 </div>
               ) : (
-                solicitudesPendientes.map(sol => (
-                  <div key={sol.id} className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl p-4 hover:shadow-md transition-shadow">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full font-bold">{sol.modulo.replace('_', ' ')}</span>
-                        <span className="text-[10px] text-slate-400">{new Date(sol.timestamp).toLocaleTimeString('es-ES')}</span>
+                solicitudesPendientes.map(sol => {
+                  const isFlashing = flashingIds.has(sol.id)
+                  return (
+                    <div
+                      key={sol.id}
+                      className={`flex items-center justify-between rounded-xl p-4 hover:shadow-md transition-all duration-300 ${
+                        isFlashing
+                          ? 'bg-red-100 border-2 border-red-500 animate-pulse shadow-lg shadow-red-200'
+                          : 'bg-amber-50 border border-amber-200'
+                      }`}
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          {isFlashing && (
+                            <span className="relative flex h-3 w-3">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-3 w-3 bg-red-600"></span>
+                            </span>
+                          )}
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                            isFlashing ? 'bg-red-200 text-red-800' : 'bg-amber-200 text-amber-800'
+                          }`}>
+                            {sol.modulo.replace('_', ' ')}
+                          </span>
+                          <span className="text-[10px] text-slate-400">{new Date(sol.timestamp).toLocaleTimeString('es-ES')}</span>
+                          {isFlashing && <span className="text-[10px] font-bold text-red-600 animate-pulse">🔴 NUEVA SOLICITUD</span>}
+                        </div>
+                        <p className={`text-sm font-semibold ${isFlashing ? 'text-red-800' : 'text-slate-800'}`}>{sol.estudianteNombre}</p>
+                        <p className="text-xs text-slate-500">Acción: {sol.accion} {sol.pacienteNombre && `• Paciente: ${sol.pacienteNombre}`}</p>
                       </div>
-                      <p className="text-sm font-semibold text-slate-800">{sol.estudianteNombre}</p>
-                      <p className="text-xs text-slate-500">Acción: {sol.accion} {sol.pacienteNombre && `• Paciente: ${sol.pacienteNombre}`}</p>
+                      <div className="flex items-center gap-2 ml-4">
+                        <Button onClick={() => handleAprobar(sol.id)} size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm">
+                          <CheckCircle2 className="w-4 h-4 mr-1" /> Aprobar
+                        </Button>
+                        <Button onClick={() => handleRechazar(sol.id)} size="sm" variant="destructive" className="shadow-sm">
+                          <XCircle className="w-4 h-4 mr-1" /> Rechazar
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 ml-4">
-                      <Button onClick={() => handleAprobar(sol.id)} size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm">
-                        <CheckCircle2 className="w-4 h-4 mr-1" /> Aprobar
-                      </Button>
-                      <Button onClick={() => handleRechazar(sol.id)} size="sm" variant="destructive" className="shadow-sm">
-                        <XCircle className="w-4 h-4 mr-1" /> Rechazar
-                      </Button>
-                    </div>
-                  </div>
-                ))
+                  )
+                })
               )}
             </CardContent>
           </Card>

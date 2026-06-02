@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useRouter } from "next/navigation"
 import { BotonSupervisado } from "@/components/seguridad/BotonSupervisado"
+import { useAutoSave } from "@/hooks/useAutoSave"
 
 // IMPORTAMOS LOS COMPONENTES DE LAS PESTAÑAS
 import { TabEvaluacionGeneral } from "@/components/tabs-expediente/tab-evaluacion-general"
@@ -31,6 +32,7 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
     const unwrappedParams = use(params);
     const pacienteId = unwrappedParams.id;
     const periodontogramaRef = useRef<any>(null);
+    const [estudianteId, setEstudianteId] = useState<string>("");
 
     // --- ESTADOS ---
     const [formData, setFormData] = useState({
@@ -89,6 +91,22 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
             } catch (error) { console.error("Error cargando expediente:", error); }
         };
 
+        // Obtener ID del estudiante
+        const userId = localStorage.getItem('user_id') || '';
+        setEstudianteId(userId);
+
+        // Recuperar backup del localStorage si existe
+        const backupKey = `hc_backup_${pacienteId}_${userId}`;
+        try {
+            const backup = localStorage.getItem(backupKey);
+            if (backup) {
+                const backupData = JSON.parse(backup);
+                setFormData(prev => ({ ...prev, ...backupData }));
+            }
+        } catch (e) {
+            console.warn('No se pudo recuperar el backup:', e);
+        }
+
         if (pacienteId) {
             setCargando(true);
             Promise.all([
@@ -98,6 +116,20 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
             ]).finally(() => setCargando(false));
         }
     }, [pacienteId]);
+
+    // --- AUTO-SAVE EN LOCALSTORAGE ---
+    const backupKey = `hc_backup_${pacienteId}_${estudianteId}`;
+    const { clearBackup: clearAutoSaveBackup } = useAutoSave({
+        key: backupKey,
+        data: formData,
+        delay: 1000, // Guardar cada 1 segundo de inactividad
+        onSaveSuccess: () => {
+            // Silenciosamente guardado
+        },
+        onSaveError: (error) => {
+            console.warn('[AutoSave] Error guardando backup en localStorage:', error);
+        }
+    });
 
     // --- FUNCIONES DE ACCIÓN ---
     const handleInputChange = (seccion: string, campo: string, valor: any) => {
@@ -150,6 +182,8 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
             }
 
             alert("¡Expediente completo guardado con éxito! 🎉");
+            // Limpiar el backup automático después de guardar exitosamente
+            clearAutoSaveBackup();
         } catch (error) { 
             alert("Error de conexión con el servidor."); 
         }
@@ -157,7 +191,7 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 p-6 flex flex-col space-y-6">
+        <div className="min-h-screen bg-clinica-bg p-6 flex flex-col space-y-6">
 
             {cargando || !paciente ? (
                 <div className="flex justify-center items-center py-20">
@@ -199,34 +233,34 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
             <Tabs defaultValue="historia" className="w-full flex-1 flex flex-col">
 
                 <TabsList className="grid w-full grid-cols-7 h-14 bg-white border shadow-sm rounded-xl p-1">
-                    <TabsTrigger value="historia" className="text-md data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700">
+                    <TabsTrigger value="historia" className="text-md data-[state=active]:bg-clinica-secondary/10 data-[state=active]:text-clinica-secondary">
                         <FileText className="h-4 w-4 mr-2" /> Historia Clínica
                     </TabsTrigger>
-                    <TabsTrigger value="odontograma" className="text-md data-[state=active]:bg-purple-50 data-[state=active]:text-purple-700">
+                    <TabsTrigger value="odontograma" className="text-md data-[state=active]:bg-clinica-primary/10 data-[state=active]:text-clinica-primary">
                         <Stethoscope className="h-4 w-4 mr-2" /> Odontograma 3D
                     </TabsTrigger>
-                    <TabsTrigger value="periodontograma" className="text-md data-[state=active]:bg-rose-50 data-[state=active]:text-rose-700">
+                    <TabsTrigger value="periodontograma" className="text-md data-[state=active]:bg-clinica-accent/10 data-[state=active]:text-clinica-accent">
                         <Activity className="h-4 w-4 mr-2" /> Periodontograma
                     </TabsTrigger>
-                    <TabsTrigger value="tratamientos" className="text-md data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700">
+                    <TabsTrigger value="tratamientos" className="text-md data-[state=active]:bg-clinica-primary/10 data-[state=active]:text-clinica-primary">
                         <ClipboardList className="h-4 w-4 mr-2" /> Tratamientos
                     </TabsTrigger>
-                    <TabsTrigger value="radiografias" className="text-md data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700">
+                    <TabsTrigger value="radiografias" className="text-md data-[state=active]:bg-clinica-secondary/10 data-[state=active]:text-clinica-secondary">
                         <ImageIcon className="h-4 w-4 mr-2" /> Radiografías
                     </TabsTrigger>
-                    <TabsTrigger value="historial-citas" className="text-md data-[state=active]:bg-cyan-50 data-[state=active]:text-cyan-700">
+                    <TabsTrigger value="historial-citas" className="text-md data-[state=active]:bg-clinica-primary/10 data-[state=active]:text-clinica-primary">
                         <History className="h-4 w-4 mr-2" /> Historial Citas
                     </TabsTrigger>
-                    <TabsTrigger value="auditoria" className="text-md data-[state=active]:bg-orange-50 data-[state=active]:text-orange-700">
+                    <TabsTrigger value="auditoria" className="text-md data-[state=active]:bg-clinica-accent/10 data-[state=active]:text-clinica-accent">
                         <ClipboardList className="h-4 w-4 mr-2" /> Auditoría
                     </TabsTrigger>
                 </TabsList>
 
                 {/* --- CONTENIDO: HISTORIA CLÍNICA --- */}
                 <TabsContent value="historia" className="mt-6 flex-1">
-                    <Card className="h-full border-emerald-100 shadow-sm">
-                        <CardHeader className="bg-emerald-50/50 border-b">
-                            <CardTitle className="text-emerald-800">Historia Clínica Detallada</CardTitle>
+                    <Card className="border-clinica-secondary/20 shadow-sm">
+                        <CardHeader className="bg-gradient-to-r from-clinica-secondary/10 to-clinica-secondary/5 border-b border-clinica-secondary/20">
+                            <CardTitle className="text-clinica-secondary">Historia Clínica Detallada</CardTitle>
                         </CardHeader>
                         <CardContent className="p-6">
                             <Tabs defaultValue="evaluacion" className="w-full">
@@ -251,9 +285,9 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
 
                 {/* --- CONTENIDO: ODONTOGRAMA 3D --- */}
                 <TabsContent value="odontograma" className="mt-6 flex-1">
-                    <Card className="border-purple-100 shadow-sm">
-                        <CardHeader className="bg-purple-50/50 border-b">
-                            <CardTitle className="text-purple-800">Odontograma Interactivo</CardTitle>
+                    <Card className="border-clinica-primary/20 shadow-sm">
+                        <CardHeader className="bg-gradient-to-r from-clinica-primary/10 to-clinica-primary/5 border-b border-clinica-primary/20">
+                            <CardTitle className="text-clinica-primary">Odontograma Interactivo</CardTitle>
                         </CardHeader>
                         <CardContent className="p-6">
                             <OdontogramaDinamico 
@@ -269,9 +303,9 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
 
                 {/* --- CONTENIDO: PERIODONTOGRAMA --- */}
                 <TabsContent value="periodontograma" className="mt-6 flex-1">
-                    <Card className="border-rose-100 shadow-sm">
-                        <CardHeader className="bg-rose-50/50 border-b">
-                            <CardTitle className="text-rose-800">Periodontograma Gráfico</CardTitle>
+                    <Card className="border-clinica-accent/20 shadow-sm">
+                        <CardHeader className="bg-gradient-to-r from-clinica-accent/10 to-clinica-accent/5 border-b border-clinica-accent/20">
+                            <CardTitle className="text-clinica-accent">Periodontograma Gráfico</CardTitle>
                         </CardHeader>
                         <CardContent className="p-6">
                             <PeriodontogramaProvider pacienteId={pacienteId}>
@@ -283,9 +317,9 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
 
                 {/* --- CONTENIDO: TRATAMIENTOS --- */}
                 <TabsContent value="tratamientos" className="mt-6 flex-1">
-                    <Card className="border-indigo-100 shadow-sm">
-                        <CardHeader className="bg-indigo-50/50 border-b">
-                            <CardTitle className="text-indigo-800">Plan de Tratamiento</CardTitle>
+                    <Card className="border-clinica-primary/20 shadow-sm">
+                        <CardHeader className="bg-gradient-to-r from-clinica-primary/10 to-clinica-primary/5 border-b border-clinica-primary/20">
+                            <CardTitle className="text-clinica-primary">Plan de Tratamiento</CardTitle>
                         </CardHeader>
                         <CardContent className="p-6 bg-slate-50">
                             <TabHistorialTratamientos pacienteId={pacienteId} />
@@ -296,14 +330,14 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
                 {/* --- NUEVO CONTENIDO: MÓDULO 5 RADIOGRAFÍAS Y RAYOS X --- */}
                 <TabsContent value="radiografias" className="mt-6 flex-1">
                     <div className="space-y-6">
-                        <div className="flex justify-between items-center bg-blue-50/50 p-4 rounded-lg border border-blue-100">
+                        <div className="flex justify-between items-center bg-clinica-secondary/10 p-4 rounded-lg border border-clinica-secondary/20">
                             <div>
-                                <h3 className="text-lg font-semibold text-blue-900">Radiografías e Imágenes</h3>
-                                <p className="text-sm text-blue-700">Explora las imágenes existentes o sube una nueva.</p>
+                                <h3 className="text-lg font-semibold text-clinica-primary">Radiografías e Imágenes</h3>
+                                <p className="text-sm text-clinica-primary/70">Explora las imágenes existentes o sube una nueva.</p>
                             </div>
                             <Button 
                                 onClick={() => setShowUploadRadiografia(!showUploadRadiografia)}
-                                className={showUploadRadiografia ? "bg-slate-500 hover:bg-slate-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white shadow-md"}
+                                className={showUploadRadiografia ? "bg-slate-500 hover:bg-slate-600 text-white" : "bg-clinica-secondary hover:bg-clinica-secondary/90 text-white shadow-md"}
                             >
                                 {showUploadRadiografia ? "Cancelar" : "+ Agregar Nueva Radiografía"}
                             </Button>
@@ -311,9 +345,9 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
 
                         {/* Panel de Carga Superior */}
                         {showUploadRadiografia && (
-                            <Card className="border-blue-100 shadow-md transition-all duration-300">
-                                <CardHeader className="bg-blue-50 border-b">
-                                    <CardTitle className="text-base flex items-center gap-2 text-blue-800">
+                            <Card className="border-clinica-secondary/20 shadow-md transition-all duration-300">
+                                <CardHeader className="bg-clinica-secondary/10 border-b border-clinica-secondary/20">
+                                    <CardTitle className="text-base flex items-center gap-2 text-clinica-primary">
                                         <UploadCloud className="w-5 h-5" /> Adquisición de Imagen
                                     </CardTitle>
                                 </CardHeader>

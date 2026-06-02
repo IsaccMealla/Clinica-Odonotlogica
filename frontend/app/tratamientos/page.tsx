@@ -79,7 +79,7 @@ export default function TratamientosPage() {
       {/* Área de Contenido */}
       {cargando ? (
         <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-          <Loader2 className="h-10 w-10 animate-spin text-blue-500 mb-4" />
+          <Loader2 className="h-10 w-10 animate-spin text-clinica-primary mb-4" />
           <p className="animate-pulse">Cargando expedientes clínicos...</p>
         </div>
       ) : tratamientos.length === 0 ? (

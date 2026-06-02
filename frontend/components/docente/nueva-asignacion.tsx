@@ -69,7 +69,7 @@ export function NuevaAsignacion({ pacientes, estudiantes, token, onSuccess }: Pr
   return (
     <Dialog open={abierto} onOpenChange={setAbierto}>
       <DialogTrigger asChild>
-        <Button className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
+        <Button className="bg-clinica-primary hover:bg-clinica-primary/80 text-white gap-2">
           <Plus className="h-4 w-4" /> Nueva Asignación
         </Button>
       </DialogTrigger>

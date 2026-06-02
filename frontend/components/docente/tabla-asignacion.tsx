@@ -73,7 +73,7 @@ export function TablaAsignacion({ token }: { token: string }) {
 
   if (cargando) return (
     <div className="flex flex-col items-center justify-center p-20 gap-2">
-      <Loader2 className="animate-spin text-blue-500 h-8 w-8" />
+      <Loader2 className="animate-spin text-clinica-primary h-8 w-8" />
       <p className="text-sm text-muted-foreground">Cargando datos...</p>
     </div>
   )
@@ -105,7 +105,7 @@ export function TablaAsignacion({ token }: { token: string }) {
           const estudiante = estudiantes.find((e) => e.id === paciente.estudiante_asignado)
           return (
             <>
-              <td className="font-mono text-sm font-semibold text-blue-700 px-4 py-4">{paciente.ci}</td>
+              <td className="font-mono text-sm font-semibold text-clinica-primary px-4 py-4">{paciente.ci}</td>
               <td className="font-medium px-4 py-4">
                 <div className="flex flex-col gap-1">
                   <span>{paciente.nombres} {paciente.apellido_paterno}</span>

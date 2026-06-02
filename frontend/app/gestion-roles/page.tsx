@@ -6,7 +6,7 @@ import { DocenteList } from '@/components/roles/DocenteList'
 
 export default function Page(){
   return (
-    <div className="min-h-screen bg-gray-50 pb-12">
+    <div className="min-h-screen bg-clinica-bg pb-12">
       <div className="max-w-7xl mx-auto p-6">
         <RoleList />
         <DocenteList />

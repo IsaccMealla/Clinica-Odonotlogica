@@ -150,10 +150,10 @@ export default function DashboardReportesPage() {
         </div>
         <div className="flex gap-3">
           <Button variant="outline" className="bg-white hover:bg-slate-50 text-slate-800 border-slate-200 pointer-events-none px-6">
-            <Calendar className="mr-2 h-5 w-5 text-emerald-600" /> 
+            <Calendar className="mr-2 h-5 w-5 text-clinica-secondary" /> 
             {filtroTiempo === 'mes' ? 'Este Mes' : filtroTiempo === 'hoy' ? 'Hoy' : filtroTiempo === 'semana' ? 'Esta Semana' : 'Histórico'}
           </Button>
-          <Button className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 shadow-md shadow-emerald-200">
+          <Button className="bg-clinica-secondary hover:bg-clinica-secondary/80 text-white px-6 shadow-md shadow-clinica-secondary/30">
             <Download className="mr-2 h-5 w-5" /> Exportar Reporte
           </Button>
         </div>
@@ -169,7 +169,7 @@ export default function DashboardReportesPage() {
         {/* CONTROLES DEL DASHBOARD (FILTROS DINÁMICOS) */}
         <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-10 border-b border-slate-100 pb-6 gap-4">
           <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-3">
-            <Filter className="text-blue-500 h-7 w-7" /> 
+            <Filter className="text-clinica-primary h-7 w-7" /> 
             Filtros de Análisis
           </h2>
           
@@ -184,7 +184,7 @@ export default function DashboardReportesPage() {
                 setFiltroRolUsuario('todos');
               }}
               disabled={cargando}
-              className="bg-slate-900 text-white border-transparent rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-semibold cursor-pointer shadow-md"
+              className="bg-clinica-primary text-white border-transparent rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-clinica-secondary outline-none font-semibold cursor-pointer shadow-md"
             >
               <option value="clinico">Vista Clínica (Tratamientos y Carpetas)</option>
               <option value="usuarios">Vista Institucional (Usuarios y Pacientes)</option>
@@ -195,7 +195,7 @@ export default function DashboardReportesPage() {
                 value={filtroEstadoCarpeta} 
                 onChange={(e) => setFiltroEstadoCarpeta(e.target.value)}
                 disabled={cargando}
-                className="bg-indigo-50 border border-indigo-200 text-indigo-800 rounded-xl px-4 py-3 text-sm focus:ring-indigo-500 outline-none font-semibold cursor-pointer animate-in fade-in zoom-in duration-300"
+                className="bg-clinica-secondary/10 border border-clinica-secondary text-clinica-secondary rounded-xl px-4 py-3 text-sm focus:ring-clinica-secondary outline-none font-semibold cursor-pointer animate-in fade-in zoom-in duration-300"
               >
                 <option value="todos">Estado Docente: Todos</option>
                 <option value="BORRADOR">Estado: En Borrador (Editando)</option>
@@ -211,7 +211,7 @@ export default function DashboardReportesPage() {
                 value={filtroRolUsuario} 
                 onChange={(e) => setFiltroRolUsuario(e.target.value)}
                 disabled={cargando}
-                className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl px-4 py-3 text-sm focus:ring-emerald-500 outline-none font-semibold cursor-pointer animate-in fade-in zoom-in duration-300"
+                className="bg-clinica-secondary/10 border border-clinica-secondary text-clinica-secondary rounded-xl px-4 py-3 text-sm focus:ring-clinica-secondary outline-none font-semibold cursor-pointer animate-in fade-in zoom-in duration-300"
               >
                 <option value="todos">Roles: Todos los Usuarios</option>
                 <option value="ESTUDIANTE">Rol: Estudiantes Clínicos</option>
@@ -242,7 +242,7 @@ export default function DashboardReportesPage() {
           <div className="w-full md:w-1/3 xl:w-1/4 flex flex-col gap-5">
             {cargando ? (
               <div className="flex flex-col justify-center items-center flex-grow bg-slate-50 rounded-2xl border border-slate-200">
-                <Loader2 className="animate-spin text-blue-500 h-10 w-10 mb-3" />
+                <Loader2 className="animate-spin text-clinica-primary h-10 w-10 mb-3" />
                 <span className="text-base font-semibold text-slate-600">Calculando métricas...</span>
               </div>
             ) : datos3D.length > 0 ? (

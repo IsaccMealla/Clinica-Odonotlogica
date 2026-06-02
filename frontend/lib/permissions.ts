@@ -19,6 +19,12 @@ export function getUserPermissionsRaw(): any {
 export function hasPermission(key: string): boolean {
   try {
     const role = (localStorage.getItem('user_role') || '').toUpperCase()
+    const isSuperuser = localStorage.getItem('is_superuser') === 'true'
+
+    // Bypass de Admin: El administrador tiene todos los permisos
+    if (isSuperuser || role === 'ADMIN' || role === 'ADMINISTRADOR') {
+      return true
+    }
 
     const perms = getUserPermissionsRaw()
     if (!perms) return false

@@ -29,6 +29,12 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from .models import *
 from .serializers import *
 
+# --- IMPORTACIONES PARA QA RUNNER ---
+import asyncio
+import sys
+import os
+from pathlib import Path
+
 # Obtenemos el modelo de usuario activo (sea el por defecto o uno personalizado)
 User = get_user_model()
 

@@ -104,7 +104,7 @@ export default function LoginPage() {
     } else {
       passLevel = 100
       passLabel = "¡Sonrisa Radiante! (Fuerte) ✨"
-      passColor = "bg-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.8)]"
+      passColor = "bg-clinica-secondary shadow-[0_0_15px_rgba(16,185,129,0.8)]"
     }
   }
 
@@ -510,7 +510,7 @@ export default function LoginPage() {
                   disabled={status === "loading" || status === "success"}
                   className={`w-full h-12 text-lg font-bold shadow-lg transition-all duration-500 rounded-xl relative overflow-hidden border
                     ${status === 'success' 
-                      ? 'bg-emerald-500 text-white border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.4)]' 
+                      ? 'bg-clinica-secondary text-white border-clinica-secondary shadow-[0_0_20px_rgba(16,185,129,0.4)]' 
                       : status === 'error'
                       ? 'bg-red-900 text-white border-red-700 shadow-red-900/50'
                       : 'bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-50 border-cyan-500/50 shadow-[0_0_20px_rgba(6,182,212,0.2)]'

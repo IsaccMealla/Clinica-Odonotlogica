@@ -44,6 +44,14 @@ interface TabEvaluacionProps {
 export function TabEvaluacionGeneral({ formData, onChange, paciente }: TabEvaluacionProps) {
   const examen = formData.examen_clinico_fisico || {};
   const habitos = formData.habitos || {};
+  const ginecologicos = formData.ginecologicos || {};
+
+  // ==========================================
+  // LÓGICA CONDICIONAL: MOSTRAR GINECOLÓGICOS SOLO PARA MUJERES
+  // ==========================================
+  const isFemale = paciente?.sexo?.toLowerCase() === 'f' || 
+                   paciente?.sexo?.toLowerCase() === 'mujer' || 
+                   paciente?.sexo?.toLowerCase() === 'femenino';
 
   // ==========================================
   // FUNCIONES DE VALIDACIÓN
@@ -80,11 +88,14 @@ export function TabEvaluacionGeneral({ formData, onChange, paciente }: TabEvalua
   // ==========================================
   return (
     <Tabs defaultValue="signos" className="w-full">
-      <TabsList className="grid w-full grid-cols-4 mb-6 bg-slate-100 p-1 rounded-xl">
+      <TabsList className={`grid w-full ${isFemale ? 'grid-cols-5' : 'grid-cols-4'} mb-6 bg-slate-100 p-1 rounded-xl`}>
         <TabsTrigger value="signos" className="rounded-lg">Signos Vitales</TabsTrigger>
         <TabsTrigger value="fisico" className="rounded-lg">Examen Físico</TabsTrigger>
         <TabsTrigger value="atm" className="rounded-lg">Examen ATM</TabsTrigger>
         <TabsTrigger value="habitos" className="rounded-lg">Hábitos</TabsTrigger>
+        {isFemale && (
+          <TabsTrigger value="gineco" className="rounded-lg">Ginecología</TabsTrigger>
+        )}
       </TabsList>
 
       {/* --- 1. SIGNOS VITALES --- */}
@@ -358,6 +369,223 @@ export function TabEvaluacionGeneral({ formData, onChange, paciente }: TabEvalua
           />
         </div>
       </TabsContent>
+
+      {/* --- 5. ANTECEDENTES GINECO-OBSTÉTRICOS (Solo para Mujeres) --- */}
+      {isFemale && (
+        <TabsContent value="gineco" className="space-y-6 bg-white p-6 border rounded-xl shadow-sm">
+          <div className="p-4 bg-pink-50/50 border border-pink-200 rounded-xl">
+            <h3 className="font-bold text-lg text-pink-800 mb-2">Examen Gineco-Obstétrico</h3>
+            <p className="text-sm text-pink-700">Información reproductiva y obstétrica de la paciente</p>
+          </div>
+
+          {/* Embarazo Actual */}
+          <div className="space-y-4 p-4 bg-pink-50/30 border border-pink-100 rounded-xl">
+            <div className="flex items-center space-x-4">
+              <BotonSwitch 
+                id="posibilidad_embarazo"
+                checked={ginecologicos.posibilidad_embarazo || false} 
+                onCheckedChange={(c: boolean) => onChange('ginecologicos', 'posibilidad_embarazo', c)} 
+              />
+              <div>
+                <Label htmlFor="posibilidad_embarazo" className="cursor-pointer font-bold text-slate-700 text-base">
+                  ¿Está embarazada?
+                </Label>
+                <p className="text-xs text-slate-500">Indica si la paciente está en estado de embarazo</p>
+              </div>
+            </div>
+
+            {ginecologicos.posibilidad_embarazo && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 ml-10">
+                <div className="space-y-2">
+                  <Label className="text-slate-600 font-semibold">Meses de Embarazo</Label>
+                  <Input 
+                    type="number" 
+                    min="0" 
+                    max="9"
+                    value={ginecologicos.embarazo_meses || ''} 
+                    onChange={(e) => onChange('ginecologicos', 'embarazo_meses', e.target.value)} 
+                    placeholder="Ej: 6"
+                    className="bg-white"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-slate-600 font-semibold">Fecha Probable de Parto</Label>
+                  <Input 
+                    type="date"
+                    value={ginecologicos.fecha_probable_parto || ''} 
+                    onChange={(e) => onChange('ginecologicos', 'fecha_probable_parto', e.target.value)} 
+                    className="bg-white"
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label className="text-slate-600 font-semibold">Observaciones del Embarazo</Label>
+                  <Textarea 
+                    value={ginecologicos.embarazo_obs || ''} 
+                    onChange={(e) => onChange('ginecologicos', 'embarazo_obs', e.target.value)} 
+                    placeholder="Complicaciones, síntomas relevantes, antecedentes de aborto..." 
+                    className="resize-none bg-white"
+                    rows={3}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Ciclo Menstrual */}
+          <div className="space-y-4 p-4 bg-purple-50/30 border border-purple-100 rounded-xl">
+            <Label className="font-bold text-slate-700">Historial Menstrual</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-slate-600 font-semibold">Última Menstruación (FUM)</Label>
+                <Input 
+                  type="date"
+                  value={ginecologicos.fecha_ultima_menstruacion || ''} 
+                  onChange={(e) => onChange('ginecologicos', 'fecha_ultima_menstruacion', e.target.value)} 
+                  placeholder="Fecha de último período"
+                  className="bg-white"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-slate-600 font-semibold">Ciclo (días)</Label>
+                <Input 
+                  type="number" 
+                  min="15" 
+                  max="60"
+                  value={ginecologicos.ciclo_menstrual_dias || ''} 
+                  onChange={(e) => onChange('ginecologicos', 'ciclo_menstrual_dias', e.target.value)} 
+                  placeholder="Ej: 28"
+                  className="bg-white"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-slate-600 font-semibold">Duración (días)</Label>
+                <Input 
+                  type="number" 
+                  min="1" 
+                  max="15"
+                  value={ginecologicos.duracion_menstruacion_dias || ''} 
+                  onChange={(e) => onChange('ginecologicos', 'duracion_menstruacion_dias', e.target.value)} 
+                  placeholder="Ej: 5"
+                  className="bg-white"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-slate-600 font-semibold">Intensidad del Flujo</Label>
+                <select 
+                  value={ginecologicos.intensidad_flujo || ''} 
+                  onChange={(e) => onChange('ginecologicos', 'intensidad_flujo', e.target.value)} 
+                  className="w-full px-3 py-2 border rounded-lg bg-white text-slate-700"
+                >
+                  <option value="">Seleccionar intensidad</option>
+                  <option value="leve">Leve</option>
+                  <option value="normal">Normal</option>
+                  <option value="profuso">Profuso</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Métodos Anticonceptivos */}
+          <div className="space-y-4 p-4 bg-blue-50/30 border border-blue-100 rounded-xl">
+            <div className="flex items-center space-x-4">
+              <BotonSwitch 
+                id="toma_anticonceptivos"
+                checked={ginecologicos.toma_anticonceptivos || false} 
+                onCheckedChange={(c: boolean) => onChange('ginecologicos', 'toma_anticonceptivos', c)} 
+              />
+              <div>
+                <Label htmlFor="toma_anticonceptivos" className="cursor-pointer font-bold text-slate-700 text-base">
+                  ¿Utiliza Método Anticonceptivo?
+                </Label>
+                <p className="text-xs text-slate-500">Anticonceptivos hormonales, dispositivos, barreras, etc.</p>
+              </div>
+            </div>
+
+            {ginecologicos.toma_anticonceptivos && (
+              <div className="ml-10 space-y-3">
+                <div className="space-y-2">
+                  <Label className="text-slate-600 font-semibold">Tipo de Anticonceptivo</Label>
+                  <Input 
+                    value={ginecologicos.tipo_anticonceptivo || ''} 
+                    onChange={(e) => onChange('ginecologicos', 'tipo_anticonceptivo', e.target.value)} 
+                    placeholder="Ej: Píldora, Inyectable, Dispositivo IUD..." 
+                    className="bg-white"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-slate-600 font-semibold">Tiempo de Uso</Label>
+                  <Input 
+                    value={ginecologicos.tiempo_anticonceptivo || ''} 
+                    onChange={(e) => onChange('ginecologicos', 'tiempo_anticonceptivo', e.target.value)} 
+                    placeholder="Ej: 2 años"
+                    className="bg-white"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-slate-600 font-semibold">Observaciones</Label>
+                  <Textarea 
+                    value={ginecologicos.anticonceptivos_obs || ''} 
+                    onChange={(e) => onChange('ginecologicos', 'anticonceptivos_obs', e.target.value)} 
+                    placeholder="Efectos secundarios, tolerancia, cambios recientes..." 
+                    className="resize-none bg-white"
+                    rows={2}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Historia Obstétrica */}
+          <div className="space-y-4 p-4 bg-amber-50/30 border border-amber-100 rounded-xl">
+            <Label className="font-bold text-slate-700">Historia Obstétrica</Label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label className="text-slate-600 font-semibold">Número de Partos</Label>
+                <Input 
+                  type="number" 
+                  min="0"
+                  value={ginecologicos.numero_partos || ''} 
+                  onChange={(e) => onChange('ginecologicos', 'numero_partos', e.target.value)} 
+                  placeholder="0"
+                  className="bg-white"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-slate-600 font-semibold">Número de Abortos</Label>
+                <Input 
+                  type="number" 
+                  min="0"
+                  value={ginecologicos.numero_abortos || ''} 
+                  onChange={(e) => onChange('ginecologicos', 'numero_abortos', e.target.value)} 
+                  placeholder="0"
+                  className="bg-white"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-slate-600 font-semibold">Número de Hijos</Label>
+                <Input 
+                  type="number" 
+                  min="0"
+                  value={ginecologicos.numero_hijos || ''} 
+                  onChange={(e) => onChange('ginecologicos', 'numero_hijos', e.target.value)} 
+                  placeholder="0"
+                  className="bg-white"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-slate-600 font-semibold">Observaciones Obstétricas</Label>
+              <Textarea 
+                value={ginecologicos.obs_obstetrica || ''} 
+                onChange={(e) => onChange('ginecologicos', 'obs_obstetrica', e.target.value)} 
+                placeholder="Complicaciones en partos anteriores, cesáreas, partos naturales..." 
+                className="resize-none bg-white"
+                rows={2}
+              />
+            </div>
+          </div>
+        </TabsContent>
+      )}
 
     </Tabs>
   )

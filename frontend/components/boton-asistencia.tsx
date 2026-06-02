@@ -35,9 +35,11 @@ export function BotonAsistencia() {
     localStorage.setItem("estudiante_presente", nuevoEstado.toString())
     if (!nuevoEstado) {
       localStorage.removeItem("estudiante_materia")
+      localStorage.removeItem("estudiante_nombre")
       setMateria("")
     } else {
       localStorage.setItem("estudiante_materia", materia)
+      localStorage.setItem("estudiante_nombre", localStorage.getItem("user_name") || "Estudiante Local")
     }
   }
 

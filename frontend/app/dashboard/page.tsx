@@ -225,15 +225,20 @@ import { loadMe } from "@/lib/permissions"
 // --- 4. COMPONENTE PRINCIPAL ---
 export default function DashboardPage() {
   const [role, setRole] = useState<string | null>(null);
-  const dashboardUI = useMemo(() => <DashboardUI role={role} />, [role]);
 
   React.useEffect(() => {
     (async () => {
       const me = await loadMe()
       const r = me?.rol || localStorage.getItem('user_role')
       if (r) setRole(r.toUpperCase())
+      else setRole('UNKNOWN')
     })()
   }, [])
+
+  // Evita el montaje doble del Canvas que causa el error "createRoot()" en React 19 + drei
+  if (role === null) {
+    return <div className="w-full h-screen bg-[#020617] flex items-center justify-center text-cyan-500 animate-pulse font-mono text-xs">INICIALIZANDO SISTEMA BIOMÉTRICO...</div>
+  }
 
   if (role === 'RECEPCIONISTA') {
     return (
@@ -264,7 +269,7 @@ export default function DashboardPage() {
           <ScrollControls pages={3} damping={0.25} distance={1.2}>
             <DNAHelix />
             <Scroll html className="w-full">
-              {dashboardUI}
+              <DashboardUI role={role} />
             </Scroll>
           </ScrollControls>
         </Canvas>

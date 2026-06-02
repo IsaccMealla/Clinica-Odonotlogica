@@ -48,12 +48,12 @@ export default function RecuperarPasswordPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 p-4 relative overflow-hidden">
       
       {/* Círculos decorativos */}
-      <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-blue-300 rounded-full mix-blend-multiply filter blur-[100px] opacity-40 animate-pulse"></div>
-      <div className="absolute bottom-[-10%] left-[-5%] w-[400px] h-[400px] bg-teal-300 rounded-full mix-blend-multiply filter blur-[100px] opacity-40"></div>
+      <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-clinica-primary rounded-full mix-blend-multiply filter blur-[100px] opacity-40 animate-pulse"></div>
+      <div className="absolute bottom-[-10%] left-[-5%] w-[400px] h-[400px] bg-clinica-secondary rounded-full mix-blend-multiply filter blur-[100px] opacity-40"></div>
 
       <Card className="w-full max-w-md relative z-10 shadow-2xl border-white/50 bg-white/90 backdrop-blur-sm">
         <CardHeader className="space-y-4 items-center text-center pt-10 pb-4">
-          <div className="h-20 w-20 bg-gradient-to-br from-blue-600 to-teal-500 rounded-3xl flex items-center justify-center shadow-lg transform -rotate-3 hover:-rotate-6 transition-transform">
+          <div className="h-20 w-20 bg-gradient-to-br from-clinica-primary to-clinica-secondary rounded-3xl flex items-center justify-center shadow-lg transform -rotate-3 hover:-rotate-6 transition-transform">
             <KeyRound className="h-10 w-10 text-white" />
           </div>
           <div className="space-y-1">
@@ -74,7 +74,7 @@ export default function RecuperarPasswordPage() {
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-slate-700 font-semibold">Correo Electrónico</Label>
                 <div className="relative group">
-                  <Mail className="absolute left-3 top-3 h-5 w-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                  <Mail className="absolute left-3 top-3 h-5 w-5 text-slate-400 group-focus-within:text-clinica-primary transition-colors" />
                   <Input 
                     id="email" 
                     type="email" 
@@ -89,7 +89,7 @@ export default function RecuperarPasswordPage() {
 
               <Button 
                 type="submit" 
-                className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white h-12 text-md font-bold shadow-md transition-all hover:shadow-lg rounded-xl mt-4" 
+                className="w-full bg-gradient-to-r from-clinica-primary to-clinica-secondary hover:from-clinica-secondary hover:to-clinica-accent text-white h-12 text-md font-bold shadow-md transition-all hover:shadow-lg rounded-xl mt-4" 
                 disabled={loading}
               >
                 {loading ? "Enviando enlace..." : "Enviar enlace de recuperación"}
@@ -112,7 +112,7 @@ export default function RecuperarPasswordPage() {
         </CardContent>
         
         <CardFooter className="flex justify-center pb-8 pt-4">
-          <Link href="/login" className="flex items-center text-sm font-medium text-slate-500 hover:text-blue-600 transition-colors">
+          <Link href="/login" className="flex items-center text-sm font-medium text-slate-500 hover:text-clinica-primary transition-colors">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Volver al inicio de sesión
           </Link>

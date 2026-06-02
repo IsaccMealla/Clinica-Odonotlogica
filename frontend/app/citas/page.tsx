@@ -37,9 +37,24 @@ export default function CitasPage() {
           'Authorization': `Bearer ${localStorage.getItem('access_token')}`
         }
       })
-      const data = await response.json()
-      const listaCitas = Array.isArray(data) ? data : (data.results || [])
-      setCitas(listaCitas)
+      
+      if (!response.ok) {
+        const text = await response.text()
+        console.error("API Error (Not OK):", text.substring(0, 500)) // Imprimir primeros 500 chars para no saturar consola
+        setCitas([])
+        return
+      }
+
+      const contentType = response.headers.get("content-type")
+      if (contentType && contentType.indexOf("application/json") !== -1) {
+        const data = await response.json()
+        const listaCitas = Array.isArray(data) ? data : (data.results || [])
+        setCitas(listaCitas)
+      } else {
+        const text = await response.text()
+        console.error("Respuesta no-JSON recibida del servidor:", text.substring(0, 500))
+        setCitas([])
+      }
     } catch (error) {
       console.error('Error fetching citas:', error)
       setCitas([])
