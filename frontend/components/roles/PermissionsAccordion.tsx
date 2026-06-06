@@ -111,7 +111,7 @@ export const PERMISSION_MODULES: Section[] = [
               {section.permissions.map(p => (
                 <div key={p.key} className="flex items-center justify-between py-2 border-b last:border-b-0">
                   <div className="flex items-center gap-3">
-                    <div className={`rounded-full p-1 ${state[p.key] ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
+                    <div className={`rounded-full p-1 ${state[p.key] ? 'bg-clinica-secondary/10 text-clinica-secondary' : 'bg-red-50 text-red-600'}`}>
                       {state[p.key] ? <CheckSquare className="w-4 h-4"/> : <XSquare className="w-4 h-4"/>}
                     </div>
                     <div>

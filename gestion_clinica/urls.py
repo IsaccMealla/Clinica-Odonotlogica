@@ -44,6 +44,15 @@ from .views import (
 )
 from .views_roles import RoleViewSet
 
+# --- MÓDULO MATERIAS ---
+from .views_materias import (
+    MateriaViewSet,
+    MateriaDocenteViewSet,
+    MateriaEstudianteViewSet,
+    SolicitudGuardadoViewSet,
+    RegistroAsistenciaViewSet,
+)
+
 # Creamos el router automático
 router = DefaultRouter()
 
@@ -97,6 +106,13 @@ router.register(r'solicitud-supervision', SolicitudSupervisionViewSet, basename=
 router.register(r'evaluacion-desempeño', EvaluacionDesempeñoViewSet, basename='evaluacion-desempeño')
 # Roles (gestión de permisos)
 router.register(r'roles', RoleViewSet, basename='roles')
+
+# ========== MÓDULO MATERIAS Y GUARDADO ==========
+router.register(r'materias', MateriaViewSet, basename='materias')
+router.register(r'materia-docente', MateriaDocenteViewSet, basename='materia-docente')
+router.register(r'materia-estudiante', MateriaEstudianteViewSet, basename='materia-estudiante')
+router.register(r'solicitud-guardado', SolicitudGuardadoViewSet, basename='solicitud-guardado')
+router.register(r'asistencia', RegistroAsistenciaViewSet, basename='asistencia')
 
 
 urlpatterns = [

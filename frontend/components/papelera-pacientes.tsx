@@ -156,7 +156,7 @@ export function PapeleraPacientes() {
                         <Button 
                           size="sm" 
                           variant="outline" 
-                          className="text-green-600 border-green-200 hover:bg-green-50"
+                          className="text-clinica-secondary border-green-200 hover:bg-clinica-secondary/10"
                           onClick={() => handleRestaurar(p.id)}
                         >
                           <RotateCcw className="h-4 w-4 mr-1" /> Restaurar

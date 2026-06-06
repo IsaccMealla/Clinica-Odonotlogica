@@ -810,7 +810,7 @@ class Cita(models.Model):
     estudiante = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.RESTRICT, related_name='citas_estudiante', limit_choices_to={'rol': 'ESTUDIANTE'})
     docente = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.RESTRICT, related_name='citas_docente', limit_choices_to={'rol': 'DOCENTE'})
     gabinete = models.ForeignKey('Sillon', on_delete=models.RESTRICT, related_name='citas')
-    motivo = models.ForeignKey('Tratamiento', on_delete=models.CASCADE, related_name='citas')
+    motivo = models.ForeignKey('Tratamiento', on_delete=models.CASCADE, related_name='citas', db_column='motivo')
     
     fecha_hora = models.DateTimeField(help_text="Fecha y hora de la cita")
     estado = models.CharField(max_length=20, choices=ESTADOS_CITA, default='RESERVADA')
@@ -1007,6 +1007,13 @@ class ImagenClinica(models.Model):
     pieza_dental = models.IntegerField(null=True, blank=True) # Para radiografías o intraorales
     descripcion = models.TextField(blank=True)
     fecha_adquisicion = models.DateTimeField(auto_now_add=True)
+    # Campo para almacenar los resultados del motor IA de procesamiento radiológico
+    resultados_ia = models.JSONField(null=True, blank=True, default=None,
+        help_text="JSON crudo del pipeline IA (YOLOv8 + OpenCV): detecciones de caries y restauraciones")
+    
+    # Campo para almacenar los diagnósticos manuales dibujados por el usuario
+    diagnosticos_usuario = models.JSONField(null=True, blank=True, default=dict,
+        help_text="JSON con los diagnósticos manuales y capturas (snapshots)")
 
     class Meta:
         verbose_name = "Imagen Clínica"

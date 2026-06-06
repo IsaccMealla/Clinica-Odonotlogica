@@ -81,22 +81,22 @@ export default function ImageUpload({ pacienteId, onUploadSuccess }: Props) {
     <div className="space-y-5">
       {/* Área de Drop/Select Archivo */}
       <div className="group">
-        <div className="flex flex-col items-center justify-center border-2 border-dashed border-blue-300 rounded-lg p-6 bg-gradient-to-br from-blue-50 to-blue-100/50 hover:border-blue-400 hover:bg-blue-100/50 transition-all duration-300 relative cursor-pointer">
+        <div className="flex flex-col items-center justify-center border-2 border-dashed border-blue-300 rounded-lg p-6 bg-gradient-to-br from-clinica-primary/10 to-clinica-primary/20/50 hover:border-clinica-secondary hover:bg-clinica-primary/20/50 transition-all duration-300 relative cursor-pointer">
           {!file ? (
             <>
               <div className="mb-3 p-3 bg-blue-200/30 rounded-full">
-                <UploadCloud className="w-8 h-8 text-blue-600" />
+                <UploadCloud className="w-8 h-8 text-clinica-primary" />
               </div>
               <Label htmlFor="file-upload" className="cursor-pointer space-y-1 text-center">
                 <p className="text-sm font-semibold text-blue-900">Haz clic o arrastra</p>
-                <p className="text-xs text-blue-700">una radiografía o imagen</p>
+                <p className="text-xs text-clinica-primary">una radiografía o imagen</p>
               </Label>
               <Input id="file-upload" type="file" className="hidden" onChange={handleFileChange} accept="image/*,.dcm" />
             </>
           ) : (
             <div className="flex items-center gap-3 w-full bg-white p-3 rounded-lg border border-green-300 shadow-sm">
               <div className="p-2 bg-green-100 rounded-lg">
-                <FileImage className="w-5 h-5 text-green-600" />
+                <FileImage className="w-5 h-5 text-clinica-secondary" />
               </div>
               <span className="text-sm font-medium truncate flex-1 text-slate-700">{file.name}</span>
               <button onClick={() => setFile(null)} className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors">
@@ -111,7 +111,7 @@ export default function ImageUpload({ pacienteId, onUploadSuccess }: Props) {
       <div className="space-y-2">
         <Label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Tipo de Imagen <span className="text-red-500">*</span></Label>
         <Select onValueChange={setCategoria} value={categoria}>
-          <SelectTrigger className="h-10 text-sm border-slate-300 focus:ring-2 focus:ring-blue-500">
+          <SelectTrigger className="h-10 text-sm border-slate-300 focus:ring-2 focus:ring-clinica-secondary">
             <SelectValue placeholder="📷 Seleccionar tipo de imagen..." />
           </SelectTrigger>
           <SelectContent>
@@ -131,7 +131,7 @@ export default function ImageUpload({ pacienteId, onUploadSuccess }: Props) {
         <Input 
           type="text" 
           placeholder="Ej: 11, 24, 38..." 
-          className="h-10 text-sm border-slate-300 focus:ring-2 focus:ring-blue-500"
+          className="h-10 text-sm border-slate-300 focus:ring-2 focus:ring-clinica-secondary"
           value={pieza ?? ""}
           onChange={(e) => setPieza(e.target.value)}
         />
@@ -151,7 +151,7 @@ export default function ImageUpload({ pacienteId, onUploadSuccess }: Props) {
         <Button
           type="button"
           disabled={subiendo || !file || !categoria}
-          className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 h-11 shadow-md font-semibold pointer-events-none"
+          className="w-full bg-gradient-to-r from-clinica-primary to-clinica-primary hover:from-clinica-primary hover:to-clinica-primary h-11 shadow-md font-semibold pointer-events-none"
         >
           {subiendo ? (
             <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Subiendo...</>

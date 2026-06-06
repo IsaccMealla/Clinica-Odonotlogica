@@ -88,7 +88,7 @@ export function NuevaAsignacion({ pacientes, estudiantes, token, onSuccess }: Pr
               <Label htmlFor="paciente" className="text-sm font-semibold">Paciente</Label>
               <select 
                 id="paciente"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-clinica-secondary"
                 value={formData.pacienteId}
                 onChange={(e) => setFormData({...formData, pacienteId: e.target.value})}
                 required
@@ -106,7 +106,7 @@ export function NuevaAsignacion({ pacientes, estudiantes, token, onSuccess }: Pr
               <Label htmlFor="estudiante" className="text-sm font-semibold">Estudiante</Label>
               <select 
                 id="estudiante"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-clinica-secondary"
                 value={formData.estudianteId}
                 onChange={(e) => setFormData({...formData, estudianteId: e.target.value})}
                 required
@@ -128,7 +128,7 @@ export function NuevaAsignacion({ pacientes, estudiantes, token, onSuccess }: Pr
             <Button 
               type="submit" 
               disabled={cargando} 
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-clinica-primary hover:bg-clinica-primary/90"
             >
               {cargando ? (
                 <Loader2 className="animate-spin h-4 w-4 mr-2" />

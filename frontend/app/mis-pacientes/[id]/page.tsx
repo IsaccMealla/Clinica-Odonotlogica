@@ -18,6 +18,7 @@ import { PeriodontogramaProvider } from "@/context/PeriodontogramaContext"
 import { OdontogramaDinamico } from "@/components/tabs-expediente/odontograma-dinamico"
 import { verificarAccesoModulo, getEstudiantesDemo } from "@/lib/supervision-store"
 import { useClinicalPersist, clearAllPatientBackups } from "@/hooks/useClinicalPersist"
+import { BotonSupervisado } from "@/components/seguridad/BotonSupervisado"
 
 // ==========================================
 // UTILIDADES DE NORMALIZACIÓN BIOLÓGICA
@@ -211,7 +212,7 @@ export default function ExpedienteEstudiantePage({ params }: { params: Promise<{
                                 <span className={`ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                                     pacienteEsFemenino 
                                         ? 'bg-pink-100 text-pink-700' 
-                                        : 'bg-blue-100 text-blue-700'
+                                        : 'bg-clinica-primary/20 text-clinica-primary'
                                 }`}>
                                     {paciente.sexo}
                                 </span>
@@ -241,16 +242,21 @@ export default function ExpedienteEstudiantePage({ params }: { params: Promise<{
                             )}
                         </div>
                     )}
-                    <Button onClick={guardarExpediente} disabled={guardando} className="bg-blue-600 hover:bg-blue-700">
-                        {guardando ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-                        Guardar Historia Clínica
-                    </Button>
+                    <BotonSupervisado
+                        modulo="M2_DIAGNOSTICO"
+                        accionLabel={guardando ? "Guardando..." : "Guardar Historia Clínica"}
+                        accionDescripcion="Guardar Expediente y Antecedentes"
+                        onAccionPermitida={guardarExpediente}
+                        disabled={guardando}
+                        pacienteId={pacienteId as string}
+                        pacienteNombre={paciente ? `${paciente.nombres} ${paciente.apellido_paterno}` : ""}
+                    />
                 </div>
             </div>
 
             {/* Tabs de Trabajo del Estudiante */}
             <Tabs defaultValue="historia" className="w-full">
-                <TabsList className="bg-white border shadow-sm p-1 h-12 mb-6 w-full justify-start overflow-x-auto">
+                <TabsList className="flex flex-wrap w-full h-auto justify-start bg-white border shadow-sm rounded-xl p-1 gap-1 mb-6">
                     <TabsTrigger value="historia">Historia Clínica</TabsTrigger>
                     
                     <TabsTrigger value="periodontograma" className={!tienePermisoOdontograma ? "opacity-50" : ""}>

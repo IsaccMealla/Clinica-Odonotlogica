@@ -22,8 +22,8 @@ function BotonSwitch({
       role="switch"
       aria-checked={checked}
       onClick={() => onCheckedChange(!checked)}
-      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-        checked ? 'bg-blue-600' : 'bg-slate-300'
+      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-clinica-secondary focus:ring-offset-2 ${
+        checked ? 'bg-clinica-primary' : 'bg-slate-300'
       }`}
     >
       <span
@@ -267,7 +267,7 @@ export function TabOdontopediatria({ formData, onChange, paciente }: TabOdontoPr
             { id: 'golosinas', label: 'Golosinas en exceso' },
             { id: 'otros_habitos_inf', label: 'Otros Hábitos' },
           ].map((hab) => (
-            <div key={hab.id} className="space-y-2 p-3 border rounded-xl bg-slate-50 hover:border-blue-200 transition-colors">
+            <div key={hab.id} className="space-y-2 p-3 border rounded-xl bg-slate-50 hover:border-clinica-primary/20 transition-colors">
               <div className="flex items-center space-x-3">
                 <BotonSwitch checked={odonto[hab.id] || false} onCheckedChange={(c) => onChange(seccion, hab.id, c)} />
                 <Label className="font-semibold text-sm cursor-pointer text-slate-700">{hab.label}</Label>
@@ -312,7 +312,7 @@ export function TabOdontopediatria({ formData, onChange, paciente }: TabOdontoPr
           </div>
         </div>
 
-        <div className="p-5 border rounded-xl bg-blue-50/50 mt-4 space-y-4">
+        <div className="p-5 border rounded-xl bg-clinica-primary/10/50 mt-4 space-y-4">
           <div className="flex items-center space-x-3">
             <BotonSwitch checked={odonto.atencion_previa || false} onCheckedChange={(c) => onChange(seccion, 'atencion_previa', c)} />
             <Label className="font-bold text-base text-blue-900">¿Atención Odontológica Previa?</Label>

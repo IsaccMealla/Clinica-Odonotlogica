@@ -98,7 +98,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({
           onClick={() => handleExport(onExportExcel, 'Excel')} 
           disabled={isDisabled}
         >
-          <Sheet className="mr-2 h-4 w-4 text-green-500" />
+          <Sheet className="mr-2 h-4 w-4 text-clinica-secondary" />
           <span>Exportar a Excel</span>
         </DropdownMenuItem>
       </DropdownMenuContent>

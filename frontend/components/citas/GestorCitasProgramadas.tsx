@@ -98,11 +98,11 @@ export function GestorCitasProgramadas({ citas, onCitasActualizadas }: GestorCit
 
   const getEstadoBadge = (estado: EstadoCita) => {
     const estados: Record<EstadoCita, { label: string; variant: any; color: string }> = {
-      'RESERVADA': { label: '📅 Reservada', variant: 'secondary', color: 'bg-blue-100' },
+      'RESERVADA': { label: '📅 Reservada', variant: 'secondary', color: 'bg-clinica-primary/20' },
       'CONFIRMADA': { label: '✓ Confirmada', variant: 'outline', color: 'bg-green-100' },
       'EN_ESPERA': { label: '⏳ En Espera', variant: 'outline', color: 'bg-yellow-100' },
       'ATENDIENDO': { label: '🏥 Atendiendo', variant: 'default', color: 'bg-purple-100' },
-      'FINALIZADO': { label: '✓ Finalizado', variant: 'default', color: 'bg-green-600' },
+      'FINALIZADO': { label: '✓ Finalizado', variant: 'default', color: 'bg-clinica-secondary' },
       'NO_ASISTIO': { label: '✗ No Asistió', variant: 'destructive', color: 'bg-red-100' },
       'CANCELADA': { label: '✗ Cancelada', variant: 'secondary', color: 'bg-gray-100' },
       'REPROGRAMADA': { label: '🔄 Reprogramada', variant: 'outline', color: 'bg-orange-100' },
@@ -464,8 +464,8 @@ export function GestorCitasProgramadas({ citas, onCitasActualizadas }: GestorCit
                                 </DialogHeader>
                                 {notificacionEnviada ? (
                                   <div className="text-center space-y-3 py-6">
-                                    <CheckCircle2 className="w-12 h-12 mx-auto text-green-600" />
-                                    <p className="font-semibold text-green-600">
+                                    <CheckCircle2 className="w-12 h-12 mx-auto text-clinica-secondary" />
+                                    <p className="font-semibold text-clinica-secondary">
                                       ¡Notificación enviada! 🔔
                                     </p>
                                     <p className="text-sm text-muted-foreground">
@@ -551,7 +551,7 @@ export function GestorCitasProgramadas({ citas, onCitasActualizadas }: GestorCit
                                       if (open) setSelectedCita(cita)
                                     }}>
                               <DialogTrigger asChild>
-                                <Button size="sm" variant="outline" className="gap-1 bg-green-50 hover:bg-green-100">
+                                <Button size="sm" variant="outline" className="gap-1 bg-clinica-secondary/10 hover:bg-green-100">
                                   <CheckCheck className="w-3 h-3" />
                                   Finalizado
                                 </Button>
@@ -576,7 +576,7 @@ export function GestorCitasProgramadas({ citas, onCitasActualizadas }: GestorCit
                                   <Button 
                                     onClick={() => handleCambiarEstado('FINALIZADO')}
                                     disabled={cargando}
-                                    className="bg-green-600 hover:bg-green-700"
+                                    className="bg-clinica-secondary hover:bg-clinica-secondary/90"
                                   >
                                     {cargando ? '⏳ Finalizando...' : '✓ Confirmar'}
                                   </Button>

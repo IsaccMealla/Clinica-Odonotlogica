@@ -118,7 +118,7 @@ export function NuevoPaciente({ onPacienteCreado }: NuevoPacienteProps) {
       <DialogTrigger asChild>
         <Button className="font-semibold">+ Nuevo Paciente</Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto border-t-8 border-t-blue-600">
+      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto border-t-8 border-t-clinica-primary">
         <form onSubmit={handleSubmit}>
           <DialogHeader className="mb-4">
             <DialogTitle className="text-2xl font-bold">Ficha de Registro de Paciente</DialogTitle>
@@ -128,7 +128,7 @@ export function NuevoPaciente({ onPacienteCreado }: NuevoPacienteProps) {
           <div className="space-y-8">
             {/* --- SECCIÓN 1: DATOS DE IDENTIDAD --- */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2 text-sm font-bold text-blue-600 uppercase border-b pb-1">Identificación y Nombres</div>
+              <div className="col-span-2 text-sm font-bold text-clinica-primary uppercase border-b pb-1">Identificación y Nombres</div>
               <div className="space-y-1">
                 <Label htmlFor="ci">Cédula de Identidad (CI) *</Label>
                 <Input id="ci" name="ci" value={formData.ci} onChange={handleChange} required />
@@ -149,7 +149,7 @@ export function NuevoPaciente({ onPacienteCreado }: NuevoPacienteProps) {
 
             {/* --- SECCIÓN 2: DATOS PERSONALES --- */}
             <div className="grid grid-cols-3 gap-4">
-              <div className="col-span-3 text-sm font-bold text-blue-600 uppercase border-b pb-1">Datos Personales</div>
+              <div className="col-span-3 text-sm font-bold text-clinica-primary uppercase border-b pb-1">Datos Personales</div>
               <div className="space-y-1">
                 <Label>Sexo *</Label>
                 <Select onValueChange={(v) => handleSelectChange("sexo", v)} required>
@@ -190,7 +190,7 @@ export function NuevoPaciente({ onPacienteCreado }: NuevoPacienteProps) {
 
             {/* --- SECCIÓN 3: CONTACTO --- */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2 text-sm font-bold text-blue-600 uppercase border-b pb-1">Ubicación y Contacto</div>
+              <div className="col-span-2 text-sm font-bold text-clinica-primary uppercase border-b pb-1">Ubicación y Contacto</div>
               <div className="col-span-2 space-y-1">
                 <Label htmlFor="direccion">Dirección Domiciliaria</Label>
                 <Input id="direccion" name="direccion" value={formData.direccion} onChange={handleChange} />
@@ -221,7 +221,7 @@ export function NuevoPaciente({ onPacienteCreado }: NuevoPacienteProps) {
           <PanelAdmisionMetadata />
           <DialogFooter className="mt-8 border-t pt-4">
             <Button type="button" variant="outline" onClick={() => setAbierto(false)}>Cancelar</Button>
-            <Button type="submit" disabled={cargando} className="bg-blue-600 hover:bg-blue-700 px-8">
+            <Button type="submit" disabled={cargando} className="bg-clinica-primary hover:bg-clinica-primary/90 px-8">
               {cargando ? "Guardando..." : "Guardar Expediente"}
             </Button>
           </DialogFooter>

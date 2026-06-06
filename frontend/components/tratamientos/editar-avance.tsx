@@ -160,14 +160,14 @@ export function EditarAvance({ avance, isOpen, onClose, onActualizar }: EditarAv
               rows={4}
               value={descripcion}
               onChange={(e) => setDescripcion(e.target.value)}
-              className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none resize-none text-sm"
+              className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-clinica-secondary outline-none resize-none text-sm"
             />
           </div>
 
           <div className="space-y-3">
             <label className="text-sm font-semibold text-gray-700">Imágenes Actuales</label>
             {cargandoImgs ? (
-              <div className="flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-blue-500" /></div>
+              <div className="flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-clinica-primary" /></div>
             ) : evidenciasExistentes.length > 0 ? (
               <div className="flex gap-3 overflow-x-auto pb-2">
                 {evidenciasExistentes.map((evidencia) => (
@@ -184,7 +184,7 @@ export function EditarAvance({ avance, isOpen, onClose, onActualizar }: EditarAv
 
           <div className="space-y-3 border-t pt-4">
             <label className="text-sm font-semibold text-gray-700">Agregar Nuevas Imágenes</label>
-            <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center cursor-pointer hover:bg-blue-50 transition-colors">
+            <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center cursor-pointer hover:bg-clinica-primary/10 transition-colors">
               <Upload className="w-8 h-8 text-gray-300 mx-auto mb-2" />
               <p className="text-xs text-gray-500 font-medium">Clic para seleccionar</p>
               <input type="file" multiple accept="image/*" className="hidden" ref={fileInputRef} onChange={handleFileChange} />
@@ -206,7 +206,7 @@ export function EditarAvance({ avance, isOpen, onClose, onActualizar }: EditarAv
 
           <div className="pt-4 flex justify-end gap-3 border-t">
             <button type="button" onClick={onClose} className="px-5 py-2.5 text-gray-500 hover:bg-gray-100 rounded-xl font-bold text-sm">Cancelar</button>
-            <button type="submit" disabled={cargando} className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center gap-2">
+            <button type="submit" disabled={cargando} className="px-6 py-2.5 bg-clinica-primary hover:bg-clinica-primary/90 text-white rounded-xl font-bold flex items-center gap-2">
               {cargando ? <><Loader2 className="w-4 h-4 animate-spin" /> Guardando...</> : "Guardar Cambios"}
             </button>
           </div>

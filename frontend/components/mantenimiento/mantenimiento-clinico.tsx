@@ -361,7 +361,7 @@ if (cargandoInicial) {
             className={`w-full rounded-[2rem] flex flex-col items-center justify-center gap-2 transition-all duration-300 shadow-sm
               ${modoCreacion 
                 ? 'bg-slate-800 text-white hover:bg-slate-900 border-2 border-slate-900' 
-                : 'bg-white border-2 border-dashed border-blue-300 text-blue-600 hover:bg-blue-50 hover:border-blue-500'}`}
+                : 'bg-white border-2 border-dashed border-blue-300 text-clinica-primary hover:bg-clinica-primary/10 hover:border-clinica-secondary'}`}
           >
             {modoCreacion ? <X className="h-8 w-8" /> : <Plus className="h-8 w-8" />}
             <span className="font-bold">{modoCreacion ? "Cancelar Creación" : "Instalar Nuevo Equipo"}</span>
@@ -379,7 +379,7 @@ if (cargandoInicial) {
             
             {/* Cabecera del Panel de Color Dinámico */}
             <div className={`h-3 w-full transition-colors duration-300 ${
-              modoCreacion ? 'bg-blue-500' :
+              modoCreacion ? 'bg-clinica-primary/100' :
               sillonSeleccionado?.estado === 'operativo' ? 'bg-emerald-500' :
               sillonSeleccionado?.estado === 'revision' ? 'bg-amber-500' :
               sillonSeleccionado?.estado === 'falla' ? 'bg-red-500' : 'bg-slate-300'
@@ -389,7 +389,7 @@ if (cargandoInicial) {
               <CardTitle className="text-2xl font-bold text-slate-800 flex items-center justify-between">
                 {modoCreacion ? "Nuevo Equipo" : "Gestión de Equipo"}
                 {sillonSeleccionado?.estado === 'falla' && !modoCreacion && <ShieldAlert className="text-red-500 h-7 w-7 animate-pulse" />}
-                {modoCreacion && <MousePointerClick className="text-blue-500 h-7 w-7 animate-bounce" />}
+                {modoCreacion && <MousePointerClick className="text-clinica-primary h-7 w-7 animate-bounce" />}
               </CardTitle>
             </CardHeader>
             
@@ -398,7 +398,7 @@ if (cargandoInicial) {
               {/* --- VISTA DE CREACIÓN --- */}
               {modoCreacion ? (
                 <div className="space-y-6 animate-in slide-in-from-right-4">
-                  <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex gap-3 text-blue-800 text-sm">
+                  <div className="bg-clinica-primary/10 p-4 rounded-xl border border-clinica-primary/20 flex gap-3 text-clinica-primary text-sm">
                     <Activity className="h-5 w-5 flex-shrink-0 mt-0.5" />
                     <p>Haz clic en cualquier parte de la cuadrícula 3D para establecer las coordenadas del nuevo sillón.</p>
                   </div>
@@ -411,7 +411,7 @@ if (cargandoInicial) {
                         value={formNuevo.nombre}
                         onChange={(e) => setFormNuevo({...formNuevo, nombre: e.target.value})}
                         placeholder="Ej. Sillón 07" 
-                        className="w-full mt-1 p-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all font-medium text-slate-800"
+                        className="w-full mt-1 p-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-clinica-secondary focus:border-clinica-secondary outline-none transition-all font-medium text-slate-800"
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
@@ -422,7 +422,7 @@ if (cargandoInicial) {
                           value={formNuevo.marca}
                           onChange={(e) => setFormNuevo({...formNuevo, marca: e.target.value})}
                           placeholder="Sirona" 
-                          className="w-full mt-1 p-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-800"
+                          className="w-full mt-1 p-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-clinica-secondary outline-none font-medium text-slate-800"
                         />
                       </div>
                       <div>
@@ -432,7 +432,7 @@ if (cargandoInicial) {
                           value={formNuevo.modelo}
                           onChange={(e) => setFormNuevo({...formNuevo, modelo: e.target.value})}
                           placeholder="Intego" 
-                          className="w-full mt-1 p-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-800"
+                          className="w-full mt-1 p-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-clinica-secondary outline-none font-medium text-slate-800"
                         />
                       </div>
                     </div>
@@ -454,7 +454,7 @@ if (cargandoInicial) {
                     <button 
                       onClick={guardarNuevoSillon}
                       disabled={guardando || !posicionFantasma || !formNuevo.nombre}
-                      className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white p-4 rounded-xl font-bold transition-colors mt-6 shadow-md hover:shadow-lg"
+                      className="w-full flex items-center justify-center gap-2 bg-clinica-primary hover:bg-clinica-primary/90 disabled:bg-blue-300 text-white p-4 rounded-xl font-bold transition-colors mt-6 shadow-md hover:shadow-lg"
                     >
                       {guardando ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
                       Registrar Equipo
@@ -480,7 +480,7 @@ if (cargandoInicial) {
                   <div className="space-y-4">
                     <div className="border-b border-slate-100 pb-2 flex justify-between items-center">
                       <p className="text-sm text-slate-500 font-bold uppercase tracking-wider">Modificar Estado</p>
-                      {guardando && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
+                      {guardando && <Loader2 className="h-4 w-4 animate-spin text-clinica-primary" />}
                     </div>
                     
                     <div className="grid grid-cols-1 gap-3 relative">
@@ -552,20 +552,20 @@ if (cargandoInicial) {
         </div>
 
         {/* --- MAPA 3D --- */}
-        <div className={`flex-grow bg-[#020617] rounded-[2rem] overflow-hidden shadow-2xl relative min-h-[600px] lg:min-h-[850px] border ring-1 transition-colors duration-500 ${modoCreacion ? 'border-blue-500/50 ring-blue-500/30' : 'border-slate-800 ring-white/10'}`}>
+        <div className={`flex-grow bg-[#020617] rounded-[2rem] overflow-hidden shadow-2xl relative min-h-[600px] lg:min-h-[850px] border ring-1 transition-colors duration-500 ${modoCreacion ? 'border-clinica-secondary/50 ring-clinica-secondary/30' : 'border-slate-800 ring-white/10'}`}>
           <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
-            <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full blur-[120px] transition-colors duration-700 ${modoCreacion ? 'bg-blue-600/20' : 'bg-blue-500/10'}`}></div>
+            <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full blur-[120px] transition-colors duration-700 ${modoCreacion ? 'bg-clinica-primary/20' : 'bg-clinica-primary/100/10'}`}></div>
           </div>
 
           <div className="absolute top-6 left-6 z-10 bg-slate-900/60 backdrop-blur-xl p-5 rounded-2xl border border-white/10 shadow-2xl">
             <h2 className="text-white font-bold text-xl flex items-center gap-2">
-              {modoCreacion ? <Plus className="h-6 w-6 text-blue-400" /> : <Activity className="h-6 w-6 text-blue-400" />}
+              {modoCreacion ? <Plus className="h-6 w-6 text-clinica-secondary" /> : <Activity className="h-6 w-6 text-clinica-secondary" />}
               {modoCreacion ? "Instalación de Equipo" : "Gemelo Digital"}
             </h2>
             <p className="text-slate-400 text-sm mt-1 flex items-center gap-2">
               <span className="relative flex h-2 w-2">
-                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${modoCreacion ? 'bg-blue-400' : 'bg-emerald-400'}`}></span>
-                <span className={`relative inline-flex rounded-full h-2 w-2 ${modoCreacion ? 'bg-blue-500' : 'bg-emerald-500'}`}></span>
+                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${modoCreacion ? 'bg-clinica-secondary' : 'bg-emerald-400'}`}></span>
+                <span className={`relative inline-flex rounded-full h-2 w-2 ${modoCreacion ? 'bg-clinica-primary/100' : 'bg-emerald-500'}`}></span>
               </span>
               {modoCreacion ? "Haz clic en la cuadrícula" : "Sincronización en vivo"}
             </p>

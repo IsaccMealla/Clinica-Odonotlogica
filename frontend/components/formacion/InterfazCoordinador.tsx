@@ -163,7 +163,7 @@ export function InterfazCoordinador() {
           onClick={() => setActiveTab('asignar')}
           className={`pb-3 px-4 font-medium ${
             activeTab === 'asignar'
-              ? 'border-b-2 border-blue-600 text-blue-600'
+              ? 'border-b-2 border-clinica-primary text-clinica-primary'
               : 'text-gray-600 hover:text-gray-900'
           }`}
         >
@@ -173,7 +173,7 @@ export function InterfazCoordinador() {
           onClick={() => setActiveTab('reportes')}
           className={`pb-3 px-4 font-medium ${
             activeTab === 'reportes'
-              ? 'border-b-2 border-blue-600 text-blue-600'
+              ? 'border-b-2 border-clinica-primary text-clinica-primary'
               : 'text-gray-600 hover:text-gray-900'
           }`}
         >
@@ -268,7 +268,7 @@ export function InterfazCoordinador() {
                   <CardDescription>Total Estudiantes</CardDescription>
                   <CardTitle className="text-3xl">{estudiantes.length}</CardTitle>
                 </div>
-                <Users className="w-8 h-8 text-blue-600" />
+                <Users className="w-8 h-8 text-clinica-primary" />
               </CardHeader>
             </Card>
 
@@ -290,7 +290,7 @@ export function InterfazCoordinador() {
                   <CardDescription>Configuraciones Activas</CardDescription>
                   <CardTitle className="text-3xl">{configCupos.length}</CardTitle>
                 </div>
-                <BarChart3 className="w-8 h-8 text-green-600" />
+                <BarChart3 className="w-8 h-8 text-clinica-secondary" />
               </CardHeader>
             </Card>
           </div>

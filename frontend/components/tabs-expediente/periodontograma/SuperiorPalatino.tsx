@@ -141,7 +141,7 @@ export function SuperiorPalatino() {
 
   return (
     <div className="w-full space-y-4 font-sans bg-white p-2 rounded-xl">
-      <div className="flex justify-between items-center bg-blue-50/80 p-4 rounded-xl border border-blue-100 shadow-sm">
+      <div className="flex justify-between items-center bg-clinica-primary/10/80 p-4 rounded-xl border border-clinica-primary/20 shadow-sm">
         <h3 className="font-bold text-lg text-blue-900">Arcada Superior (Palatino) - Modo Clínico</h3>
       </div>
 
@@ -155,7 +155,7 @@ export function SuperiorPalatino() {
             <div className="h-8 border-b border-slate-300 flex items-center px-3">Implante</div>
             <div className="h-8 border-b border-slate-300 flex items-center px-3 text-red-600">BOP (Sangra)</div>
             <div className="h-8 border-b border-slate-300 flex items-center px-3 text-yellow-600">Supuración</div>
-            <div className="h-10 border-b border-slate-300 flex items-center px-3 text-blue-700">Margen (MG)</div>
+            <div className="h-10 border-b border-slate-300 flex items-center px-3 text-clinica-primary">Margen (MG)</div>
             <div className="h-10 border-b border-slate-300 flex items-center px-3 text-red-700">Sondaje (PS)</div>
             <div className="h-10 border-b-2 border-slate-400 flex items-center px-3 bg-emerald-50 text-emerald-700 shadow-inner">NIC (Inserción)</div>
             <div className="h-[210px] flex items-center justify-center text-slate-400 bg-white border-r-2 border-slate-300"> {/* ❤️ AJUSTADO A 210px */}
@@ -210,7 +210,7 @@ export function SuperiorPalatino() {
 
                     <div className="h-10 border-b border-slate-300 grid grid-cols-3 items-center justify-items-center gap-0.5 px-0.5">
                       {[0, 1, 2].map(i => (
-                        <Input key={`mg-${i}`} type="number" value={d.margen[i] === 0 ? '' : d.margen[i]} onChange={e => updateArray(pieza, 'margen', i, e.target.value)} className="h-7 w-[90%] p-0 text-center text-xs text-blue-700 font-bold border-blue-200 focus-visible:ring-blue-400 focus-visible:border-blue-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                        <Input key={`mg-${i}`} type="number" value={d.margen[i] === 0 ? '' : d.margen[i]} onChange={e => updateArray(pieza, 'margen', i, e.target.value)} className="h-7 w-[90%] p-0 text-center text-xs text-clinica-primary font-bold border-clinica-primary/20 focus-visible:ring-clinica-secondary focus-visible:border-clinica-secondary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                       ))}
                     </div>
 

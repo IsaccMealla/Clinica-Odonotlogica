@@ -159,11 +159,11 @@ export function HistorialCitasGeneral() {
 
   const getEstadoBadge = (estado: string) => {
     const estados: Record<string, { color: string; label: string }> = {
-      'RESERVADA': { color: 'bg-blue-100 text-blue-800', label: '📅 Reservada' },
+      'RESERVADA': { color: 'bg-clinica-primary/20 text-clinica-primary', label: '📅 Reservada' },
       'CONFIRMADA': { color: 'bg-green-100 text-green-800', label: '✓ Confirmada' },
       'EN_ESPERA': { color: 'bg-yellow-100 text-yellow-800', label: '⏳ En Espera' },
       'ATENDIENDO': { color: 'bg-purple-100 text-purple-800', label: '🏥 Atendiendo' },
-      'FINALIZADO': { color: 'bg-green-600 text-white', label: '✅ Finalizado' },
+      'FINALIZADO': { color: 'bg-clinica-secondary text-white', label: '✅ Finalizado' },
       'NO_ASISTIO': { color: 'bg-red-100 text-red-800', label: '❌ No Asistió' },
       'CANCELADA': { color: 'bg-gray-100 text-gray-800', label: '🚫 Cancelada' },
       'REPROGRAMADA': { color: 'bg-orange-100 text-orange-800', label: '🔄 Reprogramada' },

@@ -22,7 +22,7 @@ export function PanelAdmisionMetadata() {
     return (
         <div className="mt-6 p-4 border border-slate-200 rounded-lg bg-slate-50/80 text-sm shadow-sm">
             <h4 className="font-bold text-slate-700 mb-3 flex items-center gap-2">
-                <Server className="w-4 h-4 text-blue-500" /> Auditoría de Origen
+                <Server className="w-4 h-4 text-clinica-primary" /> Auditoría de Origen
             </h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-slate-600">
                 <div>
@@ -91,7 +91,7 @@ export function PanelRadiografiasMetadata({ metadatos, setMetadatos }: { metadat
                 <div className="space-y-1">
                     <Label className="text-[11px] font-bold uppercase text-cyan-700">kVp (Tensión)</Label>
                     <div className="relative">
-                        <Zap className="w-3 h-3 absolute left-2.5 top-2.5 text-cyan-500" />
+                        <Zap className="w-3 h-3 absolute left-2.5 top-2.5 text-clinica-secondary" />
                         <Input className="pl-8 h-8 text-xs border-cyan-200" placeholder="Ej: 70" value={metadatos.kvp || ''} onChange={(e) => setMetadatos({ ...metadatos, kvp: e.target.value })} />
                     </div>
                 </div>
@@ -102,7 +102,7 @@ export function PanelRadiografiasMetadata({ metadatos, setMetadatos }: { metadat
                 <div className="space-y-1">
                     <Label className="text-[11px] font-bold uppercase text-cyan-700">Tiempo (s)</Label>
                     <div className="relative">
-                        <Timer className="w-3 h-3 absolute left-2.5 top-2.5 text-cyan-500" />
+                        <Timer className="w-3 h-3 absolute left-2.5 top-2.5 text-clinica-secondary" />
                         <Input className="pl-8 h-8 text-xs border-cyan-200" placeholder="0.32" value={metadatos.tiempo || ''} onChange={(e) => setMetadatos({ ...metadatos, tiempo: e.target.value })} />
                     </div>
                 </div>

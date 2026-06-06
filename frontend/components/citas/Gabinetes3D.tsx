@@ -336,7 +336,7 @@ function DialogoAsignarCita({
         </Alert>
       )}
 
-      <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+      <div className="mb-4 p-3 bg-clinica-primary/10 rounded-lg border border-clinica-primary/20">
         <p className="text-sm text-blue-900">
           <strong>Gabinete:</strong> {sillon.nombre} <br />
           <strong>Estado:</strong> <Badge className="ml-1">{sillon.estado}</Badge>
@@ -439,7 +439,7 @@ function DialogoAsignarCita({
           <Button type="button" variant="outline" onClick={onClose} disabled={loading} className="flex-1">
             Cancelar
           </Button>
-          <Button type="submit" disabled={loading} className="flex-1 bg-green-600 hover:bg-green-700">
+          <Button type="submit" disabled={loading} className="flex-1 bg-clinica-secondary hover:bg-clinica-secondary/90">
             {loading ? '⏳ Guardando...' : '✓ Crear Cita'}
           </Button>
         </div>
@@ -492,7 +492,7 @@ export default function Gabinetes3D({ onGabineteSelect, onCitaCreated }: Gabinet
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-cyan-500 mx-auto mb-4" />
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-clinica-secondary mx-auto mb-4" />
           <p className="text-slate-600">Cargando gabinetes...</p>
         </div>
       </div>
@@ -520,7 +520,7 @@ export default function Gabinetes3D({ onGabineteSelect, onCitaCreated }: Gabinet
           <h3 className="text-sm font-semibold text-slate-300 mb-3">📊 Estados</h3>
           <div className="space-y-2 text-sm">
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+              <div className="w-3 h-3 bg-clinica-secondary/100 rounded-full"></div>
               <span>Disponible: <strong>{sillones.filter(s => s.estado === 'DISPONIBLE').length}</strong></span>
             </div>
             <div className="flex items-center gap-2">
@@ -540,11 +540,11 @@ export default function Gabinetes3D({ onGabineteSelect, onCitaCreated }: Gabinet
             key={selectedSillon?.id}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-gradient-to-br from-cyan-900/40 to-slate-900/50 p-4 rounded-lg border border-cyan-500/30 md:col-span-2"
+            className="bg-gradient-to-br from-cyan-900/40 to-slate-900/50 p-4 rounded-lg border border-clinica-secondary/30 md:col-span-2"
           >
             {selectedSillon ? (
               <div>
-                <h3 className="text-sm font-semibold text-cyan-400 mb-2">🎯 Gabinete Seleccionado</h3>
+                <h3 className="text-sm font-semibold text-clinica-secondary mb-2">🎯 Gabinete Seleccionado</h3>
                 <p className="text-lg font-bold text-white mb-3">{selectedSillon.nombre}</p>
                 <div className="flex items-center gap-2 mb-3">
                   <div 
@@ -564,7 +564,7 @@ export default function Gabinetes3D({ onGabineteSelect, onCitaCreated }: Gabinet
                 )}
                 <DialogTrigger asChild>
                   <Button 
-                    className="w-full bg-cyan-600 hover:bg-cyan-700 text-white"
+                    className="w-full bg-clinica-primary hover:bg-cyan-700 text-white"
                     onClick={() => setShowDialogoAsignar(true)}
                   >
                     ➕ Asignar Cita

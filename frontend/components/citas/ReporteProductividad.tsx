@@ -134,7 +134,7 @@ export default function ReporteProductividad({ citas = [] }: Props) {
               <p className="text-xs text-muted-foreground uppercase font-bold">Total Citas</p>
               <p className="text-2xl font-bold">{totalCitas}</p>
             </div>
-            <div className="p-4 bg-green-50 rounded-lg border border-green-100">
+            <div className="p-4 bg-clinica-secondary/10 rounded-lg border border-green-100">
               <p className="text-xs text-green-700 uppercase font-bold">Efectividad</p>
               <p className="text-2xl font-bold text-green-700">{efectividad}%</p>
             </div>
@@ -142,9 +142,9 @@ export default function ReporteProductividad({ citas = [] }: Props) {
               <p className="text-xs text-red-700 uppercase font-bold">Tasa de Abandono</p>
               <p className="text-2xl font-bold text-red-700">{tasaAbandono}%</p>
             </div>
-            <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
-              <p className="text-xs text-blue-700 uppercase font-bold">Horas Clínicas</p>
-              <p className="text-2xl font-bold text-blue-700">{(totalMinutos / 60).toFixed(1)}h</p>
+            <div className="p-4 bg-clinica-primary/10 rounded-lg border border-clinica-primary/20">
+              <p className="text-xs text-clinica-primary uppercase font-bold">Horas Clínicas</p>
+              <p className="text-2xl font-bold text-clinica-primary">{(totalMinutos / 60).toFixed(1)}h</p>
             </div>
           </div>
         </CardContent>

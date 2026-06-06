@@ -57,7 +57,7 @@ export function TablaMisPacientes({ token }: { token: string }) {
   if (cargando) {
     return (
       <div className="flex justify-center items-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        <Loader2 className="h-8 w-8 animate-spin text-clinica-primary" />
       </div>
     )
   }
@@ -78,7 +78,7 @@ export function TablaMisPacientes({ token }: { token: string }) {
         }
         renderRow={(paciente: Paciente) => (
           <>
-            <td className="font-mono text-sm font-semibold text-blue-700 px-4 py-4">{paciente.ci}</td>
+            <td className="font-mono text-sm font-semibold text-clinica-primary px-4 py-4">{paciente.ci}</td>
             <td className="font-medium px-4 py-4">
               <div className="flex flex-col gap-1">
                 <span>{paciente.nombres} {paciente.apellido_paterno}</span>

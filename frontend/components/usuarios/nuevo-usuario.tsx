@@ -91,9 +91,9 @@ export function NuevoUsuario({ onUsuarioCreado }: NuevoUsuarioProps) {
   return (
     <Dialog open={abierto} onOpenChange={setAbierto}>
       <DialogTrigger asChild>
-        <Button className="font-semibold bg-blue-600 hover:bg-blue-700 text-white">+ Nuevo Usuario</Button>
+        <Button className="font-semibold bg-clinica-primary hover:bg-clinica-primary/90 text-white">+ Nuevo Usuario</Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto border-t-8 border-t-blue-600">
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto border-t-8 border-t-clinica-primary">
         <form onSubmit={handleSubmit}>
           <DialogHeader className="mb-4">
             <DialogTitle className="text-2xl font-bold">Registro de Personal y Estudiantes</DialogTitle>
@@ -135,7 +135,7 @@ export function NuevoUsuario({ onUsuarioCreado }: NuevoUsuarioProps) {
           </div>
           <DialogFooter className="mt-8 pt-4 border-t">
             <Button type="button" variant="outline" onClick={() => setAbierto(false)}>Cancelar</Button>
-            <Button type="submit" disabled={cargando} className="bg-blue-600 hover:bg-blue-700">
+            <Button type="submit" disabled={cargando} className="bg-clinica-primary hover:bg-clinica-primary/90">
               {cargando ? "Guardando..." : "Guardar Usuario"}
             </Button>
           </DialogFooter>

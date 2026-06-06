@@ -220,7 +220,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className={`min-h-screen flex items-center justify-center p-4 relative overflow-hidden transition-colors duration-500 ${isSuperMode ? 'bg-slate-900' : 'bg-slate-100 dark:bg-[#020617]'}`}>
+    <div className={`min-h-screen flex items-center justify-center p-4 relative overflow-hidden transition-colors duration-500 ${isSuperMode ? 'bg-slate-900' : 'bg-clinica-bg dark:bg-[#020617]'}`}>
       
       {/* EXPLOSIÓN VISUAL DEL EASTER EGG */}
       <AnimatePresence>
@@ -232,7 +232,7 @@ export default function LoginPage() {
             <motion.div 
               animate={{ opacity: [0, 1, 0], scale: [1, 1.5, 2] }} 
               transition={{ duration: 0.5 }}
-              className="absolute inset-0 bg-cyan-500/20 mix-blend-screen"
+              className="absolute inset-0 bg-clinica-secondary/20 mix-blend-screen"
             />
             {superParticles.map(p => (
               <motion.div
@@ -256,22 +256,22 @@ export default function LoginPage() {
       <motion.div 
         animate={isSuperMode ? { scale: [1, 2], opacity: [0.8, 0], rotate: 180 } : { scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }} 
         transition={{ duration: isSuperMode ? 1 : 8, repeat: isSuperMode ? 0 : Infinity, ease: "easeInOut" }}
-        className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-cyan-400/40 rounded-full filter blur-[120px] pointer-events-none"
+        className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-clinica-secondary/40 rounded-full filter blur-[120px] pointer-events-none"
       />
 
       {/* --- ICONOS FLOTANTES CON PARALAX --- */}
       <div className={`absolute inset-0 overflow-hidden pointer-events-none z-0 transition-opacity duration-1000 ${isSuperMode ? 'opacity-30' : 'opacity-100'}`}>
         <motion.div animate={{ x: mousePosition.x * -40, y: mousePosition.y * -40 }} transition={{ type: "spring", stiffness: 75, damping: 20 }} className="absolute top-20 left-[15%]">
-          <Activity className="w-32 h-32 text-cyan-500 opacity-20 dark:opacity-10 -rotate-12" />
+          <Activity className="w-32 h-32 text-clinica-primary opacity-20 dark:opacity-10 -rotate-12" />
         </motion.div>
         <motion.div animate={{ x: mousePosition.x * 60, y: mousePosition.y * 60 }} transition={{ type: "spring", stiffness: 75, damping: 20 }} className="absolute bottom-24 left-[10%]">
-          <Stethoscope className="w-48 h-48 text-teal-500 opacity-20 dark:opacity-10 rotate-12" />
+          <Stethoscope className="w-48 h-48 text-clinica-secondary opacity-20 dark:opacity-10 rotate-12" />
         </motion.div>
         <motion.div animate={{ x: mousePosition.x * -80, y: mousePosition.y * 80 }} transition={{ type: "spring", stiffness: 75, damping: 20 }} className="absolute top-32 right-[15%]">
-          <HeartPulse className="w-40 h-40 text-cyan-600 opacity-20 dark:opacity-10 rotate-[30deg]" />
+          <HeartPulse className="w-40 h-40 text-clinica-primary opacity-20 dark:opacity-10 rotate-[30deg]" />
         </motion.div>
         <motion.div animate={{ x: mousePosition.x * 30, y: mousePosition.y * -30 }} transition={{ type: "spring", stiffness: 75, damping: 20 }} className="absolute bottom-32 right-[12%]">
-          <Plus className="w-24 h-24 text-teal-600 opacity-20 dark:opacity-10 -rotate-12" />
+          <Plus className="w-24 h-24 text-clinica-secondary opacity-20 dark:opacity-10 -rotate-12" />
         </motion.div>
       </div>
 
@@ -281,7 +281,7 @@ export default function LoginPage() {
         transition={{ duration: 0.4 }}
         className="w-full max-w-md relative z-10"
       >
-        <Card className={`w-full relative shadow-[0_20px_70px_-15px_rgba(6,182,212,0.4)] border bg-[#0f172a]/95 backdrop-blur-2xl rounded-3xl overflow-visible transition-all duration-500 ${isSuperMode ? 'border-cyan-400 shadow-[0_0_100px_rgba(6,182,212,0.8)]' : 'border-cyan-500/30'}`}>
+        <Card className={`w-full relative shadow-[0_20px_70px_-15px_rgba(15,118,110,0.4)] border bg-[#0f172a]/95 backdrop-blur-2xl rounded-3xl overflow-visible transition-all duration-500 ${isSuperMode ? 'border-clinica-secondary shadow-[0_0_100px_rgba(6,182,212,0.8)]' : 'border-clinica-primary/30'}`}>
           <CardHeader className="space-y-2 items-center text-center pt-12 pb-4">
             
             <div className="relative flex justify-center mt-4 mb-6">
@@ -295,18 +295,18 @@ export default function LoginPage() {
                   transition={{ type: "spring", stiffness: 300, damping: 20 }}
                   className={`absolute -top-16 z-20 px-4 py-2 rounded-2xl shadow-xl border text-sm font-bold max-w-[280px] text-center
                     ${capsLockOn ? 'bg-yellow-500 text-yellow-950 border-yellow-400'
-                    : isSuperMode ? 'bg-cyan-400 text-slate-900 border-cyan-300 shadow-[0_0_20px_rgba(34,211,238,0.8)]'
+                    : isSuperMode ? 'bg-clinica-secondary text-slate-900 border-cyan-300 shadow-[0_0_20px_rgba(34,211,238,0.8)]'
                     : status === 'error' && !activeJoke ? 'bg-red-950/90 text-red-400 border-red-900/50' 
                     : status === 'success' && !activeJoke ? 'bg-emerald-950/90 text-emerald-400 border-emerald-900/50'
-                    : 'bg-slate-800 text-cyan-50 border-cyan-500/30 shadow-cyan-500/20'}`}
+                    : 'bg-slate-800 text-clinica-bg border-clinica-primary/30 shadow-clinica-primary/20'}`}
                 >
                   {getByteMessage()}
                   <div className={`absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 border-b border-r rotate-45
                     ${capsLockOn ? 'bg-yellow-500 border-yellow-400'
-                    : isSuperMode ? 'bg-cyan-400 border-cyan-300'
+                    : isSuperMode ? 'bg-clinica-secondary border-cyan-300'
                     : status === 'error' && !activeJoke ? 'bg-red-950 border-red-900/50' 
                     : status === 'success' && !activeJoke ? 'bg-emerald-950 border-emerald-900/50'
-                    : 'bg-slate-800 border-cyan-500/30'}`}>
+                    : 'bg-slate-800 border-clinica-primary/30'}`}>
                   </div>
                 </motion.div>
               </AnimatePresence>
@@ -323,16 +323,16 @@ export default function LoginPage() {
                     animate={status === "error" ? { x: [-10, 10, -10, 10, 0] } : {}}
                     transition={{ duration: 0.4 }}
                     className={`h-24 w-24 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(34,211,238,0.2)] border-2 relative overflow-hidden z-10 transition-colors duration-500
-                      ${isSuperMode ? 'bg-gradient-to-br from-cyan-400 to-blue-600 border-cyan-300 shadow-[0_0_50px_rgba(34,211,238,1)]'
+                      ${isSuperMode ? 'bg-gradient-to-br from-clinica-secondary to-clinica-primary border-cyan-300 shadow-[0_0_50px_rgba(34,211,238,1)]'
                       : status === 'success' ? 'bg-gradient-to-br from-emerald-900/80 to-teal-900/40 border-emerald-500/50'
                       : status === 'error' ? 'bg-gradient-to-br from-red-900/80 to-orange-900/40 border-red-500/50'
-                      : 'bg-gradient-to-br from-cyan-900/80 to-blue-900/40 border-cyan-500/50'}`}
+                      : 'bg-gradient-to-br from-clinica-primary/80 to-clinica-secondary/40 border-clinica-primary/50'}`}
                   >
                     <svg viewBox="0 0 100 100" className="w-16 h-16 drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]">
                       <path 
                         d="M 30 20 C 30 5, 70 5, 70 20 C 70 45, 85 70, 75 85 C 65 100, 55 85, 50 70 C 45 85, 35 100, 25 85 C 15 70, 30 45, 30 20 Z" 
                         fill="#ffffff" 
-                        stroke={isSuperMode ? '#22d3ee' : status === 'error' ? '#fca5a5' : status === 'success' ? '#6ee7b7' : '#67e8f9'} 
+                        stroke={isSuperMode ? '#22d3ee' : status === 'error' ? '#fca5a5' : status === 'success' ? '#6ee7b7' : '#10B981'} 
                         strokeWidth="2"
                       />
                       {/* OJOS DE BYTE */}
@@ -356,10 +356,14 @@ export default function LoginPage() {
                           <path d="M 35 38 Q 40 33 45 38" />
                           <path d="M 55 38 Q 60 33 65 38" />
                         </g>
-                      ) : isPasswordFocused && !showPassword ? (
-                        <g stroke="#0f172a" strokeWidth="3" strokeLinecap="round" fill="none">
-                          <path d="M 32 42 Q 40 45 48 42" />
-                          <path d="M 52 42 Q 60 45 68 42" />
+                      ) : showPassword ? (
+                        <g>
+                          <g stroke="#0f172a" strokeWidth="3" strokeLinecap="round" fill="none">
+                            <path d="M 32 42 Q 40 45 48 42" />
+                            <path d="M 52 42 Q 60 45 68 42" />
+                          </g>
+                          <circle cx="38" cy="42" r="7" fill="#ffffff" stroke={isSuperMode ? '#22d3ee' : '#10B981'} strokeWidth="2" />
+                          <circle cx="62" cy="42" r="7" fill="#ffffff" stroke={isSuperMode ? '#22d3ee' : '#10B981'} strokeWidth="2" />
                         </g>
                       ) : (
                         <g>
@@ -377,7 +381,7 @@ export default function LoginPage() {
                   whileTap={{ scale: 0.9 }}
                   onClick={tellAJoke}
                   type="button"
-                  className="absolute -right-3 -bottom-2 bg-cyan-500 hover:bg-cyan-400 text-white p-2 rounded-full shadow-[0_0_15px_rgba(6,182,212,0.6)] border-2 border-[#0f172a] z-30 transition-colors"
+                  className="absolute -right-3 -bottom-2 bg-clinica-secondary hover:bg-clinica-primary text-white p-2 rounded-full shadow-[0_0_15px_rgba(16,185,129,0.6)] border-2 border-[#0f172a] z-30 transition-colors"
                 >
                   <Smile className="w-4 h-4" />
                 </motion.button>
@@ -386,7 +390,7 @@ export default function LoginPage() {
 
             <div className="space-y-1">
               <CardTitle className="text-3xl font-extrabold tracking-tight text-white">
-                Clínica <span className="text-cyan-400">Pro</span>
+                Clínica <span className="text-clinica-secondary">Pro</span>
               </CardTitle>
               <CardDescription className="text-sm font-medium text-slate-400">
                 Sistema Biométrico Odontológico
@@ -416,12 +420,12 @@ export default function LoginPage() {
               <div className="space-y-2">
                 <Label htmlFor="username" className="text-slate-300 font-semibold">Usuario</Label>
                 <div className="relative group">
-                  <User className="absolute left-3 top-3 h-5 w-5 text-slate-500 group-focus-within:text-cyan-400 transition-colors z-10" />
+                  <User className="absolute left-3 top-3 h-5 w-5 text-slate-500 group-focus-within:text-clinica-secondary transition-colors z-10" />
                   <Input 
                     id="username" 
                     type="text" 
                     placeholder="Escribe tu usuario..." 
-                    className="pl-11 h-12 bg-slate-900/50 text-white placeholder:text-slate-600 focus:bg-slate-900 border-slate-700 focus:ring-2 focus:ring-cyan-500/50 transition-all text-md"
+                    className="pl-11 h-12 bg-slate-900/50 text-white placeholder:text-slate-600 focus:bg-slate-900 border-slate-700 focus:ring-2 focus:ring-clinica-secondary/50 transition-all text-md"
                     required
                     value={formData.username}
                     onChange={(e) => handleChange("username", e.target.value)}
@@ -432,19 +436,19 @@ export default function LoginPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password" className="text-slate-300 font-semibold">Contraseña</Label>
-                  <a href="#" className="text-sm text-cyan-400 hover:text-cyan-300 font-bold transition-colors">
+                  <a href="#" className="text-sm text-clinica-secondary hover:text-clinica-secondary/80 font-bold transition-colors">
                     ¿Olvidaste tu contraseña?
                   </a>
                 </div>
                 <div className="relative group">
-                  <Lock className={`absolute left-3 top-3 h-5 w-5 z-10 transition-colors ${capsLockOn ? 'text-yellow-500' : 'text-slate-500 group-focus-within:text-cyan-400'}`} />
+                  <Lock className={`absolute left-3 top-3 h-5 w-5 z-10 transition-colors ${capsLockOn ? 'text-yellow-500' : 'text-slate-500 group-focus-within:text-clinica-secondary'}`} />
                   <Input 
                     id="password" 
                     type={showPassword ? "text" : "password"} 
                     placeholder="••••••••" 
                     onFocus={() => setIsPasswordFocused(true)}
                     onBlur={() => setIsPasswordFocused(false)}
-                    className={`pl-11 pr-20 h-12 bg-slate-900/50 text-white placeholder:text-slate-600 focus:bg-slate-900 border-slate-700 focus:ring-2 transition-all text-md ${capsLockOn ? 'focus:ring-yellow-500/50 border-yellow-500/30' : 'focus:ring-cyan-500/50'}`}
+                    className={`pl-11 pr-20 h-12 bg-slate-900/50 text-white placeholder:text-slate-600 focus:bg-slate-900 border-slate-700 focus:ring-2 transition-all text-md ${capsLockOn ? 'focus:ring-yellow-500/50 border-yellow-500/30' : 'focus:ring-clinica-secondary/50'}`}
                     required
                     value={formData.password}
                     onChange={(e) => handleChange("password", e.target.value)}
@@ -462,7 +466,7 @@ export default function LoginPage() {
                     <button 
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="text-slate-500 hover:text-cyan-400 transition-colors focus:outline-none"
+                      className="text-slate-500 hover:text-clinica-secondary transition-colors focus:outline-none"
                     >
                       {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>
@@ -497,7 +501,7 @@ export default function LoginPage() {
                   id="remember" 
                   checked={formData.rememberMe}
                   onCheckedChange={(checked) => handleChange("rememberMe", checked as boolean)}
-                  className="h-5 w-5 data-[state=checked]:bg-cyan-500 data-[state=checked]:border-cyan-500 border-slate-600"
+                  className="h-5 w-5 data-[state=checked]:bg-clinica-secondary data-[state=checked]:border-clinica-secondary border-slate-600"
                 />
                 <Label htmlFor="remember" className="text-sm font-medium text-slate-300 cursor-pointer select-none">
                   Mantener sesión iniciada
@@ -513,18 +517,18 @@ export default function LoginPage() {
                       ? 'bg-clinica-secondary text-white border-clinica-secondary shadow-[0_0_20px_rgba(16,185,129,0.4)]' 
                       : status === 'error'
                       ? 'bg-red-900 text-white border-red-700 shadow-red-900/50'
-                      : 'bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-50 border-cyan-500/50 shadow-[0_0_20px_rgba(6,182,212,0.2)]'
+                      : 'bg-clinica-primary/20 hover:bg-clinica-primary/30 text-clinica-bg border-clinica-primary/50 shadow-[0_0_20px_rgba(15,118,110,0.2)]'
                     }`} 
                 >
                   <AnimatePresence mode="wait">
                     {status === "idle" && (
                       <motion.span key="idle" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-2">
-                        <Lock className="w-5 h-5 text-cyan-400" /> Ingresar al Sistema
+                        <Lock className="w-5 h-5 text-clinica-secondary" /> Ingresar al Sistema
                       </motion.span>
                     )}
                     {status === "loading" && (
                       <motion.span key="loading" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-2">
-                        <Loader2 className="w-5 h-5 animate-spin text-cyan-400" /> Autenticando...
+                        <Loader2 className="w-5 h-5 animate-spin text-clinica-secondary" /> Autenticando...
                       </motion.span>
                     )}
                     {status === "success" && (

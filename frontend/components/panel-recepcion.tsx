@@ -43,7 +43,7 @@ export function PanelRecepcion() {
       <Card className="bg-white/10 backdrop-blur-md border-white/20">
         <CardHeader>
           <CardTitle className="text-xl text-white flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></span>
+            <span className="w-3 h-3 rounded-full bg-clinica-secondary/100 animate-pulse"></span>
             Estudiantes Presentes en Clínica Hoy
           </CardTitle>
         </CardHeader>
@@ -56,13 +56,13 @@ export function PanelRecepcion() {
                 <div key={i} className="flex flex-col md:flex-row items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10 gap-4">
                   <div>
                     <h3 className="font-semibold text-white">{est.nombre}</h3>
-                    <p className="text-sm text-cyan-400">{est.materia}</p>
+                    <p className="text-sm text-clinica-secondary">{est.materia}</p>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="secondary" className="bg-cyan-600 hover:bg-cyan-700 text-white border-0">
+                    <Button variant="secondary" className="bg-clinica-primary hover:bg-cyan-700 text-white border-0">
                       Asignar Paciente de Sala
                     </Button>
-                    <Button variant="outline" className="border-cyan-500 text-cyan-400 hover:bg-cyan-500/20">
+                    <Button variant="outline" className="border-clinica-secondary text-clinica-secondary hover:bg-clinica-secondary/20">
                       Agendar en Sillón Libre
                     </Button>
                   </div>

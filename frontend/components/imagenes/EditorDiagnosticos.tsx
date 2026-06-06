@@ -232,7 +232,7 @@ export default function EditorDiagnosticos({ imageUrl, diagnosticos, onSave }: E
 
   return (
     <div className="space-y-4">
-      <Card className="bg-gradient-to-br from-indigo-50 to-blue-50 border-indigo-200 shadow-lg">
+      <Card className="bg-gradient-to-br from-indigo-50 to-clinica-primary/10 border-indigo-200 shadow-lg">
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2 text-indigo-800">
             <Palette className="w-5 h-5" /> Editor de Diagnósticos

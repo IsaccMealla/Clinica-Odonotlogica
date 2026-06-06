@@ -84,7 +84,7 @@ export function GraficoFinanciero({ datos }: { datos: any[] }) {
         {/* Luces de fondo (Blobs) para quitar lo aburrido del blanco */}
         <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
           <div className="absolute -top-32 -left-20 w-96 h-96 bg-emerald-50 rounded-full mix-blend-multiply filter blur-3xl opacity-70"></div>
-          <div className="absolute top-10 right-0 w-80 h-80 bg-blue-50 rounded-full mix-blend-multiply filter blur-3xl opacity-60"></div>
+          <div className="absolute top-10 right-0 w-80 h-80 bg-clinica-primary/10 rounded-full mix-blend-multiply filter blur-3xl opacity-60"></div>
         </div>
 
         <div className="flex flex-col lg:flex-row items-center justify-between gap-8 relative z-10 w-full">
@@ -106,7 +106,7 @@ export function GraficoFinanciero({ datos }: { datos: any[] }) {
                 <ShieldCheck className="h-3.5 w-3.5" />
                 Datos Cifrados
               </span>
-              <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm">
+              <span className="inline-flex items-center gap-1.5 bg-clinica-primary/10 text-clinica-primary border border-clinica-primary/20 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm">
                 <ArrowUpRight className="h-3.5 w-3.5" />
                 +12% vs Año Anterior
               </span>

@@ -71,6 +71,24 @@ export default function VisorRadiografiasAvanzado({ imagenes }: Props) {
     if (imagenes && imagenes.length >= 2) {
       setCompareIndex2(imagenes.length - 1)
     }
+
+    // Cargar diagnósticos y snapshots guardados
+    if (imagenes) {
+      const initialDiagnosticos: Record<string, Diagnosis[]> = {};
+      const initialSnapshots: Record<string, string> = {};
+      imagenes.forEach(img => {
+        if (img.diagnosticos_usuario) {
+          if (img.diagnosticos_usuario.diagnosticos) {
+            initialDiagnosticos[img.id.toString()] = img.diagnosticos_usuario.diagnosticos;
+          }
+          if (img.diagnosticos_usuario.snapshot) {
+            initialSnapshots[img.id.toString()] = img.diagnosticos_usuario.snapshot;
+          }
+        }
+      });
+      setDiagnosticosPorImagen(initialDiagnosticos);
+      setSnapshots(initialSnapshots);
+    }
   }, [imagenes])
 
   useEffect(() => {
@@ -94,12 +112,33 @@ export default function VisorRadiografiasAvanzado({ imagenes }: Props) {
     setFullscreenPan({ x: 0, y: 0 });
   }
   
-  const handleSaveDiagnosticos = (diagnosticos: Diagnosis[], snapshotDataUrl?: string) => {
+  const handleSaveDiagnosticos = async (diagnosticos: Diagnosis[], snapshotDataUrl?: string) => {
     const imagenId = imagenesState[index]?.id.toString()
     if (imagenId) {
       setDiagnosticosPorImagen(prev => ({ ...prev, [imagenId]: diagnosticos }))
       if (snapshotDataUrl) {
         setSnapshots(prev => ({ ...prev, [imagenId]: snapshotDataUrl }))
+      }
+
+      try {
+        const res = await fetch(`http://localhost:8000/api/imagenes/${imagenId}/`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('access_token') || ''}`
+          },
+          body: JSON.stringify({
+            diagnosticos_usuario: {
+              diagnosticos: diagnosticos,
+              snapshot: snapshotDataUrl || null
+            }
+          })
+        });
+        if (!res.ok) {
+          console.error("Error al guardar diagnósticos en el backend");
+        }
+      } catch (error) {
+        console.error("Error de red al guardar diagnósticos", error);
       }
     }
   }
@@ -125,7 +164,7 @@ export default function VisorRadiografiasAvanzado({ imagenes }: Props) {
     <div className="w-full space-y-6">
       <Tabs defaultValue="visor" className="w-full">
         <TabsList className="grid w-full grid-cols-3 h-14 bg-white border shadow-md rounded-xl p-1">
-          <TabsTrigger value="visor" className="text-md data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:shadow-md transition-all duration-300">
+          <TabsTrigger value="visor" className="text-md data-[state=active]:bg-clinica-primary/10 data-[state=active]:text-clinica-primary data-[state=active]:shadow-md transition-all duration-300">
             <Maximize2 className="h-4 w-4 mr-2" /> Visor Estándar
           </TabsTrigger>
           <TabsTrigger value="dicom" className="text-md data-[state=active]:bg-purple-50 data-[state=active]:text-purple-700 data-[state=active]:shadow-md transition-all duration-300">
@@ -138,10 +177,10 @@ export default function VisorRadiografiasAvanzado({ imagenes }: Props) {
 
         <TabsContent value="visor" className="mt-6 space-y-4">
           <Card className="shadow-lg border border-slate-200 rounded-lg overflow-hidden">
-            <CardHeader className="bg-gradient-to-r from-slate-50 to-blue-50 border-b border-slate-200 pb-4">
+            <CardHeader className="bg-gradient-to-r from-slate-50 to-clinica-primary/10 border-b border-slate-200 pb-4">
               <div className="flex justify-between items-center">
                 <CardTitle className="text-base font-bold flex items-center gap-2 text-slate-800">
-                  <Maximize2 className="w-5 h-5 text-blue-600" /> Centro de Diagnóstico por Imagen
+                  <Maximize2 className="w-5 h-5 text-clinica-primary" /> Centro de Diagnóstico por Imagen
                 </CardTitle>
                 {viewMode === 'galeria' && (
                   <Button size="sm" variant={autoPlay ? "default" : "outline"} onClick={() => setAutoPlay(!autoPlay)} className="animate-pulse">
@@ -175,7 +214,7 @@ export default function VisorRadiografiasAvanzado({ imagenes }: Props) {
                             {showImageSelector && (
                               <div className="absolute top-full left-0 right-0 mt-2 bg-slate-800 border border-slate-600 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
                                 {imagenesState.map((img, idx) => (
-                                  <button key={img.id} onClick={() => { setIndex(idx); setShowImageSelector(false) }} className={`w-full text-left px-4 py-2 text-sm transition-colors ${index === idx ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700'}`}>
+                                  <button key={img.id} onClick={() => { setIndex(idx); setShowImageSelector(false) }} className={`w-full text-left px-4 py-2 text-sm transition-colors ${index === idx ? 'bg-clinica-primary text-white' : 'text-slate-300 hover:bg-slate-700'}`}>
                                     {idx + 1}. {img.categoria} - {img.pieza_dental ? `Pieza ${img.pieza_dental}` : 'N/A'}
                                   </button>
                                 ))}
@@ -185,7 +224,7 @@ export default function VisorRadiografiasAvanzado({ imagenes }: Props) {
                         </div>
 
                         <div className="relative w-full flex-1 flex items-center justify-center bg-slate-950 p-6 min-h-[480px]">
-                          <div className="w-full h-full max-w-md max-h-md flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-950 rounded-lg overflow-hidden border border-slate-800 shadow-xl cursor-pointer hover:border-blue-500 transition-all" onDoubleClick={handleDoubleClick} title="Doble clic para pantalla completa">
+                          <div className="w-full h-full max-w-md max-h-md flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-950 rounded-lg overflow-hidden border border-slate-800 shadow-xl cursor-pointer hover:border-clinica-secondary transition-all" onDoubleClick={handleDoubleClick} title="Doble clic para pantalla completa">
                             <img src={imagenesState[index]?.archivo} className="w-full h-full object-contain transition-all duration-500 hover:scale-110" alt="Radiografía" />
                           </div>
                         </div>
@@ -197,7 +236,7 @@ export default function VisorRadiografiasAvanzado({ imagenes }: Props) {
                               <p className="text-xs text-slate-300">🦷 Pieza: {imagenesState[index]?.pieza_dental || 'No especificada'}</p>
                             </div>
                             <div className="text-center bg-black/50 px-4 py-2 rounded-full backdrop-blur-sm border border-slate-700">
-                              <p className="text-sm font-bold text-blue-400">{index + 1}/{imagenesState.length}</p>
+                              <p className="text-sm font-bold text-clinica-secondary">{index + 1}/{imagenesState.length}</p>
                               <p className="text-xs text-slate-400">Imagen</p>
                             </div>
                           </div>
@@ -224,10 +263,10 @@ export default function VisorRadiografiasAvanzado({ imagenes }: Props) {
                     
                     {imagenesState.length > 1 && (
                       <>
-                        <Button variant="secondary" size="icon" className="absolute left-6 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300 bg-blue-600/70 hover:bg-blue-700 text-white transform hover:-translate-x-2 shadow-lg" onClick={anterior}>
+                        <Button variant="secondary" size="icon" className="absolute left-6 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300 bg-clinica-primary/70 hover:bg-clinica-primary/90 text-white transform hover:-translate-x-2 shadow-lg" onClick={anterior}>
                           <ChevronLeft className="w-6 h-6" />
                         </Button>
-                        <Button variant="secondary" size="icon" className="absolute right-6 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300 bg-blue-600/70 hover:bg-blue-700 text-white transform hover:translate-x-2 shadow-lg" onClick={siguiente}>
+                        <Button variant="secondary" size="icon" className="absolute right-6 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300 bg-clinica-primary/70 hover:bg-clinica-primary/90 text-white transform hover:translate-x-2 shadow-lg" onClick={siguiente}>
                           <ChevronRight className="w-6 h-6" />
                         </Button>
                       </>
@@ -259,13 +298,13 @@ export default function VisorRadiografiasAvanzado({ imagenes }: Props) {
                         <ReactCompareSlider itemOne={<ReactCompareSliderImage src={imagenesState[compareIndex1]?.archivo} alt="Antes" />} itemTwo={<ReactCompareSliderImage src={imagenesState[compareIndex2]?.archivo} alt="Después" />} className="rounded-lg shadow-lg border-2 border-slate-300" style={{ height: '500px' }} />
                       </div>
                       <div className="grid grid-cols-2 gap-4 animate-slide-up">
-                        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-300 shadow-md hover:shadow-lg transition-shadow duration-300 transform hover:scale-105 cursor-pointer" onDoubleClick={() => { setIndex(compareIndex1); handleDoubleClick() }}>
+                        <Card className="bg-gradient-to-br from-clinica-primary/10 to-clinica-primary/20 border-blue-300 shadow-md hover:shadow-lg transition-shadow duration-300 transform hover:scale-105 cursor-pointer" onDoubleClick={() => { setIndex(compareIndex1); handleDoubleClick() }}>
                           <CardHeader className="pb-2">
-                            <CardTitle className="text-sm text-blue-800 flex items-center gap-2"><span className="text-xl">📅</span> Antes</CardTitle>
+                            <CardTitle className="text-sm text-clinica-primary flex items-center gap-2"><span className="text-xl">📅</span> Antes</CardTitle>
                           </CardHeader>
                           <CardContent>
-                            <p className="text-xs text-blue-700 font-semibold">{imagenesState[compareIndex1]?.fecha_adquisicion ? new Date(imagenesState[compareIndex1].fecha_adquisicion).toLocaleDateString('es-ES') : 'N/A'}</p>
-                            <p className="text-xs text-blue-600 mt-1">Categoría: {imagenesState[compareIndex1]?.categoria}</p>
+                            <p className="text-xs text-clinica-primary font-semibold">{imagenesState[compareIndex1]?.fecha_adquisicion ? new Date(imagenesState[compareIndex1].fecha_adquisicion).toLocaleDateString('es-ES') : 'N/A'}</p>
+                            <p className="text-xs text-clinica-primary mt-1">Categoría: {imagenesState[compareIndex1]?.categoria}</p>
                           </CardContent>
                         </Card>
                         <Card className="bg-gradient-to-br from-green-50 to-emerald-100 border-green-300 shadow-md hover:shadow-lg transition-shadow duration-300 transform hover:scale-105 cursor-pointer" onDoubleClick={() => { setIndex(compareIndex2); handleDoubleClick() }}>
@@ -274,7 +313,7 @@ export default function VisorRadiografiasAvanzado({ imagenes }: Props) {
                           </CardHeader>
                           <CardContent>
                             <p className="text-xs text-green-700 font-semibold">{imagenesState[compareIndex2]?.fecha_adquisicion ? new Date(imagenesState[compareIndex2].fecha_adquisicion).toLocaleDateString('es-ES') : 'N/A'}</p>
-                            <p className="text-xs text-green-600 mt-1">Categoría: {imagenesState[compareIndex2]?.categoria}</p>
+                            <p className="text-xs text-clinica-secondary mt-1">Categoría: {imagenesState[compareIndex2]?.categoria}</p>
                           </CardContent>
                         </Card>
                       </div>
@@ -323,17 +362,17 @@ export default function VisorRadiografiasAvanzado({ imagenes }: Props) {
                 <TabsContent value="timeline" className="animate-fade-in">
                   <div className="space-y-4">
                     <div className="relative pl-8">
-                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-blue-400 via-purple-400 to-pink-400 rounded-full"></div>
+                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-clinica-secondary via-purple-400 to-pink-400 rounded-full"></div>
                       {imagenesState.length > 0 ? (
                         <div className="space-y-6">
                           {imagenesState.map((imagen, idx) => {
                             const diags = diagnosticosPorImagen[imagen.id?.toString()] || []
                             return (
                               <div key={imagen.id} className="relative pl-4 group cursor-pointer animate-fade-in" style={{ animationDelay: `${idx * 100}ms` }} onClick={() => setIndex(idx)}>
-                                <div className="absolute -left-5 top-1 w-6 h-6 bg-blue-500 rounded-full border-4 border-white shadow-lg group-hover:scale-125 transition-transform duration-300 animate-pulse-glow flex items-center justify-center">
+                                <div className="absolute -left-5 top-1 w-6 h-6 bg-clinica-primary/100 rounded-full border-4 border-white shadow-lg group-hover:scale-125 transition-transform duration-300 animate-pulse-glow flex items-center justify-center">
                                   {diags.length > 0 && <span className="text-xs text-white font-bold">{diags.length}</span>}
                                 </div>
-                                <Card className={`border-l-4 ${diags.length > 0 ? 'border-l-emerald-500 bg-gradient-to-r from-emerald-50 to-transparent' : 'border-l-blue-500 bg-gradient-to-r from-blue-50 to-transparent'} hover:shadow-lg transition-all duration-300 transform group-hover:translate-x-2`}>
+                                <Card className={`border-l-4 ${diags.length > 0 ? 'border-l-emerald-500 bg-gradient-to-r from-emerald-50 to-transparent' : 'border-l-clinica-secondary bg-gradient-to-r from-clinica-primary/10 to-transparent'} hover:shadow-lg transition-all duration-300 transform group-hover:translate-x-2`}>
                                   <CardHeader className="pb-2">
                                     <div className="flex items-start justify-between">
                                       <div className="space-y-1">
@@ -341,7 +380,7 @@ export default function VisorRadiografiasAvanzado({ imagenes }: Props) {
                                         <p className="text-xs text-slate-600">Pieza: {imagen.pieza_dental || 'No especificada'}</p>
                                       </div>
                                       <div className="text-right">
-                                        <p className="text-xs font-bold text-blue-600">{idx + 1}/{imagenesState.length}</p>
+                                        <p className="text-xs font-bold text-clinica-primary">{idx + 1}/{imagenesState.length}</p>
                                       </div>
                                     </div>
                                   </CardHeader>

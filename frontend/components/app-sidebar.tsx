@@ -3,9 +3,9 @@
 // FILE: frontend/components/app-sidebar.tsx
 import { useEffect, useState } from "react"
 import { loadMe } from '@/lib/permissions'
-import { 
-  Calendar, Home, Users, Settings, Syringe, 
-  BarChart3, UserCog, ClipboardList, UserCheck, Wrench, Shield, BookOpen
+import {
+  Calendar, Home, Users, Settings, Syringe,
+  BarChart3, UserCog, ClipboardList, UserCheck, Wrench, Shield, BookOpen, FileText
 } from "lucide-react"
 import Link from "next/link"
 import {
@@ -30,10 +30,11 @@ const items = [
   { title: "Reportes 3D", url: "/reportes", icon: BarChart3, roles: ["ADMIN", "DOCENTE"] },
   { title: "Récord Académico", url: "/academico", icon: BookOpen, roles: ["ADMIN", "ESTUDIANTE"] },
   { title: "Mantenimiento", url: "/mantenimiento", icon: Wrench, roles: ["ADMIN", "DOCENTE"] },
-  { title: "Usuarios", url: "/usuarios", icon: UserCog, roles: ["ADMIN"] }, 
+  { title: "Usuarios", url: "/usuarios", icon: UserCog, roles: ["ADMIN"] },
+  { title: "Auditoría", url: "/auditoria", icon: FileText, roles: ["ADMIN"] },
   { title: "Configuración", url: "/configuracion", icon: Settings, roles: ["ADMIN", "DOCENTE"] },
   { title: "Gestión de Roles", url: "/gestion-roles", icon: Shield, roles: ["ADMIN"] },
-  { title: "⚙️ Panel de Calidad (QA)", url: "/admin/qa", icon: Settings, roles: ["ADMIN"] },
+  { title: "Panel de Calidad (QA)", url: "/admin/qa", icon: Settings, roles: ["ADMIN"] },
 ]
 
 export function AppSidebar() {
@@ -41,11 +42,11 @@ export function AppSidebar() {
 
   useEffect(() => {
     // Intenta cargar datos del usuario desde backend y actualizar localStorage
-    (async ()=>{
+    (async () => {
       const me = await loadMe()
       const role = me?.rol || localStorage.getItem('user_role')
       console.log('Rol detectado en Sidebar:', role)
-      if(role) setUserRole(role.toUpperCase())
+      if (role) setUserRole(role.toUpperCase())
     })()
   }, [])
 
@@ -60,7 +61,7 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="text-lg font-bold text-primary mb-4 mt-2">
+          <SidebarGroupLabel className="text-lg font-bold text-clinica-primary mb-4 mt-2">
             Clinica Dental Pro
           </SidebarGroupLabel>
           <SidebarGroupContent>
@@ -69,7 +70,7 @@ export function AppSidebar() {
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <Link href={item.url} className="text-base py-5">
-                      <item.icon className={`w-5 h-5 ${item.title === "Mis Pacientes" ? "text-clinica-secondary" : ""}`} />
+                      <item.icon className={`w-5 h-5 ${item.title === "Mis Pacientes" ? "text-clinica-secondary" : "text-clinica-primary group-hover:text-clinica-secondary"}`} />
                       <span>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>

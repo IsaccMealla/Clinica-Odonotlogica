@@ -63,7 +63,7 @@ export function TablaPacientes({ pacientesIniciales, onRefresh }: TablaPacientes
         }
         renderRow={(paciente:any) => (
           <>
-            <td className="font-mono text-sm font-semibold text-blue-700 dark:text-blue-400 px-4 py-4">{paciente.ci}</td>
+            <td className="font-mono text-sm font-semibold text-clinica-primary dark:text-clinica-secondary px-4 py-4">{paciente.ci}</td>
             <td className="font-medium px-4 py-4">
               <div className="flex flex-col gap-1">
                 <span>{paciente.nombres} {paciente.apellido_paterno} {paciente.apellido_materno}</span>

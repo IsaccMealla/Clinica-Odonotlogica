@@ -361,10 +361,9 @@ class ImagenClinicaSerializer(serializers.ModelSerializer):
         model = ImagenClinica
         fields = [
             'id', 'paciente', 'archivo', 'categoria', 
-            'pieza_dental', 'descripcion', 'fecha_adquisicion'
+            'pieza_dental', 'descripcion', 'fecha_adquisicion',
+            'resultados_ia', 'diagnosticos_usuario'
            ]
-        # ESTO ES LO MÁS IMPORTANTE:
-        # Quitamos 'estudiante' de los campos requeridos en el POST
         read_only_fields = ['id', 'estudiante', 'fecha_adquisicion']
 
 

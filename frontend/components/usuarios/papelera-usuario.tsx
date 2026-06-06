@@ -162,7 +162,7 @@ export function PapeleraUsuario({
                       <Button 
                         variant="ghost" 
                         size="sm" 
-                        className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                        className="text-clinica-secondary hover:text-green-700 hover:bg-clinica-secondary/10"
                         onClick={() => handleRestaurar(user.id)}
                         disabled={cargando}
                       >

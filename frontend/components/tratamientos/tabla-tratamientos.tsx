@@ -17,7 +17,7 @@ export function TablaTratamientos({ tratamientosIniciales, onRefresh }: TablaTra
   const getEstadoBadge = (estado: string) => {
     switch (estado) {
       case 'EN_PROGRESO':
-        return <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">En Progreso</span>
+        return <span className="px-3 py-1 bg-clinica-primary/20 text-clinica-primary rounded-full text-xs font-medium">En Progreso</span>
       case 'FINALIZADO':
         return <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">Finalizado</span>
       case 'DERIVADO':
@@ -64,8 +64,8 @@ export function TablaTratamientos({ tratamientosIniciales, onRefresh }: TablaTra
           <>
             <td className="px-6 py-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
-                  <Activity className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <div className="p-2 bg-clinica-primary/10 dark:bg-blue-900/30 rounded-lg">
+                  <Activity className="w-5 h-5 text-clinica-primary dark:text-clinica-secondary" />
                 </div>
                 <div>
                   <p className="font-medium text-gray-900 dark:text-white">{tratamiento.nombre_tratamiento}</p>
@@ -87,7 +87,7 @@ export function TablaTratamientos({ tratamientosIniciales, onRefresh }: TablaTra
             <td className="px-6 py-4 text-right space-x-2">
               <button
                 onClick={() => router.push(`/tratamientos/${tratamiento.id}`)}
-                className="text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-md transition-colors text-xs font-medium inline-flex items-center gap-1"
+                className="text-clinica-primary hover:text-clinica-primary bg-clinica-primary/10 hover:bg-clinica-primary/20 px-3 py-1.5 rounded-md transition-colors text-xs font-medium inline-flex items-center gap-1"
               >
                 <FileText className="w-4 h-4" />
                 Avances

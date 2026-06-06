@@ -68,7 +68,7 @@ function ModalCambiarEstadoTratamiento({
             <select 
               value={nuevoEstado} 
               onChange={(e) => setNuevoEstado(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-clinica-secondary outline-none"
             >
               <option value="EN_PROGRESO">🔄 En Progreso</option>
               <option value="FINALIZADO">✅ Finalizado con Éxito</option>
@@ -80,7 +80,7 @@ function ModalCambiarEstadoTratamiento({
             <button type="button" onClick={onClose} className="px-3 py-2 text-gray-600 bg-gray-100 rounded-lg text-sm font-medium hover:bg-gray-200">
               Cancelar
             </button>
-            <button type="submit" disabled={cargando} className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center gap-2">
+            <button type="submit" disabled={cargando} className="px-3 py-2 bg-clinica-primary text-white rounded-lg text-sm font-medium hover:bg-clinica-primary/90 flex items-center gap-2">
               {cargando && <Loader2 className="w-4 h-4 animate-spin" />}
               Guardar Estado
             </button>
@@ -151,7 +151,7 @@ function TarjetaSesion({ avance, onActualizar, rolUsuario }: { avance: any, onAc
       <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all">
         <div className="flex justify-between items-start mb-3">
           <div className="flex items-center gap-2 mt-1">
-            <Calendar className="w-4 h-4 text-blue-500" />
+            <Calendar className="w-4 h-4 text-clinica-primary" />
             <span className="text-sm font-bold text-gray-800 capitalize">
               {formatearFecha(avance.fecha_sesion || avance.fecha)}
             </span>
@@ -179,7 +179,7 @@ function TarjetaSesion({ avance, onActualizar, rolUsuario }: { avance: any, onAc
             )}
             
             <div className="flex gap-1 ml-2 border-l pl-2">
-              <button onClick={() => setModalEditarAbierto(true)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg">
+              <button onClick={() => setModalEditarAbierto(true)} className="p-1.5 text-gray-400 hover:text-clinica-primary hover:bg-clinica-primary/10 rounded-lg">
                 <Edit className="w-4 h-4" />
               </button>
               <button onClick={handleEliminar} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
@@ -310,13 +310,13 @@ export default function DetalleTratamientoPage() {
       case 'FINALIZADO': return { color: 'bg-green-100 text-green-700', texto: 'Finalizado' }
       case 'DERIVADO': return { color: 'bg-purple-100 text-purple-700', texto: 'Derivado' }
       case 'ABANDONADO': return { color: 'bg-gray-200 text-gray-700', texto: 'Abandonado' }
-      default: return { color: 'bg-blue-100 text-blue-700', texto: 'En Progreso' }
+      default: return { color: 'bg-clinica-primary/20 text-clinica-primary', texto: 'En Progreso' }
     }
   }
 
   if (cargando) return (
     <div className="flex flex-col items-center justify-center min-h-[60vh]">
-      <Loader2 className="w-10 h-10 animate-spin text-blue-600 mb-4" />
+      <Loader2 className="w-10 h-10 animate-spin text-clinica-primary mb-4" />
       <p className="text-gray-500 font-medium">Cargando expediente...</p>
     </div>
   )
@@ -342,7 +342,7 @@ export default function DetalleTratamientoPage() {
               </span>
             </div>
             <p className="text-gray-500 flex items-center gap-2 mt-1 font-medium text-sm">
-              <User className="w-4 h-4 text-blue-500" /> 
+              <User className="w-4 h-4 text-clinica-primary" /> 
               {tratamiento.nombre_paciente_real} 
               <span className="text-gray-300">|</span> Pieza: {tratamiento.diente_pieza || 'N/A'}
             </p>
@@ -354,7 +354,7 @@ export default function DetalleTratamientoPage() {
           onClick={() => setModalEstadoAbierto(true)}
           className="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-lg text-sm font-semibold transition-colors shadow-sm"
         >
-          <RefreshCw className="w-4 h-4 text-blue-600" />
+          <RefreshCw className="w-4 h-4 text-clinica-primary" />
           Cambiar Estado
         </button>
       </div>
@@ -363,7 +363,7 @@ export default function DetalleTratamientoPage() {
         <div className="lg:col-span-2 space-y-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-5 rounded-2xl shadow-sm border border-gray-200 gap-4">
             <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-              <Clock className="w-5 h-5 text-blue-600" /> Sesiones Clínicas
+              <Clock className="w-5 h-5 text-clinica-primary" /> Sesiones Clínicas
             </h2>
             {/* Solo permitimos nuevos avances si está EN_PROGRESO */}
             {tratamiento.estado === 'EN_PROGRESO' && (
@@ -388,7 +388,7 @@ export default function DetalleTratamientoPage() {
         <div className="space-y-6">
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
             <h3 className="font-bold text-gray-900 mb-5 flex items-center gap-2 border-b pb-3">
-              <FileText className="w-5 h-5 text-blue-600" /> Resumen del Caso
+              <FileText className="w-5 h-5 text-clinica-primary" /> Resumen del Caso
             </h3>
             <div className="space-y-5 text-sm">
               <div className="flex flex-col gap-1 border-b border-gray-50 pb-3">
@@ -403,7 +403,7 @@ export default function DetalleTratamientoPage() {
                 <span className="text-gray-400 text-xs font-semibold tracking-wider flex items-center gap-1">
                   <GraduationCap className="w-3.5 h-3.5" /> Estudiante Asignado
                 </span>
-                <span className="font-bold text-blue-700 capitalize">
+                <span className="font-bold text-clinica-primary capitalize">
                    {tratamiento.nombre_estudiante_real}
                 </span>
               </div>

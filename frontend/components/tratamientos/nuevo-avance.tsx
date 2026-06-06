@@ -104,7 +104,7 @@ export function NuevoAvance({ tratamientoId, onAvanceCreado }: NuevoAvanceProps)
     <>
       <button 
         onClick={() => setIsOpen(true)} 
-        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 shadow-md transition-all active:scale-95"
+        className="bg-clinica-primary hover:bg-clinica-primary/90 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 shadow-md transition-all active:scale-95"
       >
         <Plus className="w-4 h-4" /> Registrar Sesión
       </button>
@@ -142,7 +142,7 @@ export function NuevoAvance({ tratamientoId, onAvanceCreado }: NuevoAvanceProps)
                   value={descripcion} 
                   onChange={(e) => setDescripcion(e.target.value)}
                   placeholder="Ej: Se realizó aislamiento absoluto y apertura cameral..."
-                  className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none dark:bg-gray-700 dark:border-gray-600 dark:text-white resize-none text-sm transition-all"
+                  className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-clinica-secondary outline-none dark:bg-gray-700 dark:border-gray-600 dark:text-white resize-none text-sm transition-all"
                 />
               </div>
 
@@ -152,9 +152,9 @@ export function NuevoAvance({ tratamientoId, onAvanceCreado }: NuevoAvanceProps)
                 </label>
                 <div 
                   onClick={() => fileInputRef.current?.click()} 
-                  className="border-2 border-dashed border-gray-200 dark:border-gray-600 rounded-2xl p-8 text-center cursor-pointer hover:bg-blue-50 dark:hover:bg-gray-700/50 transition-all group"
+                  className="border-2 border-dashed border-gray-200 dark:border-gray-600 rounded-2xl p-8 text-center cursor-pointer hover:bg-clinica-primary/10 dark:hover:bg-gray-700/50 transition-all group"
                 >
-                  <Upload className="w-10 h-10 text-gray-300 group-hover:text-blue-500 mx-auto mb-2 transition-colors" />
+                  <Upload className="w-10 h-10 text-gray-300 group-hover:text-clinica-primary mx-auto mb-2 transition-colors" />
                   <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Haz clic para seleccionar archivos</p>
                   <input 
                     type="file" 
@@ -169,7 +169,7 @@ export function NuevoAvance({ tratamientoId, onAvanceCreado }: NuevoAvanceProps)
                 {archivos.length > 0 && (
                    <div className="flex gap-2 flex-wrap mt-2">
                       {archivos.map((f, i) => (
-                        <div key={i} className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-800 text-[11px] font-bold">
+                        <div key={i} className="flex items-center gap-2 bg-clinica-primary/10 dark:bg-blue-900/30 text-clinica-primary dark:text-blue-300 px-3 py-1.5 rounded-lg border border-clinica-primary/20 dark:border-clinica-primary text-[11px] font-bold">
                           <ImageIcon className="w-3 h-3" />
                           <span className="truncate max-w-[120px]">{f.name}</span>
                         </div>
@@ -189,7 +189,7 @@ export function NuevoAvance({ tratamientoId, onAvanceCreado }: NuevoAvanceProps)
                 <button 
                   type="submit" 
                   disabled={cargando} 
-                  className="px-8 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-200 dark:shadow-none disabled:bg-blue-300 transition-all active:scale-95"
+                  className="px-8 py-2.5 bg-clinica-primary hover:bg-clinica-primary/90 text-white rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-200 dark:shadow-none disabled:bg-blue-300 transition-all active:scale-95"
                 >
                   {cargando ? (
                     <>

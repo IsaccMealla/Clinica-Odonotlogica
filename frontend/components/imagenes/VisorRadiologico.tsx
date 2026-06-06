@@ -71,9 +71,9 @@ export default function VisorRadiologico({ imagenes }: { imagenes: any[] }) {
 
   return (
     <Card className="w-full shadow-lg border border-slate-200 rounded-lg overflow-hidden">
-      <CardHeader className="bg-gradient-to-r from-slate-50 to-blue-50 border-b border-slate-200 pb-4">
+      <CardHeader className="bg-gradient-to-r from-slate-50 to-clinica-primary/10 border-b border-slate-200 pb-4">
         <CardTitle className="text-base font-bold flex items-center gap-2 text-slate-800">
-          <Maximize2 className="w-5 h-5 text-blue-600" /> 
+          <Maximize2 className="w-5 h-5 text-clinica-primary" /> 
           Centro de Diagnóstico por Imagen
         </CardTitle>
       </CardHeader>
@@ -155,7 +155,7 @@ export default function VisorRadiologico({ imagenes }: { imagenes: any[] }) {
           <div className="grid grid-cols-2 gap-4 mb-6 bg-slate-50 p-4 rounded-lg border">
             <div className="space-y-2">
                 <label className="font-semibold text-slate-700">📸 Imagen Inicial (Pre):</label>
-                <select className="w-full border border-slate-300 p-2.5 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm" onChange={(e) => setImgPre(e.target.value)}>
+                <select className="w-full border border-slate-300 p-2.5 rounded-lg bg-white focus:ring-2 focus:ring-clinica-secondary focus:border-transparent text-sm" onChange={(e) => setImgPre(e.target.value)}>
                   <option value="">Seleccionar imagen...</option>
                   {imagenesState.map(img => (
                     <option key={img.id} value={img.archivo}>
@@ -166,7 +166,7 @@ export default function VisorRadiologico({ imagenes }: { imagenes: any[] }) {
               </div>
               <div className="space-y-2">
                 <label className="font-semibold text-slate-700">📸 Imagen Final (Post):</label>
-                <select className="w-full border border-slate-300 p-2.5 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm" onChange={(e) => setImgPost(e.target.value)}>
+                <select className="w-full border border-slate-300 p-2.5 rounded-lg bg-white focus:ring-2 focus:ring-clinica-secondary focus:border-transparent text-sm" onChange={(e) => setImgPost(e.target.value)}>
                   <option value="">Seleccionar imagen...</option>
                   {imagenesState.map(img => (
                     <option key={img.id} value={img.archivo}>
@@ -178,7 +178,7 @@ export default function VisorRadiologico({ imagenes }: { imagenes: any[] }) {
           </div>
 
           {imgPre && imgPost ? (
-            <div className="border-4 border-blue-200 rounded-lg overflow-hidden shadow-lg bg-black">
+            <div className="border-4 border-clinica-primary/20 rounded-lg overflow-hidden shadow-lg bg-black">
               <ReactCompareSlider
                 itemOne={<ReactCompareSliderImage src={imgPre} alt="Imagen Pre" />}
                 itemTwo={<ReactCompareSliderImage src={imgPost} alt="Imagen Post" />}

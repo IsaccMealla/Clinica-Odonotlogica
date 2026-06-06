@@ -143,7 +143,7 @@ export function NuevoTratamiento({ onTratamientoCreado }: NuevoTratamientoProps)
     <>
       <button 
         onClick={() => setIsOpen(true)}
-        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-sm"
+        className="bg-clinica-primary hover:bg-clinica-primary/90 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-sm"
       >
         <Plus className="w-5 h-5" />
         Nuevo Tratamiento
@@ -169,7 +169,7 @@ export function NuevoTratamiento({ onTratamientoCreado }: NuevoTratamientoProps)
                     required
                     value={formData.paciente}
                     onChange={(e) => setFormData(prev => ({...prev, paciente: e.target.value}))}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none dark:bg-gray-700"
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-clinica-secondary outline-none dark:bg-gray-700"
                   >
                     <option value="">Seleccione...</option>
                     {pacientes.map(p => (
@@ -185,7 +185,7 @@ export function NuevoTratamiento({ onTratamientoCreado }: NuevoTratamientoProps)
                       required
                       value={formData.estudiante}
                       onChange={(e) => setFormData(prev => ({...prev, estudiante: e.target.value}))}
-                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none dark:bg-gray-700"
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-clinica-secondary outline-none dark:bg-gray-700"
                     >
                       <option value="">Seleccione...</option>
                       {estudiantes.map(e => (
@@ -204,7 +204,7 @@ export function NuevoTratamiento({ onTratamientoCreado }: NuevoTratamientoProps)
                   placeholder="Ej: Profilaxis, Exodoncia..."
                   value={formData.nombre_tratamiento}
                   onChange={(e) => setFormData(prev => ({...prev, nombre_tratamiento: e.target.value}))}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none dark:bg-gray-700"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-clinica-secondary outline-none dark:bg-gray-700"
                 />
               </div>
 
@@ -214,7 +214,7 @@ export function NuevoTratamiento({ onTratamientoCreado }: NuevoTratamientoProps)
                 <select 
                   value={formData.diente_pieza}
                   onChange={(e) => setFormData(prev => ({...prev, diente_pieza: e.target.value}))}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none dark:bg-gray-700 appearance-none bg-white"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-clinica-secondary outline-none dark:bg-gray-700 appearance-none bg-white"
                 >
                   <option value="">Seleccione una opción...</option>
                   {opcionesPiezas.map((grupo) => (
@@ -244,7 +244,7 @@ export function NuevoTratamiento({ onTratamientoCreado }: NuevoTratamientoProps)
                 <button 
                   type="submit" 
                   disabled={cargando}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                  className="px-4 py-2 bg-clinica-primary text-white rounded-lg hover:bg-clinica-primary/90 flex items-center gap-2"
                 >
                   {cargando && <Loader2 className="w-4 h-4 animate-spin" />}
                   Guardar Tratamiento

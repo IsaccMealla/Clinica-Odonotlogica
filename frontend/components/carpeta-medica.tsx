@@ -114,7 +114,7 @@ export function CarpetaMedica({ paciente }: { paciente: any }) {
   return (
     <Dialog open={open} onOpenChange={(v) => { setOpen(v); if(!v) setIsEditing(false); }}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="text-blue-600 hover:bg-blue-50">
+        <Button variant="ghost" size="icon" className="text-clinica-primary hover:bg-clinica-primary/10">
           <ClipboardList className="h-4 w-4" />
         </Button>
       </DialogTrigger>
@@ -126,7 +126,7 @@ export function CarpetaMedica({ paciente }: { paciente: any }) {
           <div className="flex justify-between items-center">
             <div>
               <DialogTitle className="text-2xl font-bold flex items-center gap-2">
-                <ClipboardList className="text-blue-600 h-6 w-6" />
+                <ClipboardList className="text-clinica-primary h-6 w-6" />
                 Expediente: {paciente.nombres} {paciente.apellido_paterno}
               </DialogTitle>
               
@@ -147,7 +147,7 @@ export function CarpetaMedica({ paciente }: { paciente: any }) {
                   toast.success("Carpeta médica descargada")
                 }} 
                 variant="outline"
-                className="text-blue-600 hover:bg-blue-50"
+                className="text-clinica-primary hover:bg-clinica-primary/10"
                 title="Descargar Carpeta Médica en PDF"
               >
                 <Download className="mr-2 h-4 w-4" />
@@ -207,7 +207,7 @@ export function CarpetaMedica({ paciente }: { paciente: any }) {
                     </div>
                   </Section>
 
-                  <Section title="Sistémicos" icon={<HeartPulse className="text-blue-600 h-4 w-4"/>}>
+                  <Section title="Sistémicos" icon={<HeartPulse className="text-clinica-primary h-4 w-4"/>}>
                     <div className="grid grid-cols-2 gap-4">
                       {['bajo_tratamiento_medico', 'toma_medicamentos', 'intervencion_quirurgica', 'diabetes', 'problemas_renales', 'problemas_corazon', 'hepatitis', 'aftas_herpes', 'consumo_drogas', 'enfermedades_venereas', 'vih_positivo', 'ulcera_gastrica', 'fiebre_reumatica', 'asma'].map(f => (
                         <CheckWithObs disabled={!isEditing} key={f} label={f} section="personales" field={f} obsField={`${f}_obs`} data={data} onCheck={handleCheckChange} onText={handleInputChange} />
@@ -263,7 +263,7 @@ export function CarpetaMedica({ paciente }: { paciente: any }) {
         <div className="p-4 border-t bg-white shrink-0 flex justify-end gap-3">
           <Button variant="outline" onClick={() => setOpen(false)}>Cerrar</Button>
           {isEditing && (
-            <Button onClick={guardarAntecedentes} disabled={loading} className="bg-blue-600 hover:bg-blue-700 min-w-[140px]">
+            <Button onClick={guardarAntecedentes} disabled={loading} className="bg-clinica-primary hover:bg-clinica-primary/90 min-w-[140px]">
               {loading ? "Guardando..." : "Guardar Cambios"}
             </Button>
           )}

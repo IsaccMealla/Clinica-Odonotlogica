@@ -21,9 +21,9 @@ export default function CalendarioAgenda({ citas, onCitaUpdate }: CalendarioAgen
   const getEstadoColor = (estado: string) => {
     switch (estado) {
       case 'RESERVADA': return 'bg-yellow-500'
-      case 'CONFIRMADA': return 'bg-blue-500'
+      case 'CONFIRMADA': return 'bg-clinica-primary/100'
       case 'EN_ESPERA': return 'bg-orange-500'
-      case 'ATENDIENDO': return 'bg-green-500'
+      case 'ATENDIENDO': return 'bg-clinica-secondary/100'
       case 'NO_ASISTIO': return 'bg-red-500'
       default: return 'bg-gray-500'
     }

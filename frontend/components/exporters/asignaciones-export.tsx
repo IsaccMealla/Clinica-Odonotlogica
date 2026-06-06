@@ -69,7 +69,7 @@ export function AsignacionesExport({ asignaciones }: AsignacionesExportProps) {
           onClick={() => handleExport(exportAsignacionesExcel, "Excel")}
           disabled={exporting}
         >
-          <Sheet className="mr-2 h-4 w-4 text-green-500" />
+          <Sheet className="mr-2 h-4 w-4 text-clinica-secondary" />
           <span>Listado Asignaciones (Excel)</span>
         </DropdownMenuItem>
       </DropdownMenuContent>

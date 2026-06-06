@@ -137,7 +137,7 @@ export function DashboardEstudiante() {
                 <div>
                   <div className="flex justify-between mb-2">
                     <span className="text-sm font-medium">Progreso de Cupo</span>
-                    <span className="text-sm font-bold text-blue-600">{asignacion.porcentaje_avance.toFixed(0)}%</span>
+                    <span className="text-sm font-bold text-clinica-primary">{asignacion.porcentaje_avance.toFixed(0)}%</span>
                   </div>
                   <Progress value={asignacion.porcentaje_avance} className="h-2" />
                   <p className="text-xs text-gray-500 mt-2">
@@ -149,8 +149,8 @@ export function DashboardEstudiante() {
                 <div className="flex items-center gap-2">
                   {asignacion.estado === 'ACTIVO' ? (
                     <>
-                      <CheckCircle2 className="w-4 h-4 text-green-600" />
-                      <span className="text-sm text-green-600 font-medium">Activo</span>
+                      <CheckCircle2 className="w-4 h-4 text-clinica-secondary" />
+                      <span className="text-sm text-clinica-secondary font-medium">Activo</span>
                     </>
                   ) : (
                     <>
@@ -191,7 +191,7 @@ export function DashboardEstudiante() {
             <Card key={solicitud.id} className="flex items-center justify-between p-4">
               <div className="flex items-center gap-3">
                 {solicitud.estado === 'APROBADO' ? (
-                  <CheckCircle2 className="w-5 h-5 text-green-600" />
+                  <CheckCircle2 className="w-5 h-5 text-clinica-secondary" />
                 ) : solicitud.estado === 'RECHAZADO' ? (
                   <AlertCircle className="w-5 h-5 text-red-600" />
                 ) : (

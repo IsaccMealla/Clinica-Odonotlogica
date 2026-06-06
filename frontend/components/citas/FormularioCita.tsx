@@ -291,7 +291,7 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-blue-600 hover:bg-blue-700">
+        <Button className="bg-clinica-primary hover:bg-clinica-primary/90 text-white">
           <Plus className="w-4 h-4 mr-2" />
           {citaEditar ? 'Editar Cita' : 'Nueva Cita'}
         </Button>
@@ -467,7 +467,7 @@ export function FormularioCita({ onCitaCreated, citaEditar, citasExistentes = []
               pacienteId={formData.paciente}
               pacienteNombre="Paciente"
               disabled={loading}
-              className="bg-green-600 hover:bg-green-700 text-white min-w-[120px]"
+              className="bg-clinica-secondary hover:bg-clinica-secondary/90 text-white min-w-[120px]"
               onAccionPermitida={() => {
                 const fakeEvent = { preventDefault: () => { } } as React.FormEvent;
                 handleSubmit(fakeEvent);

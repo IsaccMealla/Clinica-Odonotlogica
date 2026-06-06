@@ -14,7 +14,7 @@ export function VerPaciente({ paciente }: { paciente: any }) {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950">
+        <Button variant="ghost" size="icon" className="hover:text-clinica-primary hover:bg-clinica-primary/10 dark:hover:bg-blue-950">
           <Eye className="h-4 w-4" />
           <span className="sr-only">Ver detalles</span>
         </Button>

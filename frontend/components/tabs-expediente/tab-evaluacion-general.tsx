@@ -22,8 +22,8 @@ function BotonSwitch({
       role="switch"
       aria-checked={checked}
       onClick={() => onCheckedChange(!checked)}
-      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-        checked ? 'bg-blue-600' : 'bg-slate-300'
+      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-clinica-secondary focus:ring-offset-2 ${
+        checked ? 'bg-clinica-primary' : 'bg-slate-300'
       }`}
     >
       <span
@@ -225,7 +225,7 @@ export function TabEvaluacionGeneral({ formData, onChange, paciente }: TabEvalua
             <Input value={examen.consciencia || ''} onChange={(e) => handleTextChange('examen_clinico_fisico', 'consciencia', e.target.value)} />
           </div>
           
-          <div className="flex items-center space-x-4 mt-8 p-4 bg-blue-50/50 border border-blue-100 rounded-xl hover:bg-blue-50 transition-colors">
+          <div className="flex items-center space-x-4 mt-8 p-4 bg-clinica-primary/10/50 border border-clinica-primary/20 rounded-xl hover:bg-clinica-primary/10 transition-colors">
             <BotonSwitch checked={examen.orientacion_etp || false} onCheckedChange={(c: boolean) => onChange('examen_clinico_fisico', 'orientacion_etp', c)} />
             <div className="space-y-0.5">
               <Label className="cursor-pointer font-bold text-slate-700 text-base">Paciente Orientado (ETP)</Label>
@@ -292,7 +292,7 @@ export function TabEvaluacionGeneral({ formData, onChange, paciente }: TabEvalua
             { id: 'disminucion_apertura', label: 'Disminución de apertura' },
             { id: 'dolor_apertura', label: 'Dolor a la apertura' },
           ].map((item) => (
-            <div key={item.id} className="space-y-2 p-4 border rounded-xl bg-slate-50 transition-all hover:border-blue-200">
+            <div key={item.id} className="space-y-2 p-4 border rounded-xl bg-slate-50 transition-all hover:border-clinica-primary/20">
               <div className="flex items-center space-x-3">
                 <BotonSwitch 
                   checked={examen[item.id] || false} 
@@ -305,7 +305,7 @@ export function TabEvaluacionGeneral({ formData, onChange, paciente }: TabEvalua
                   placeholder={`Observaciones de ${item.label.toLowerCase()}...`} 
                   value={examen[`${item.id}_obs`] || ''} 
                   onChange={(e) => handleTextChange('examen_clinico_fisico', `${item.id}_obs`, e.target.value)} 
-                  className="mt-3 text-sm bg-white border-blue-100 focus-visible:ring-blue-500" 
+                  className="mt-3 text-sm bg-white border-clinica-primary/20 focus-visible:ring-clinica-secondary" 
                 />
               )}
             </div>
@@ -486,7 +486,7 @@ export function TabEvaluacionGeneral({ formData, onChange, paciente }: TabEvalua
           </div>
 
           {/* Métodos Anticonceptivos */}
-          <div className="space-y-4 p-4 bg-blue-50/30 border border-blue-100 rounded-xl">
+          <div className="space-y-4 p-4 bg-clinica-primary/10/30 border border-clinica-primary/20 rounded-xl">
             <div className="flex items-center space-x-4">
               <BotonSwitch 
                 id="toma_anticonceptivos"

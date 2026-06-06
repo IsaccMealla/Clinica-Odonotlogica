@@ -21,8 +21,8 @@ const DIENTES_DECIDUO_INFERIOR = [85, 84, 83, 82, 81, 71, 72, 73, 74, 75];
 // Tipos de hallazgo por cara del diente
 const HALLAZGOS = [
     { id: 'caries', label: 'Caries', color: 'bg-red-500', textColor: 'text-red-600' },
-    { id: 'obturacion', label: 'Obturación', color: 'bg-blue-500', textColor: 'text-blue-600' },
-    { id: 'sellante', label: 'Sellante', color: 'bg-green-500', textColor: 'text-green-600' },
+    { id: 'obturacion', label: 'Obturación', color: 'bg-clinica-primary/100', textColor: 'text-clinica-primary' },
+    { id: 'sellante', label: 'Sellante', color: 'bg-clinica-secondary/100', textColor: 'text-clinica-secondary' },
     { id: 'corona', label: 'Corona', color: 'bg-yellow-500', textColor: 'text-yellow-600' },
     { id: 'ausente', label: 'Ausente', color: 'bg-slate-800', textColor: 'text-slate-700' },
     { id: 'fractura', label: 'Fractura', color: 'bg-orange-500', textColor: 'text-orange-600' },
@@ -102,11 +102,11 @@ export function OdontogramaDinamico({ pacienteId, esPediatrico, edadPaciente, da
                             </div>
                         </div>
                     ) : (
-                        <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-xl">
-                            <User className="h-5 w-5 text-blue-600" />
+                        <div className="flex items-center gap-2 px-4 py-2 bg-clinica-primary/10 border border-clinica-primary/20 rounded-xl">
+                            <User className="h-5 w-5 text-clinica-primary" />
                             <div>
-                                <span className="font-bold text-blue-800 text-sm">Dentición Permanente</span>
-                                <span className="text-xs text-blue-600 block">{totalPiezas} piezas dentales</span>
+                                <span className="font-bold text-clinica-primary text-sm">Dentición Permanente</span>
+                                <span className="text-xs text-clinica-primary block">{totalPiezas} piezas dentales</span>
                             </div>
                         </div>
                     )}
@@ -117,7 +117,7 @@ export function OdontogramaDinamico({ pacienteId, esPediatrico, edadPaciente, da
                     <button
                         onClick={() => setVista('2d')}
                         className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                            vista === '2d' ? 'bg-white shadow-sm text-blue-700' : 'text-slate-500 hover:text-slate-700'
+                            vista === '2d' ? 'bg-white shadow-sm text-clinica-primary' : 'text-slate-500 hover:text-slate-700'
                         }`}
                     >
                         <Eye className="h-4 w-4" /> Vista 2D
@@ -125,7 +125,7 @@ export function OdontogramaDinamico({ pacienteId, esPediatrico, edadPaciente, da
                     <button
                         onClick={() => setVista('3d')}
                         className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                            vista === '3d' ? 'bg-white shadow-sm text-blue-700' : 'text-slate-500 hover:text-slate-700'
+                            vista === '3d' ? 'bg-white shadow-sm text-clinica-primary' : 'text-slate-500 hover:text-slate-700'
                         }`}
                     >
                         <Rotate3d className="h-4 w-4" /> Vista 3D
@@ -361,7 +361,7 @@ function DienteInteractivo({
                     onClick={onSelect}
                     className={`text-[10px] font-bold px-1 py-0.5 rounded transition-colors cursor-pointer ${
                         isSelected 
-                            ? 'bg-blue-600 text-white' 
+                            ? 'bg-clinica-primary text-white' 
                             : 'text-slate-500 hover:bg-slate-200'
                     }`}
                 >
@@ -425,7 +425,7 @@ function DienteInteractivo({
                     onClick={onSelect}
                     className={`text-[10px] font-bold px-1 py-0.5 rounded transition-colors cursor-pointer ${
                         isSelected 
-                            ? 'bg-blue-600 text-white' 
+                            ? 'bg-clinica-primary text-white' 
                             : 'text-slate-500 hover:bg-slate-200'
                     }`}
                 >

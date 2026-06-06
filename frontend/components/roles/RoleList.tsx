@@ -60,7 +60,7 @@ export default function RoleList(){
         <h2 className="text-2xl font-bold">Gestión de Roles</h2>
         <div className="flex items-center gap-2">
           {hasPermission('manage_roles') && (
-            <button onClick={()=>setOpenCreate(true)} className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded">
+            <button onClick={()=>setOpenCreate(true)} className="inline-flex items-center gap-2 px-3 py-2 bg-clinica-primary text-white rounded">
               <Plus className="w-4 h-4"/> Crear Rol
             </button>
           )}
@@ -99,7 +99,7 @@ export default function RoleList(){
               <div className="text-sm text-gray-500">Permisos habilitados:</div>
             </div>
             <div>
-              <button onClick={()=>setEditing(selected)} className="px-3 py-1 bg-blue-600 text-white rounded">Editar Permisos</button>
+              <button onClick={()=>setEditing(selected)} className="px-3 py-1 bg-clinica-primary text-white rounded">Editar Permisos</button>
             </div>
           </div>
           <div className="mt-4">
@@ -109,7 +109,7 @@ export default function RoleList(){
                 .filter(p => (selected.permissions || {})[p.key])
                 .map(p => (
                   <div key={p.key} className="flex items-center gap-2 p-2 border rounded">
-                    <div className="w-2 h-2 rounded-full bg-green-500" />
+                    <div className="w-2 h-2 rounded-full bg-clinica-secondary/100" />
                     <div>
                       <div className="font-medium">{p.label}</div>
                       <div className="text-xs text-gray-500">{p.key}</div>
@@ -169,7 +169,7 @@ function EditRoleForm({role, onSaved}:{role: Role, onSaved:(r:Role)=>void}){
     <div>
       <PermissionsAccordion initial={permissions} onChange={(s)=>setPermissions(s)} />
       <div className="flex justify-end mt-4">
-        <button onClick={save} className="px-4 py-2 bg-green-600 text-white rounded">Guardar cambios</button>
+        <button onClick={save} className="px-4 py-2 bg-clinica-secondary text-white rounded">Guardar cambios</button>
       </div>
     </div>
   )

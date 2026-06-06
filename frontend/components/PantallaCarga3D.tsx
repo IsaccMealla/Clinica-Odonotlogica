@@ -2,40 +2,39 @@
 
 import { useRef } from "react"
 import { Canvas, useFrame } from "@react-three/fiber"
-import { Float, Sparkles, MeshDistortMaterial, Sphere, Environment } from "@react-three/drei"
+import { Float, Sparkles, Environment } from "@react-three/drei"
 
 // --- Sub-componente Animado ---
 function NucleoHolografico() {
-  const sphereRef = useRef<any>(null);
+  const dienteRef = useRef<any>(null);
 
   useFrame((state) => {
-    if (sphereRef.current) {
-      sphereRef.current.rotation.x = state.clock.elapsedTime * 0.2;
-      sphereRef.current.rotation.y = state.clock.elapsedTime * 0.3;
+    if (dienteRef.current) {
+      dienteRef.current.rotation.y = state.clock.elapsedTime * 0.6;
+      dienteRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.3) * 0.05;
     }
   });
 
   return (
-    <Float speed={2} rotationIntensity={0.5} floatIntensity={1}>
-      <mesh ref={sphereRef}>
-        <Sphere args={[1.5, 64, 64]}>
-          <MeshDistortMaterial 
-            color="#3b82f6" 
-            attach="material" 
-            distort={0.4} 
-            speed={2}     
-            roughness={0.2} 
-            metalness={0.8}
-            wireframe={true} 
-          />
-        </Sphere>
-      </mesh>
-      
-      <Sphere args={[0.8, 32, 32]}>
-        <meshStandardMaterial color="#0ea5e9" emissive="#0ea5e9" emissiveIntensity={2} toneMapped={false} />
-      </Sphere>
+    <Float speed={1.5} rotationIntensity={0.3} floatIntensity={1}>
+      <group ref={dienteRef}>
+        <mesh position={[0, 0.2, 0]}>
+          <sphereGeometry args={[1.2, 64, 64]} />
+          <meshStandardMaterial color="#f8fafc" roughness={0.45} metalness={0.15} />
+        </mesh>
 
-      <Sparkles count={100} scale={5} size={3} speed={0.4} opacity={0.6} color="#60a5fa" />
+        <mesh position={[-0.45, -1.1, 0]} rotation={[Math.PI, 0.1, 0]}>
+          <coneGeometry args={[0.34, 1.4, 32]} />
+          <meshStandardMaterial color="#f8fafc" roughness={0.45} metalness={0.15} />
+        </mesh>
+
+        <mesh position={[0.45, -1.1, 0]} rotation={[Math.PI, -0.1, 0]}>
+          <coneGeometry args={[0.34, 1.4, 32]} />
+          <meshStandardMaterial color="#f8fafc" roughness={0.45} metalness={0.15} />
+        </mesh>
+      </group>
+
+      <Sparkles count={80} scale={5} size={2.5} speed={0.4} opacity={0.65} color="#60a5fa" />
     </Float>
   );
 }
@@ -59,7 +58,7 @@ export default function PantallaCarga3D({
       
       {/* Capa de texto HTML superpuesta */}
       <div className="absolute z-10 bottom-10 flex flex-col items-center">
-        <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 animate-pulse tracking-widest uppercase text-center px-4">
+        <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-clinica-secondary to-emerald-400 animate-pulse tracking-widest uppercase text-center px-4">
           {texto}
         </h2>
         <p className="text-slate-400 text-sm mt-2 font-mono text-center">

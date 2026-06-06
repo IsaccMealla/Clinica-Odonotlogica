@@ -113,10 +113,10 @@ export function DocenteAuthModal({ onAprobado, children, accion, disabled = fals
                 ) : (
                     <div className="py-8 flex flex-col items-center justify-center space-y-4 animate-in zoom-in duration-300">
                         <div className="h-20 w-20 bg-green-100 rounded-full flex items-center justify-center shadow-inner">
-                            <ShieldCheck className="h-12 w-12 text-green-600" />
+                            <ShieldCheck className="h-12 w-12 text-clinica-secondary" />
                         </div>
                         <h3 className="text-xl font-bold text-green-700 text-center">¡Procedimiento firmado exitosamente!</h3>
-                        <p className="text-sm text-green-600 font-medium text-center bg-green-50 px-3 py-1 rounded-full border border-green-200">
+                        <p className="text-sm text-clinica-secondary font-medium text-center bg-clinica-secondary/10 px-3 py-1 rounded-full border border-green-200">
                             Cupo académico registrado para el estudiante.
                         </p>
                     </div>

@@ -19,21 +19,21 @@ export function VerUsuario({ usuario }: { usuario: any }) {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50" title="Ver Detalles">
+        <Button variant="ghost" size="icon" className="hover:text-clinica-primary hover:bg-clinica-primary/10 dark:hover:bg-blue-950/50" title="Ver Detalles">
           <Eye className="h-4 w-4" />
         </Button>
       </DialogTrigger>
       <DialogContent className="w-[95vw] sm:max-w-[400px]">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold flex items-center gap-2">
-            <UserCircle className="h-6 w-6 text-blue-600" />
+            <UserCircle className="h-6 w-6 text-clinica-primary" />
             Perfil de Usuario
           </DialogTitle>
         </DialogHeader>
         
         <div className="space-y-4 py-4">
           <div className="flex flex-col items-center justify-center p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border">
-            <div className="h-16 w-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-2xl font-bold mb-2">
+            <div className="h-16 w-16 bg-clinica-primary/20 text-clinica-primary rounded-full flex items-center justify-center text-2xl font-bold mb-2">
               {usuario.first_name ? usuario.first_name.charAt(0).toUpperCase() : "U"}
             </div>
             <h3 className="font-semibold text-lg">{nombreCompleto}</h3>

@@ -61,7 +61,7 @@ export function TablaUsuarios({
           <>
             <td className="px-4 py-4 font-medium">{`${user.first_name} ${user.last_name}`}</td>
             <td className="px-4 py-4 text-muted-foreground">{user.email}</td>
-            <td className="px-4 py-4"><span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">@{user.username}</span></td>
+            <td className="px-4 py-4"><span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-clinica-primary/20 text-clinica-primary dark:bg-blue-900 dark:text-blue-200">@{user.username}</span></td>
             <td className="px-4 py-4"><span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-400">{user.rol}</span></td>
             <td className="px-4 py-4 text-right">
               <div className="flex justify-end gap-1 flex-wrap">

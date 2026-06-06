@@ -291,7 +291,7 @@ export default function DicomViewer({
           <button onClick={() => { setWindowWidth(150); setWindowCenter(200) }} className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded transition-colors border border-slate-600">Hueso / Dental</button>
           <button onClick={() => { setWindowWidth(50); setWindowCenter(128) }} className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded transition-colors border border-slate-600">Contraste Alto</button>
           <div className="w-px h-5 bg-slate-700 mx-1"></div>
-          <button onClick={() => { setZoom(1); setPanX(0); setPanY(0) }} className="px-3 py-1 bg-blue-900/50 hover:bg-blue-800/80 text-blue-300 text-xs rounded transition-colors border border-blue-800/50">Restaurar Zoom</button>
+          <button onClick={() => { setZoom(1); setPanX(0); setPanY(0) }} className="px-3 py-1 bg-blue-900/50 hover:bg-clinica-primary/80 text-blue-300 text-xs rounded transition-colors border border-clinica-primary/50">Restaurar Zoom</button>
         </div>
         <button onClick={exportToPDF} className="px-4 py-1 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded transition-colors flex items-center gap-2 shadow-md">
           <Printer className="w-4 h-4" /> Exportar a PDF
@@ -323,14 +323,14 @@ export default function DicomViewer({
           <button
             onClick={() => setCurrentImageIdIndex(prev => Math.max(prev - 1, 0))}
             disabled={currentImageIdIndex === 0}
-            className="p-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 text-white rounded-lg transition-colors"
+            className="p-2 bg-clinica-primary hover:bg-clinica-primary/90 disabled:bg-slate-600 text-white rounded-lg transition-colors"
           >
             <ChevronUp className="w-4 h-4" />
           </button>
           <button
             onClick={() => setCurrentImageIdIndex(prev => Math.min(prev + 1, imageIds.length - 1))}
             disabled={currentImageIdIndex === imageIds.length - 1}
-            className="p-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 text-white rounded-lg transition-colors"
+            className="p-2 bg-clinica-primary hover:bg-clinica-primary/90 disabled:bg-slate-600 text-white rounded-lg transition-colors"
           >
             <ChevronDown className="w-4 h-4" />
           </button>

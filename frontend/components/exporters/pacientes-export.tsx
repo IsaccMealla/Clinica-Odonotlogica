@@ -73,7 +73,7 @@ export function PacientesExport({ pacientes, pacienteSeleccionado }: PacientesEx
               onClick={() => handleExport(exportCarpetaMedicaExcel, "Excel")}
               disabled={exporting}
             >
-              <Sheet className="mr-2 h-4 w-4 text-green-500" />
+              <Sheet className="mr-2 h-4 w-4 text-clinica-secondary" />
               <span>Carpeta Médica (Excel)</span>
             </DropdownMenuItem>
           </>
@@ -91,7 +91,7 @@ export function PacientesExport({ pacientes, pacienteSeleccionado }: PacientesEx
               onClick={() => handleExport(exportPacientesExcel, "Excel")}
               disabled={exporting}
             >
-              <Sheet className="mr-2 h-4 w-4 text-green-500" />
+              <Sheet className="mr-2 h-4 w-4 text-clinica-secondary" />
               <span>Listado Pacientes (Excel)</span>
             </DropdownMenuItem>
           </>

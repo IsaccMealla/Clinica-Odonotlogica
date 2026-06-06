@@ -51,7 +51,7 @@ function Barra3D({ position, color, height, label, valor, detalle }: Barra3DProp
           <Html position={[0, height / 2 + 0.5, 0]} center zIndexRange={[100, 0]}>
             <div className="bg-white/95 text-slate-900 text-sm px-4 py-3 rounded-xl shadow-2xl backdrop-blur-sm border border-slate-200 whitespace-nowrap pointer-events-none min-w-[120px] text-center">
               <p className="font-bold text-slate-700 uppercase tracking-wider text-xs">{label}</p>
-              <p className="text-2xl font-black text-blue-600 my-1">{valor}</p>
+              <p className="text-2xl font-black text-clinica-primary my-1">{valor}</p>
               <p className="text-slate-500 font-medium text-xs">{detalle}</p>
             </div>
           </Html>

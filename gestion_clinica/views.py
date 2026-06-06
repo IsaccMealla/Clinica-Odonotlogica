@@ -65,9 +65,21 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 # VIEWSET DE USUARIOS 
 # =========================================================================
 class UsuarioViewSet(viewsets.ModelViewSet):
-    queryset = User.objects.all().order_by('-date_joined')
     serializer_class = UsuarioSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        qs = User.objects.all().order_by('-date_joined')
+        rol = self.request.query_params.get('rol')
+        if rol:
+            qs = qs.filter(rol=rol)
+        return qs
+
+    def paginate_queryset(self, queryset):
+        # Disable pagination if filtering by rol (e.g. for selection dropdowns or admin tables)
+        if self.request.query_params.get('rol'):
+            return None
+        return super().paginate_queryset(queryset)
 
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def me(self, request):
@@ -130,6 +142,13 @@ class PacienteViewSet(viewsets.ModelViewSet):
             
         # Si es ADMIN, DOCENTE o RECEPCIONISTA (y no es superuser), ve todos
         return qs
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        if getattr(user, 'rol', None) == 'ESTUDIANTE':
+            serializer.save(estudiante_asignado=user)
+        else:
+            serializer.save()
 
     # --- NUEVA ACCIÓN: Pacientes específicos del estudiante logueado ---
     @action(detail=False, methods=['get'])
@@ -221,72 +240,6 @@ class PacienteViewSet(viewsets.ModelViewSet):
                 return seccion_data
                 
             # 1. Formularios Base
-            if 'familiares' in data:
-                AntecedentePatologicoFamiliar.objects.update_or_create(
-                    paciente=paciente, defaults=limpiar_datos(data['familiares'])
-                )
-            if 'personales' in data:
-                AntecedentePatologicoPersonal.objects.update_or_create(
-                    paciente=paciente, defaults=limpiar_datos(data['personales'])
-                )
-            if 'no_patologicos' in data:
-                AntecedenteNoPatologicoPersonal.objects.update_or_create(
-                    paciente=paciente, defaults=limpiar_datos(data['no_patologicos'])
-                )
-            if 'ginecologicos' in data:
-                AntecedenteGinecologico.objects.update_or_create(
-                    paciente=paciente, defaults=limpiar_datos(data['ginecologicos'])
-                )
-            
-            # 2. Nuevos Formularios
-            if 'habitos' in data:
-                Habitos.objects.update_or_create(
-                    paciente=paciente, defaults=limpiar_datos(data['habitos'])
-                )
-            if 'antecedentes_periodontales' in data:
-                AntecedentesPeriodontales.objects.update_or_create(
-                    paciente=paciente, defaults=limpiar_datos(data['antecedentes_periodontales'])
-                )
-            if 'examen_periodontal' in data:
-                ExamenPeriodontal.objects.update_or_create(
-                    paciente=paciente, defaults=limpiar_datos(data['examen_periodontal'])
-                )
-            if 'historia_odontopediatrica' in data:
-                HistoriaOdontopediatrica.objects.update_or_create(
-                    paciente=paciente, defaults=limpiar_datos(data['historia_odontopediatrica'])
-                )
-            if 'prostodoncia_removible' in data:
-                ProstodonciaRemovible.objects.update_or_create(
-                    paciente=paciente, defaults=limpiar_datos(data['prostodoncia_removible'])
-                )
-            if 'prostodoncia_fija' in data:
-                ProstodonciaFija.objects.update_or_create(
-                    paciente=paciente, defaults=limpiar_datos(data['prostodoncia_fija'])
-                )
-            if 'protocolo_quirurgico' in data:
-                ProtocoloQuirurgico.objects.update_or_create(
-                    paciente=paciente, defaults=limpiar_datos(data['protocolo_quirurgico'])
-                )
-            if 'examen_clinico_fisico' in data:
-                ExamenClinicoFisico.objects.update_or_create(
-                    paciente=paciente, defaults=limpiar_datos(data['examen_clinico_fisico'])
-                )
-
-            return Response({'message': 'Historial clínico actualizado correctamente'}, status=status.HTTP_200_OK)
-# Función auxiliar para inyectar el ID en cada sección antes de guardar
-            def limpiar_datos(seccion_data):
-                if isinstance(seccion_data, dict):
-                    # Creamos una copia para evitar el error de "QueryDict is immutable"
-                    data_copia = dict(seccion_data)
-                    data_copia.pop('id', None)
-                    data_copia.pop('paciente', None)
-                    
-                    # 👇 AQUÍ ESTÁ LA MAGIA: Inyectamos el usuario automáticamente 👇
-                    estudiante_final = paciente.estudiante_asignado if paciente.estudiante_asignado else request.user
-                    data_copia['estudiante'] = estudiante_final
-                    return data_copia
-                return seccion_data
-                # 1. Formularios Base
             if 'familiares' in data:
                 AntecedentePatologicoFamiliar.objects.update_or_create(
                     paciente=paciente, defaults=limpiar_datos(data['familiares'])
@@ -670,6 +623,17 @@ class CitaViewSet(viewsets.ModelViewSet):
             usuario=self.request.user,
             descripcion='Cita creada por ' + self.request.user.get_full_name()
         )
+        
+        # 🟢 NOTIFICAR AL ESTUDIANTE DE LA NUEVA CITA
+        from notificaciones.models import Notificacion
+        Notificacion.objects.create(
+            usuario_destino=cita.estudiante,
+            titulo=f'📅 Nueva Cita Asignada',
+            mensaje=f'Se te ha asignado una cita con {cita.paciente.nombres} {cita.paciente.apellido_paterno} el {cita.fecha_hora.strftime("%d/%m/%Y %H:%M")} en el {cita.gabinete.nombre}.',
+            tipo='CITA',
+            sonido=True,
+            datos_extra={'cita_id': str(cita.id)}
+        )
 
     @action(detail=True, methods=['post'])
     def check_in(self, request, pk=None):
@@ -692,6 +656,17 @@ class CitaViewSet(viewsets.ModelViewSet):
             tipo_cambio='CHECK_IN',
             usuario=request.user,
             descripcion='Paciente marcado en sala de espera'
+        )
+        
+        # 🟢 NOTIFICAR AL ESTUDIANTE QUE EL PACIENTE LLEGÓ
+        from notificaciones.models import Notificacion
+        Notificacion.objects.create(
+            usuario_destino=cita.estudiante,
+            titulo=f'🔔 Paciente en Espera',
+            mensaje=f'Tu paciente {cita.paciente.nombres} {cita.paciente.apellido_paterno} ya llegó a la clínica y se encuentra en sala de espera.',
+            tipo='CITA',
+            sonido=True,
+            datos_extra={'cita_id': str(cita.id), 'estado': 'EN_ESPERA'}
         )
         
         serializer = self.get_serializer(cita)
@@ -937,6 +912,66 @@ class ImagenClinicaViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         # Asigna automáticamente el estudiante que está logueado
         serializer.save(estudiante=self.request.user)
+
+    @action(detail=True, methods=['post'])
+    def analizar_ia(self, request, pk=None):
+        """
+        Endpoint proxy: Envia la imagen al microservicio FastAPI de IA,
+        recibe el payload JSON y lo almacena en resultados_ia del modelo.
+        POST /api/imagenes/{id}/analizar_ia/
+        """
+        import requests as http_requests
+
+        imagen = self.get_object()
+
+        if not imagen.archivo:
+            return Response(
+                {'error': 'Esta imagen no tiene archivo asociado'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            # Leer archivo binario desde el storage de Django
+            imagen.archivo.open('rb')
+            file_bytes = imagen.archivo.read()
+            imagen.archivo.close()
+
+            # Enviar al microservicio FastAPI
+            response = http_requests.post(
+                'http://localhost:8001/api/v1/predict',
+                files={'file': (imagen.archivo.name, file_bytes, 'image/jpeg')},
+                timeout=30
+            )
+
+            if response.status_code == 200:
+                resultado_ia = response.json()
+
+                # Almacenar el JSON crudo en el campo resultados_ia
+                imagen.resultados_ia = resultado_ia
+                imagen.save(update_fields=['resultados_ia'])
+
+                return Response({
+                    'status': 'ok',
+                    'imagen_id': str(imagen.id),
+                    'paciente_id': str(imagen.paciente_id),
+                    'resultados': resultado_ia
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response(
+                    {'error': f'Error del microservicio IA: {response.status_code}', 'detail': response.text[:500]},
+                    status=status.HTTP_502_BAD_GATEWAY
+                )
+
+        except http_requests.exceptions.ConnectionError:
+            return Response(
+                {'error': 'No se pudo conectar al microservicio de IA. Verifica que este corriendo en el puerto 8001.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+        except Exception as e:
+            return Response(
+                {'error': f'Error interno al analizar imagen: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 # =========================================================================

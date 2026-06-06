@@ -503,7 +503,7 @@ export default function QAAgentPanel() {
               <CardHeader>
                 <CardTitle className="text-sm flex items-center gap-2">
                   {session.estado_general === 'PASA' ? (
-                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    <CheckCircle2 className="h-4 w-4 text-clinica-secondary" />
                   ) : (
                     <AlertCircle className="h-4 w-4 text-red-500" />
                   )}
@@ -519,7 +519,7 @@ export default function QAAgentPanel() {
                     <div className="font-semibold text-green-700">
                       {session.results.filter(r => r.estado === 'PASA').length}
                     </div>
-                    <div className="text-green-600">Pasadas</div>
+                    <div className="text-clinica-secondary">Pasadas</div>
                   </div>
                   <div className="bg-red-100 p-2 rounded">
                     <div className="font-semibold text-red-700">
@@ -575,7 +575,7 @@ export default function QAAgentPanel() {
                     <div key={idx} className="text-xs border-l-2 border-clinica-primary pl-2 pb-2">
                       <div className="flex items-center gap-1">
                         {result.estado === 'PASA' ? (
-                          <CheckCircle2 className="h-3 w-3 text-green-500" />
+                          <CheckCircle2 className="h-3 w-3 text-clinica-secondary" />
                         ) : (
                           <AlertCircle className="h-3 w-3 text-red-500" />
                         )}

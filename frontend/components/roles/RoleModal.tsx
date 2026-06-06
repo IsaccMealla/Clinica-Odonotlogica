@@ -38,7 +38,7 @@ export default function RoleModal({open, onClose, onCreate}:{open:boolean, onClo
           </label>
           <div className="flex justify-end gap-2">
             <button onClick={onClose} className="px-4 py-2 bg-gray-100 rounded">Cancelar</button>
-            <button onClick={submit} className="px-4 py-2 bg-green-500 text-white rounded">Crear</button>
+            <button onClick={submit} className="px-4 py-2 bg-clinica-secondary/100 text-white rounded">Crear</button>
           </div>
         </div>
       </div>

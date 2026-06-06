@@ -195,7 +195,7 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
 
             {cargando || !paciente ? (
                 <div className="flex justify-center items-center py-20">
-                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
+                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-clinica-primary"></div>
                 </div>
             ) : (
             <>
@@ -232,7 +232,7 @@ export default function ExpedientePacientePage({ params }: { params: Promise<{ i
             {/* --- TABS PRINCIPALES (AHORA 6 COLUMNAS) --- */}
             <Tabs defaultValue="historia" className="w-full flex-1 flex flex-col">
 
-                <TabsList className="grid w-full grid-cols-7 h-14 bg-white border shadow-sm rounded-xl p-1">
+                <TabsList className="flex flex-wrap w-full h-auto justify-start bg-white border shadow-sm rounded-xl p-1 gap-1">
                     <TabsTrigger value="historia" className="text-md data-[state=active]:bg-clinica-secondary/10 data-[state=active]:text-clinica-secondary">
                         <FileText className="h-4 w-4 mr-2" /> Historia Clínica
                     </TabsTrigger>

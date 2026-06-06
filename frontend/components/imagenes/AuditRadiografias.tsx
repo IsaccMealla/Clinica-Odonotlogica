@@ -41,7 +41,7 @@ export default function AuditRadiografias() {
       case 'upload':
         return <Badge className="bg-green-100 text-green-800">Cargado</Badge>
       case 'view':
-        return <Badge className="bg-blue-100 text-blue-800">Visualizado</Badge>
+        return <Badge className="bg-clinica-primary/20 text-clinica-primary">Visualizado</Badge>
       default:
         return <Badge className="bg-slate-100 text-slate-800">{action}</Badge>
     }
@@ -51,7 +51,7 @@ export default function AuditRadiografias() {
     return attempted === false ? (
       <span className="text-yellow-600" title="Pendiente de sincronización">⚠️</span>
     ) : (
-      <span className="text-green-600" title="Sincronizado">✓</span>
+      <span className="text-clinica-secondary" title="Sincronizado">✓</span>
     )
   }
 
@@ -59,9 +59,9 @@ export default function AuditRadiografias() {
     <div className="space-y-6">
       {/* Resumen */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+        <Card className="p-4 bg-gradient-to-br from-clinica-primary/10 to-clinica-primary/20 border-clinica-primary/20">
           <div className="space-y-2">
-            <div className="flex items-center gap-2 text-blue-700">
+            <div className="flex items-center gap-2 text-clinica-primary">
               <Activity className="w-5 h-5" />
               <span className="font-semibold">Total de Eventos</span>
             </div>
